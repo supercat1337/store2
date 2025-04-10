@@ -1,4 +1,4 @@
-# Store2
+# Supercat Store2
 
 A lightweight, efficient, and easy-to-use reactive state management system for JavaScript applications.
 
@@ -10,7 +10,7 @@ npm i @supercat1337/store2
 
 ## Overview
 
-Store2 is a reactive state management system for JavaScript applications. It provides a simple and intuitive way to manage and update state in a reactive way, allowing components to automatically re-render when the state changes. It's designed to be flexible and scalable, making it suitable for a wide range of applications, from small web apps to large-scale enterprise systems.
+Supercat Store2 is a reactive state management system for JavaScript applications. It provides a simple and intuitive way to manage and update state in a reactive way, allowing components to automatically re-render when the state changes. It's designed to be flexible and scalable, making it suitable for a wide range of applications, from small web apps to large-scale enterprise systems.
 
 Store2 is based on the concept of "reactive items" which can be atoms, computed values, collections, or reactive props objects. These items can be observed and updated, triggering notifications to dependent components.
 
