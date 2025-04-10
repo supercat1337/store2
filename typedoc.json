@@ -1,0 +1,6 @@
+{
+    "out": "./docs",
+    "plugin": ["typedoc-plugin-missing-exports"],
+    "entryPoints": ["./src/index.js", "./node_modules/@supercat1337/event-emitter/dist/event-emitter.esm.js"],
+    "entryPointStrategy": "expand"
+}
