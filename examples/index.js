@@ -1,6 +1,6 @@
 // @ts-check
 
-import { Atom, batch, Computed } from "./../src/index.js";
+import { Atom, batch, Computed } from "./@supercat1337/store2";
 
 let res = [];
 let output = [];

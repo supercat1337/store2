@@ -1,26 +1,20 @@
 // @ts-check
 
-import { Computed } from "../reactives/computed.js";
-import { UpdateDataRecord } from "../core/UpdateDataRecord.js";
-import {
-    debounce,
-    getAllPropertyDescriptors,
-    isPlainObject,
-} from "../helpers/tools.js";
-import { modeController } from "../services/modeController.js";
-import { getSetOfUsedReactiveItems } from "../services/trackers.js";
-import { Atom } from "../reactives/atom.js";
-import { Collection } from "../reactives/collection.js";
-import { ReactiveProps } from "../reactives/reactiveProps.js";
-import { ReactivePrimitive } from "../reactives/reactivePrimitive.js";
+import { Computed } from '../reactives/Computed.js';
+import { debounce, getAllPropertyDescriptors, isPlainObject } from '../helpers/tools.js';
+import { modeController } from '../services/modeController.js';
+import { getSetOfUsedReactiveItems } from '../services/dependencyTracker.js';
+import { Atom } from '../reactives/Atom.js';
+import { Collection } from '../reactives/Collection.js';
+import { ShallowReactive } from '../reactives/ShallowReactive.js';
 
 /**
  * Automatically tracks and subscribes to changes in reactive items used by the specified function.
  * This allows the function to be re-executed whenever any of its dependencies change, maintaining
  * up-to-date results.
  *
- * @param {(updates?:Map<string, UpdateDataRecord>)=>void} fn - The function to track and reactively execute.
- * @param {Object} [options] - The options for the autorun function.
+ * @param {(updates?:Map<string, import("./../core/UpdateDataRecord.js").UpdateDataRecord>)=>void} fn - The function to track and reactively execute.
+ * @param {object} [options] - The options for the autorun function.
  * @param {string} [options.name] - An optional name for the autorun.
  * @param {number} [options.delay] - The number of milliseconds to delay the execution of the callback function.
  * @param {AbortSignal} [options.signal] - An optional AbortSignal to cancel the autorun.
@@ -55,13 +49,13 @@ import { ReactivePrimitive } from "../reactives/reactivePrimitive.js";
  * ```
  */
 function autorun(fn, options) {
-    let _options = Object.assign(
+    const _options = Object.assign(
         {
             name: undefined,
             delay: 0,
             signal: undefined,
             onError: undefined,
-            type: "autorun",
+            type: 'autorun',
         },
         options
     );
@@ -69,7 +63,7 @@ function autorun(fn, options) {
     if (modeController.untrackMode) {
         throw new Error(
             `Autorun${
-                _options.name ? ` (${_options.name})` : ""
+                _options.name ? ` (${_options.name})` : ''
             }: cannot initialize when untrackMode is on.`
         );
     }
@@ -84,8 +78,8 @@ function autorun(fn, options) {
  * change, allowing for reactive updates based on the data function.
  *
  * @param {()=>any} dataFunction - The function whose reactive dependencies are tracked.
- * @param {(updates?:Map<string, UpdateDataRecord>)=>void} fn - The callback function to execute when tracked dependencies change.
- * @param {Object} [options] - The options for the reaction function.
+ * @param {(updates?:Map<string, import("../core/UpdateDataRecord.js").UpdateDataRecord>)=>void} fn - The callback function to execute when tracked dependencies change.
+ * @param {object} [options] - The options for the reaction function.
  * @param {string} [options.name] - An optional name for the reaction.
  * @param {number} [options.delay] - The number of milliseconds to delay the execution of the callback function.
  * @param {AbortSignal} [options.signal] - An optional signal to abort the reaction.
@@ -124,15 +118,15 @@ function autorun(fn, options) {
  * ```
  */
 function reaction(dataFunction, fn, options) {
-    let _options = Object.assign(
-        { name: undefined, delay: 0, signal: undefined, type: "reaction" },
+    const _options = Object.assign(
+        { name: undefined, delay: 0, signal: undefined, type: 'reaction' },
         options
     );
 
     if (modeController.untrackMode) {
         throw new Error(
             `Reaction${
-                _options.name ? ` (${_options.name})` : ""
+                _options.name ? ` (${_options.name})` : ''
             }: cannot initialize when untrackMode is on.`
         );
     }
@@ -142,24 +136,24 @@ function reaction(dataFunction, fn, options) {
         _options.delay = 0;
     }
 
-    let items;
-    let unsubscribers = [];
+    /** @type {Function[]} */
+    const unsubscribers = [];
 
-    items = getSetOfUsedReactiveItems(dataFunction);
+    const items = getSetOfUsedReactiveItems(dataFunction);
 
-    if (items.size == 0) {
+    if (items.size === 0) {
         throw new Error(
             `Autorun/Reaction${
-                _options.name ? ` (${_options.name})` : ""
+                _options.name ? ` (${_options.name})` : ''
             }: No reactive items found.`
         );
     }
 
-    for (let item of items) {
+    for (const item of items) {
         unsubscribers.push(item.subscribe(fn, _options));
     }
 
-    let unsubscriber = () => {
+    const unsubscriber = () => {
         for (let i = 0; i < unsubscribers.length; i++) {
             unsubscribers[i]();
         }
@@ -172,7 +166,7 @@ function reaction(dataFunction, fn, options) {
  * Automatically calls the given function whenever the given predicate evaluates to true.
  * @param {()=>boolean} predicate - The predicate that should be evaluated.
  * @param {()=>void} fn - The function to be called when the predicate evaluates to true.
- * @param {Object} [options] - Optional options.
+ * @param {object} [options] - Optional options.
  * @param {number} [options.timeout] - The number of milliseconds to wait before timing out.
  * @param {number} [options.delay] - The number of milliseconds to wait before calling the function.
  * @param {AbortSignal} [options.signal] - An AbortSignal to cancel the function call.
@@ -199,21 +193,22 @@ function reaction(dataFunction, fn, options) {
  * ```
  */
 function when(predicate, fn, options) {
-    let computed = new Computed(predicate);
-    let timeout = options?.timeout || 0;
+    const computed = new Computed(predicate);
+    const timeout = options?.timeout || 0;
+    /** @type {ReturnType<typeof setTimeout>|null} */
     let timer;
 
-    let mainUnsubscriber = function () {
+    const mainUnsubscriber = function () {
         if (timer) {
             clearTimeout(timer);
-            timer = undefined;
+            timer = null;
         }
 
         unsubscribe();
         computed.destroy();
     };
 
-    let unsubscribe = computed.subscribe(() => {
+    const unsubscribe = computed.subscribe(() => {
         if (computed.value) {
             //mainUnsubscriber();
             fn();
@@ -232,7 +227,7 @@ function when(predicate, fn, options) {
 /**
  * Waits until the given predicate evaluates to true.
  * @param {()=>boolean} predicate - The predicate that should be evaluated.
- * @param {Object} [options] - Optional options.
+ * @param {object} [options] - Optional options.
  * @param {number} [options.timeout] - The number of milliseconds to wait before timing out.
  * @returns {Promise<void>} A promise that resolves when the predicate evaluates to true.
  * @example
@@ -250,22 +245,23 @@ function when(predicate, fn, options) {
  * ```
  */
 function waitTrue(predicate, options) {
-    return new Promise((resolve) => {
-        let computed = new Computed(predicate);
-        let timeout = options?.timeout || 0;
+    return new Promise(resolve => {
+        const computed = new Computed(predicate);
+        const timeout = options?.timeout || 0;
+        /** @type {ReturnType<typeof setTimeout>|null} */
         let timer;
 
-        let mainUnsubscriber = function () {
+        const mainUnsubscriber = function () {
             if (timer) {
                 clearTimeout(timer);
-                timer = undefined;
+                timer = null;
             }
 
             unsubscribe();
             computed.destroy();
         };
 
-        let unsubscribe = computed.subscribe(() => {
+        const unsubscribe = computed.subscribe(() => {
             if (computed.value) {
                 mainUnsubscriber();
                 resolve();
@@ -316,6 +312,8 @@ function runInAction(fn) {
  * Executes the specified function while batching notifications to reactive items.
  * This is useful for operations that make multiple changes to reactive items, as
  * it prevents the notifications from being sent until all changes have been made.
+ * Supports nested batch calls.
+ *
  * @param {Function} fn - The function to execute while batching notifications.
  * @returns {void}
  * @example
@@ -342,17 +340,12 @@ function runInAction(fn) {
  * ```
  */
 function batch(fn) {
-    let batchMode = modeController.batchMode;
-    modeController.batchMode = true;
-
+    modeController.enterBatch();
     try {
         fn();
-    } catch (e) {
-        modeController.batchMode = batchMode;
-        throw e;
+    } finally {
+        modeController.exitBatch();
     }
-
-    modeController.batchMode = batchMode;
 }
 
 /**
@@ -385,7 +378,7 @@ function batch(fn) {
  * ```
  */
 function untrack(fn) {
-    let untrackMode = modeController.untrackMode;
+    const untrackMode = modeController.untrackMode;
     let result;
     modeController.untrackMode = true;
     try {
@@ -418,7 +411,8 @@ function untrack(fn) {
  * ```
  */
 function getNow(interval = 1000) {
-    let atom = new Atom(0, { name: "now" });
+    const atom = new Atom(0, { name: 'now' });
+    /** @type {ReturnType<typeof setTimeout>} */
     let intervalId;
 
     atom.onHasSubscribers(() => {
@@ -434,6 +428,10 @@ function getNow(interval = 1000) {
         runInAction(() => {
             atom.value = 0;
         });
+    });
+
+    atom.onDestroy(() => {
+        clearInterval(intervalId);
     });
 
     return atom;
@@ -472,7 +470,7 @@ function getNow(interval = 1000) {
  */
 function fromPromise(promise) {
     /** @type {Atom<"pending"|"resolved"|"rejected">} */
-    let stateAtom = new Atom("pending", { name: "fromPromise" });
+    const stateAtom = new Atom('pending', { name: 'fromPromise' });
     /** @type {T} */
     let promiseResult;
 
@@ -481,7 +479,7 @@ function fromPromise(promise) {
 
     /**
      * Executes the appropriate function based on the current state of the promise.
-     * @param {Object} param0 - An object containing the functions to execute for each state.
+     * @param {object} param0 - An object containing the functions to execute for each state.
      * @param {(value: T)=>void} [param0.resolved] - The function to execute when the promise is resolved.
      * @param {(error: Error)=>void} [param0.rejected] - The function to execute when the promise is rejected.
      * @param {()=>void} [param0.pending] - The function to execute when the promise is pending.
@@ -497,7 +495,7 @@ function fromPromise(promise) {
         }
 
         stateAtom.subscribe(() => {
-            if (stateAtom.value === "resolved") {
+            if (stateAtom.value === 'resolved') {
                 try {
                     if (param0.resolved) {
                         param0.resolved(promiseResult);
@@ -507,7 +505,7 @@ function fromPromise(promise) {
                 }
             }
 
-            if (stateAtom.value === "rejected") {
+            if (stateAtom.value === 'rejected') {
                 try {
                     if (param0.rejected) {
                         param0.rejected(promiseError);
@@ -519,13 +517,13 @@ function fromPromise(promise) {
         });
 
         return promise
-            .then((value) => {
+            .then(value => {
                 promiseResult = value;
-                stateAtom.value = "resolved";
+                stateAtom.value = 'resolved';
             })
-            .catch((e) => {
+            .catch(e => {
                 promiseError = e;
-                stateAtom.value = "rejected";
+                stateAtom.value = 'rejected';
             })
             .finally(() => {
                 stateAtom.destroy();
@@ -542,7 +540,7 @@ function fromPromise(promise) {
  * returns a new Atom instance.
  * @template T
  * @param {T} value - The initial value of the Atom.
- * @param {Object} [options] - Options
+ * @param {object} [options] - Options
  * @param {string} [options.name] - The name of Atom.
  * @param {(a:T, b:T)=>boolean} [options.compareFunction] - A function that compares two values to determine if they are equal.
  * @returns {Atom<T>} A new Atom instance with the given value and options.
@@ -565,10 +563,10 @@ function atom(value, options) {
  * Creates a new Computed instance. Computed is a reactive primitive that holds a value that is computed from other reactive values.
  * @template T
  * @param {()=>T} fn - The function that returns the value of the Computed
- * @param {Object} [options] - Options
+ * @param {object} [options] - Options
  * @param {string} [options.name] - The name of Computed.
  * @param {(a:T, b:T)=>boolean} [options.compareFunction] - A function that compares two values to determine if they are equal.
- * @param {boolean} [options.isHardFunction] - Whether the function is a hard function. If true, it prevents calling the function by comparing the string representation of the dependencies.
+ * @param {boolean} [options.smartRecompute] - Whether the function is a hard function. If true, it prevents calling the function by comparing the string representation of the dependencies.
  * @returns {Computed<T>} A new Computed instance with the given function and options.
  * @example
  * ```js
@@ -592,7 +590,7 @@ function computed(fn, options) {
  * returns a new Collection instance.
  * @template T
  * @param {T[]} value - The array to observe.
- * @param {Object} [options] - Options
+ * @param {object} [options] - Options
  * @param {string} [options.name] - The name of Collection object.
  * @param {(a:T, b:T)=>boolean} [options.compareFunction] - A function that compares two values to determine if they are equal.
  * @returns {T[]} The observed array
@@ -609,21 +607,21 @@ function computed(fn, options) {
  * ```
  */
 function collection(value, options) {
-    let item = new Collection(value, options);
+    const item = new Collection(value, options);
     return item.value;
 }
 
 /**
- * Creates a new ReactiveProps instance. An ReactiveProps is a reactive primitive that holds a value. Same as `reactiveProps` but
- * returns a new ReactiveProps instance.
+ * Creates a new ShallowReactive instance. An ShallowReactive is a reactive primitive that holds a value. Same as `shallowReactive` but
+ * returns a new ShallowReactive instance.
  * @template T
  * @param {T} value - The object to observe.
- * @param {Object} [options] - Options to configure the observable behavior.
- * @param {string} [options.name] - The name of ReactiveProps object.
+ * @param {object} [options] - Options to configure the observable behavior.
+ * @param {string} [options.name] - The name of ShallowReactive object.
  * @returns {T} The observed object
  * @example
  * ```js
- * const obj = reactiveProps({ a: 1, b: 2 });
+ * const obj = shallowReactive({ a: 1, b: 2 });
  *
  * obj.subscribe(() => {
  *     console.log(obj.value);
@@ -633,9 +631,9 @@ function collection(value, options) {
  * // output: { a: 3, b: 2 }
  * ```
  */
-function reactiveProps(value, options) {
+function shallowReactive(value, options) {
     // @ts-ignore
-    let item = new ReactiveProps(value, options);
+    const item = new ShallowReactive(value, options);
     return /** @type {T} */ (item.value);
 }
 
@@ -644,10 +642,10 @@ function reactiveProps(value, options) {
  *
  * @template T
  * @param {T} obj - The object to be observed.
- * @param {{[key:string]:"atom"|"computed"|"collection"|"reactiveProps"|false}} annotations -
+ * @param {{[key:string]:"atom"|"computed"|"collection"|"shallowReactive"|false}} annotations -
  *        Annotations defining the type of reactivity for each property. Properties with a
  *        'false' annotation will be ignored.
- * @param {Object} [options] - Options to configure the observable behavior.
+ * @param {object} [options] - Options to configure the observable behavior.
  * @param {string} [options.name] - The name of the observable object. Defaults to an empty string. Using as prefix for reactive property names.
  * @returns {T} The input object with enhanced reactive properties.
  *
@@ -726,72 +724,79 @@ function reactiveProps(value, options) {
  */
 function makeObservable(obj, annotations, options) {
     /** @type {{[key:string]:ReactivePrimitive}} */
-    let reactiveStore = {};
-    let _options = Object.assign({ name: "" }, options);
+    const reactiveStore = {};
+    const _options = Object.assign({ name: '' }, options);
 
-    for (let key in annotations) {
+    for (const key in annotations) {
         if (annotations[key] === false) {
             continue;
         }
 
         if (
             /** @type {Array<string|boolean>} */ ([
-                "atom",
-                "collection",
-                "reactiveProps",
+                'atom',
+                'collection',
+                'shallowReactive',
             ]).includes(annotations[key])
         ) {
-            if (annotations[key] == "atom") {
+            if (annotations[key] === 'atom') {
+                // @ts-ignore
                 reactiveStore[key] = new Atom(obj[key], {
-                    name: _options.name + "." + key,
+                    name: _options.name + '.' + key,
                 });
             }
 
-            if (annotations[key] == "collection") {
+            if (annotations[key] === 'collection') {
+                // @ts-ignore
                 reactiveStore[key] = new Collection(obj[key], {
-                    name: _options.name + "." + key,
+                    name: _options.name + '.' + key,
                 });
             }
 
-            if (annotations[key] == "reactiveProps") {
-                reactiveStore[key] = new ReactiveProps(obj[key], {
-                    name: _options.name + "." + key,
+            if (annotations[key] === 'shallowReactive') {
+                // @ts-ignore
+                reactiveStore[key] = new ShallowReactive(obj[key], {
+                    name: _options.name + '.' + key,
                 });
             }
-
+            const existingDescriptor = Object.getOwnPropertyDescriptor(obj, key);
             Object.defineProperty(obj, key, {
                 get() {
                     return reactiveStore[key].getValue();
                 },
                 set(value) {
-                    // @ts-expect-error
+                    // @ts-ignore
                     reactiveStore[key].value = value;
                 },
+                enumerable: existingDescriptor?.enumerable ?? true,
+                configurable: existingDescriptor?.configurable ?? true,
             });
         }
     }
+    // @ts-ignore
+    const allDescriptors = getAllPropertyDescriptors(obj);
 
-    let allDescriptors = getAllPropertyDescriptors(obj);
-
-    for (let key in annotations) {
-        if (annotations[key] == "computed") {
+    for (const key in annotations) {
+        if (annotations[key] === 'computed') {
             // if class or plain object
             const descriptor = allDescriptors[key];
             //Object.getOwnPropertyDescriptor(obj.prototype || obj, key) || obj[key];  //
 
-            if (descriptor && typeof descriptor.get === "function") {
-                let f = descriptor.get;
+            if (descriptor && typeof descriptor.get === 'function') {
+                const f = descriptor.get;
                 reactiveStore[key] = new Computed(
                     function () {
                         return f.call(obj);
                     },
-                    { name: _options.name + "." + key }
+                    { name: _options.name + '.' + key }
                 );
-
+                const existingDescriptor = Object.getOwnPropertyDescriptor(obj, key);
                 Object.defineProperty(obj, key, {
                     get() {
                         return reactiveStore[key].getValue();
                     },
+                    enumerable: existingDescriptor?.enumerable ?? true,
+                    configurable: existingDescriptor?.configurable ?? true,
                 });
             }
         }
@@ -807,8 +812,8 @@ function makeObservable(obj, annotations, options) {
  * @template {{[key:string]:any}} R
  * @param {T} target - The object to be extended and observed.
  * @param {R} properties - The properties to add to the target object.
- * @param {{[key:string]:"atom"|"computed"|"collection"|"reactiveProps"|false}} [overrides] - Optional overrides to define the type of the reactive property. If an override is false, the key will be ignored.
- * @param {Object} [options] - Options to configure the observable behavior.
+ * @param {{[key:string]:"atom"|"computed"|"collection"|"shallowReactive"|false}} [overrides] - Optional overrides to define the type of the reactive property. If an override is false, the key will be ignored.
+ * @param {object} [options] - Options to configure the observable behavior.
  * @param {string} [options.name] - The name of the observable object. Defaults to an empty string. Using as prefix for reactive property names.
  * @returns {T & R} The extended object with observable properties.
  * @example
@@ -839,16 +844,8 @@ function makeObservable(obj, annotations, options) {
  * ```
  */
 function extendObservable(target, properties, overrides, options) {
-    Object.assign(
-        /** @type {T & R} */ (/** @type {unknown} */ (target)),
-        properties
-    );
-    makeAutoObservable(
-        target,
-        overrides,
-        options,
-        new Set(Object.keys(properties))
-    );
+    Object.assign(/** @type {T & R} */ (/** @type {unknown} */ (target)), properties);
+    makeAutoObservable(target, overrides, options, new Set(Object.keys(properties)));
     return /** @type {T & R} */ (target);
 }
 
@@ -856,8 +853,8 @@ function extendObservable(target, properties, overrides, options) {
  * Makes existing object properties observable. Same as {@link makeObservable} but infers all the properties.
  * @template T
  * @param {T} obj - The object to observe.
- * @param {{[key:string]:"atom"|"computed"|"collection"|"reactiveProps"|false}} [overrides] - The overrides to use to define type of the reactive property. If an override is false, the key will be ignored.
- * @param {Object} [options] - Options to configure the observable behavior.
+ * @param {{[key:string]:"atom"|"computed"|"collection"|"shallowReactive"|false}} [overrides] - The overrides to use to define type of the reactive property. If an override is false, the key will be ignored.
+ * @param {object} [options] - Options to configure the observable behavior.
  * @param {string} [options.name] - The name of the observable object. Defaults to an empty string. Using as prefix for reactive property names.
  * @param {Set<string>} [filter] - A set of property keys to selectively apply annotations.
  * @returns {T}
@@ -891,19 +888,20 @@ function extendObservable(target, properties, overrides, options) {
  * ```
  */
 function makeAutoObservable(obj, overrides = {}, options, filter) {
-    let _options = Object.assign({ name: "" }, options);
+    const _options = Object.assign({ name: '' }, options);
 
-    let allDescriptors = getAllPropertyDescriptors(obj);
-
-    /** @type {Set<string>} */
-    let atomKeys = new Set();
+    // @ts-ignore
+    const allDescriptors = getAllPropertyDescriptors(obj);
 
     /** @type {Set<string>} */
-    let computedKeys = new Set();
+    const atomKeys = new Set();
 
-    Object.entries(allDescriptors).forEach((descriptorObject) => {
-        let key = descriptorObject[0];
-        let descriptor = descriptorObject[1];
+    /** @type {Set<string>} */
+    const computedKeys = new Set();
+
+    Object.entries(allDescriptors).forEach(descriptorObject => {
+        const key = descriptorObject[0];
+        const descriptor = descriptorObject[1];
 
         if (filter !== undefined && !filter.has(key)) {
             return;
@@ -922,43 +920,46 @@ function makeAutoObservable(obj, overrides = {}, options, filter) {
         }
     });
 
-    /** @type {{[key:string]:"atom"|"computed"|"collection"|"reactiveProps"|false}} */
+    /** @type {{[key:string]:"atom"|"computed"|"collection"|"shallowReactive"|false}} */
     let annotations = {};
 
     let keys = [...atomKeys];
     for (let i = 0; i < keys.length; i++) {
-        let key = keys[i];
+        const key = keys[i];
 
         if (overrides[key] === false) {
             continue;
         }
 
-        if (typeof obj[key] === "function") {
+        // @ts-ignore
+        if (typeof obj[key] === 'function') {
             continue;
         }
 
+        // @ts-ignore
         if (Array.isArray(obj[key])) {
-            annotations[key] = "collection";
+            annotations[key] = 'collection';
             continue;
         }
 
+        // @ts-ignore
         if (isPlainObject(obj[key])) {
-            annotations[key] = "reactiveProps";
+            annotations[key] = 'shallowReactive';
             continue;
         }
 
-        annotations[key] = "atom";
+        annotations[key] = 'atom';
     }
 
     keys = [...computedKeys];
     for (let i = 0; i < keys.length; i++) {
-        let key = keys[i];
+        const key = keys[i];
 
         if (overrides[key] === false) {
             continue;
         }
 
-        annotations[key] = "computed";
+        annotations[key] = 'computed';
     }
 
     annotations = Object.assign({}, annotations, overrides);
@@ -970,7 +971,7 @@ export {
     atom,
     computed,
     collection,
-    reactiveProps,
+    shallowReactive,
     autorun,
     batch,
     reaction,

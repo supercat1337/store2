@@ -1,6 +1,6 @@
 // @ts-check
 
-import { Atom, batch, reaction } from "../src/index.js";
+import { Atom, batch, reaction } from "@supercat1337/store2";
 
 const a = new Atom(0, { name: "a" });
 const b = new Atom(0, { name: "b" });

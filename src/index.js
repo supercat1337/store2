@@ -1,10 +1,10 @@
 // @ts-check
 
-export { ReactivePrimitive } from "./reactives/reactivePrimitive.js";
-export { Atom } from "./reactives/atom.js";
-export { Computed } from "./reactives/computed.js";
-export { Collection } from "./reactives/collection.js";
-export { ReactiveProps } from "./reactives/reactiveProps.js";
+export { ReactivePrimitive } from "./reactives/ReactivePrimitive.js";
+export { Atom } from "./reactives/Atom.js";
+export { Computed } from "./reactives/Computed.js";
+export { Collection } from "./reactives/Collection.js";
+export { ShallowReactive } from "./reactives/ShallowReactive.js";
 export { Store } from "./complex/store.js";
 export { ReactiveList } from "./complex/reactiveList.js";
 

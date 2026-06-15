@@ -1,6 +1,6 @@
 // @ts-check
 
-import {Atom, runInAction} from "../src/index.js";
+import {Atom, runInAction} from "@supercat1337/store2";
 
 let a = new Atom(0, { name: "a" });
 let b = new Atom(0, { name: "b" });

@@ -1,6 +1,6 @@
 // @ts-check
 
-import { Atom, Computed, batch} from "../src/index.js";
+import { Atom, Computed, batch} from "@supercat1337/store2";
 
 /**
  * @param {number} num

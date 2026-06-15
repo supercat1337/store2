@@ -112,12 +112,12 @@ c.data.pop();
 // length = 3
 ```
 
-### Reactive Properties (ReactiveProps)
+### Reactive Properties (shallowReactive)
 
-ReactiveProps is a fundamental reactive primitive designed to manage a shallow object. It serves as the foundational element of reactive state management. This object is shallowly reactive, meaning it detects and responds only to changes in its direct properties, not the properties of any nested objects.
+shallowReactive is a fundamental reactive primitive designed to manage a shallow object. It serves as the foundational element of reactive state management. This object is shallowly reactive, meaning it detects and responds only to changes in its direct properties, not the properties of any nested objects.
 
 ```js
-const b = new ReactiveProps({ foo: 1 });
+const b = new shallowReactive({ foo: 1 });
 
 let bar = 0;
 
@@ -189,7 +189,7 @@ batch(() => {
 
 ### ReactiveList
 
-ReactiveList is a class designed to handle a list of ReactiveProps items reactively.
+ReactiveList is a class designed to handle a list of shallowReactive items reactively.
 It supports operations for adding, removing, and updating list items, ensuring that changes are propagated.
 
 ```js
@@ -237,7 +237,7 @@ The library also provides a range of advanced functions for more complex use cas
 -   makeObservable() - explicitly add observability to an object.
 -   extendObservable() - add observability to a previously non-observable object.
 -   reaction() - create a custom reaction to changes in one or more reactive items.
--   reactiveProps() - create a reactive version of an object with reactive properties.
+-   shallowReactive() - create a reactive version of an object with reactive properties.
 -   runInAction() - run a function within a reactive context.
 -   untrack() - manually opt-out of tracking for a reactive item.
 -   waitTrue() - wait for a reactive value to become true.

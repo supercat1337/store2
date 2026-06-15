@@ -1,15 +1,15 @@
 // @ts-check
 
-import { ReactivePrimitive } from "./reactivePrimitive.js";
-import { COMPUTED, Engine } from "../core/Engine.js";
-import { modeController } from "../services/modeController.js";
-import { getValueTracker } from "../services/trackers.js";
-import { clone } from "../helpers/tools.js";
+import { COMPUTED } from '../core/Engine.js';
+import { clone, getError } from '../helpers/tools.js';
+import { dependencyTracker } from '../services/dependencyTracker.js';
+import { modeController } from '../services/modeController.js';
+import { ReactivePrimitive } from './ReactivePrimitive.js';
 
 /**
  * Computed is a reactive primitive that holds a value that is computed from other reactive values.
  * It is the base unit of reactive state.
- * @extends ReactivePrimitive
+ * @augments ReactivePrimitive
  * @template {unknown} T
  * @example
  * ```js
@@ -61,72 +61,46 @@ class Computed extends ReactivePrimitive {
     #fn;
 
     /** @type {string} */
-    #cachedDependentsVersionString = "";
+    __cachedDependentsVersionString = '';
 
     options = {
-        name: "",
-        isHardFunction: false,
-        compareFunction: null,
+        smartRecompute: false,
     };
 
     /**
      * Initializes an Atom instance with a given value.
      * @param {function():T} fn - function that returns the value of the Computed
-     * @param {Object} [options] - Options
+     * @param {object} [options] - Options
      * @param {string} [options.name] - The name of the Computed instance.
-     * @param {(a:T, b:T)=>boolean} [options.compareFunction] - A function that compares two values for equality.
-     * @param {boolean} [options.isHardFunction] - Indicates whether the computed is a hard function. If true, it prevents calling the function by comparing the string representation of the dependencies.
+     * @param {((a:T, b:T)=>boolean)|null} [options.compareFunction] - A function that compares two values for equality.
+     * @param {boolean} [options.smartRecompute] - When true, the computed value will be
+     *        recalculated only when the version string of its dependencies changes,
+     *        rather than on every dependency notification. This avoids unnecessary
+     *        recalculations when dependencies change but their final values remain
+     *        the same (e.g., toggling back and forth). Defaults to false.
      */
-    constructor(fn, options) {
-        super();
+    constructor(
+        fn,
+        options = {
+            name: '',
+            compareFunction: null,
+            smartRecompute: false,
+        }
+    ) {
+        super(COMPUTED);
 
-        this.options = Object.assign({}, this.options, options);
+        this.options = {
+            smartRecompute: options.smartRecompute ?? false,
+        };
 
-        if (this.options.name) this.name = this.options.name;
-
-        this.engine = new Engine(this, COMPUTED);
-        if (this.options.compareFunction)
-            this.engine.compareFn = this.options.compareFunction;
-
+        this.name = options.name || '';
+        this.engine.compareFn = options.compareFunction || null;
         this.#fn = fn;
 
-        getValueTracker.turnOn();
-        modeController.computedMode = true;
-        try {
-            let value = fn();
+        this.#currentValue = this.#collectDependenciesAndInitValue();
 
-            if (value instanceof ReactivePrimitive) {
-                throw new Error(
-                    `Computed${
-                        this.name ? ` (${this.name})` : ""
-                    }: Return value must not be a reactive item`
-                );
-            }
-
-            this.#currentValue = value;
-            this.engine.oldValues.set("", this.#currentValue);
-        } catch (error) {
-            this.engine.error = error;
-        }
-
-        modeController.computedMode = false;
-        getValueTracker.turnOff();
-
-        if (this.engine.error) {
-            throw this.engine.error;
-        }
-
-        if (getValueTracker.data.size == 0) {
-            throw new Error(
-                `Computed${this.name ? ` (${this.name})` : ""}: No dependencies`
-            );
-        }
-
-        this.engine.addDependencies(getValueTracker.data);
-
-        if (this.options.isHardFunction) {
-            this.#cachedDependentsVersionString =
-                this.#getDependentsVersionString();
+        if (this.options.smartRecompute) {
+            this.__cachedDependentsVersionString = this.#getDependenciesVersionString();
         }
     }
 
@@ -134,25 +108,57 @@ class Computed extends ReactivePrimitive {
      * Returns a string representation of the dependencies of the Computed value.
      * @returns {string}
      */
-    #getDependentsVersionString() {
+    #getDependenciesVersionString() {
         /** @type {string[]} */
-        let result = [];
-        /** @type {Engine} */
-        let engine = this.engine;
+        const result = [];
+        const engine = this.engine;
 
-        engine.dependencies.forEach((dependency) => {
+        engine.dependencies.forEach(dependency => {
+            // If a dependency is stale (shouldRecalc = true), we must recalculate it
+            // to get its most recent version. This is necessary for smartRecompute
+            // to correctly detect changes in the dependency graph.
             if (dependency.engine.shouldRecalc) {
-                dependency.getValue();
+                dependency.getValue(); // side effect: forces recomputation
             }
 
-            result.push(
-                dependency.engine.id.toString() +
-                    ":" +
-                    dependency.engine.version
-            );
+            result.push(dependency.engine.id.toString() + ':' + dependency.engine.version);
         });
 
-        return result.join(";");
+        return result.join(';');
+    }
+
+    #collectDependenciesAndInitValue() {
+        dependencyTracker.turnOn();
+        modeController.computedMode = true;
+        /** @type {T} */
+        let value;
+        try {
+            value = this.#fn();
+            if (value instanceof ReactivePrimitive) {
+                throw new Error(
+                    `Computed${
+                        this.name ? ` (${this.name})` : ''
+                    }: Return value must not be a reactive item`
+                );
+            }
+        } catch (e) {
+            this.engine.setError(getError(e));
+        }
+
+        modeController.computedMode = false;
+        dependencyTracker.turnOff();
+
+        if (this.engine.error) {
+            throw this.engine.error;
+        }
+
+        if (dependencyTracker.data.size === 0) {
+            throw new Error(`Computed${this.name ? ` (${this.name})` : ''}: No dependencies`);
+        }
+
+        this.engine.addDependencies(dependencyTracker.data);
+        // @ts-ignore
+        return value;
     }
 
     /**
@@ -161,23 +167,25 @@ class Computed extends ReactivePrimitive {
      * @returns {boolean} true if the Computed value needs to be recalculated, false if it does not.
      */
     isStale() {
-        /** @type {Engine} */
-        let engine = this.engine;
+        const engine = this.engine;
 
-        if (engine.error != null) return true;
+        if (engine.error !== null) {
+            return true;
+        }
 
-        if (engine.shouldRecalc) return true;
+        if (engine.shouldRecalc) {
+            return true;
+        }
 
         return false;
     }
 
     #areDependenciesStale() {
-        /** @type {Engine} */
-        let engine = this.engine;
+        const engine = this.engine;
 
-        let dependentsVersionString = this.#getDependentsVersionString();
-        if (dependentsVersionString != this.#cachedDependentsVersionString) {
-            this.#cachedDependentsVersionString = dependentsVersionString;
+        const dependentsVersionString = this.#getDependenciesVersionString();
+        if (dependentsVersionString !== this.__cachedDependentsVersionString) {
+            this.__cachedDependentsVersionString = dependentsVersionString;
             engine.shouldRecalc = true;
 
             return true;
@@ -187,21 +195,23 @@ class Computed extends ReactivePrimitive {
     }
 
     /**
-     * @param {{untracked?: boolean}} [options] - Optional options. If `untracked` is `false`, the Computed value will be added to the getValueTracker.
+     * @param {{untracked?: boolean}} [options] - Optional options. If `untracked` is `false`, the Computed value will be added to the dependencyTracker.
      * @returns {T} The current value of the Computed value.
      */
     getValue(options) {
         super.getValue(options);
 
-        /** @type {Engine} */
-        let engine = this.engine;
+        const engine = this.engine;
+
+        // If there's an error and dependencies haven't changed, rethrow the same error without recalculating
+        if (engine.error !== null && !engine.shouldRecalc) {
+            throw engine.error;
+        }
 
         if (modeController.computedMode) {
             if (this.isStale()) {
                 throw new Error(
-                    `Computed${
-                        this.name ? ` (${this.name})` : ""
-                    }: Dependencies cannot be stale`,
+                    `Computed${this.name ? ` (${this.name})` : ''}: Dependencies cannot be stale`,
                     { cause: this }
                 );
             }
@@ -212,7 +222,7 @@ class Computed extends ReactivePrimitive {
             return this.#currentValue;
         }
 
-        if (this.options.isHardFunction) {
+        if (this.options.smartRecompute) {
             if (!this.#areDependenciesStale()) {
                 engine.shouldRecalc = false;
                 return this.#currentValue;
@@ -228,6 +238,14 @@ class Computed extends ReactivePrimitive {
      */
     get value() {
         return this.getValue();
+    }
+
+    /**
+     *
+     * @returns {T}
+     */
+    peekValue() {
+        return this.#currentValue;
     }
 
     /**
@@ -262,11 +280,17 @@ class Computed extends ReactivePrimitive {
     }
 
     #calc() {
-        /** @type {Engine} */
-        let engine = this.engine;
+        const engine = this.engine;
 
         engine.shouldRecalc = false;
-        engine.error = null;
+        engine.clearError();
+
+        // Collect new dependencies if dynamic mode is enabled
+        /** @type {Set<ReactivePrimitive>} */
+        const newDeps = new Set();
+        const unsubscribe = dependencyTracker.onAdd(item => {
+            newDeps.add(item);
+        });
 
         let value;
 
@@ -274,27 +298,31 @@ class Computed extends ReactivePrimitive {
         try {
             value = this.#fn();
         } catch (e) {
+            const error = getError(e);
             engine.setError(
-                new Error(
-                    `Computed${this.name ? ` (${this.name})` : ""}: ` +
-                        e.message,
-                    { cause: this }
-                )
+                new Error(`Computed${this.name ? ` (${this.name})` : ''}: ` + error.message, {
+                    cause: this,
+                })
             );
             throw engine.error;
+        } finally {
+            unsubscribe();
         }
 
         if (this.equals(this.#currentValue, value)) {
+            // Value didn't actually change – remove any pending update
+            this.engine.clearUpdates();
             return this.#currentValue;
         }
 
-        let oldValue = this.#currentValue;
+        const oldValue = this.#currentValue;
         this.#currentValue = clone(value);
 
-        let newValue = this.#currentValue;
-        engine.addUpdate("", "set", oldValue, newValue);
-
-        engine.valueChangedCallback();
+        const newValue = this.#currentValue;
+        //this.engine.version++;
+        if (engine.addUpdate('', 'set', oldValue, newValue)) {
+            engine.valueChangedCallback();
+        }
 
         return this.#currentValue;
     }

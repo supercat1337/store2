@@ -1,16 +1,15 @@
 // @ts-check
 
-import { EventEmitterExt } from "@supercat1337/event-emitter-ext";
+import { EventEmitterExt } from '@supercat1337/event-emitter-ext';
 
 class ModeControllerService {
     computedMode = false;
-
     untrackMode = false;
-
     throwErrorInSubscribers = true;
 
-    #batchMode = false;
+    #batchDepth = 0;
     #subscribersMode = false;
+
     /** @type {EventEmitterExt<"batchModeStart"|"batchModeEnd"|"beforeBatchModeEnd">} */
     batchModeEvents;
 
@@ -19,21 +18,17 @@ class ModeControllerService {
 
     constructor() {
         this.batchModeEvents = new EventEmitterExt();
-        this.batchModeEvents.registerEvents(
-            "batchModeStart",
-            "beforeBatchModeEnd",
-            "batchModeEnd"
-        );
+        this.batchModeEvents.registerEvents('batchModeStart', 'beforeBatchModeEnd', 'batchModeEnd');
         this.batchModeEvents.setListenerRunnerStrategy(1);
 
         this.subscribersModeEvents = new EventEmitterExt();
         this.subscribersModeEvents.noLimitsToEmit = true;
-        this.subscribersModeEvents.registerEvents("subscribersModeEnd");
+        this.subscribersModeEvents.registerEvents('subscribersModeEnd');
     }
 
     /**
      * Subscribes a function to be called whenever the given event is triggered.
-     * @param {"batchModeStart"|"batchModeEnd"|"beforeBatchModeEnd"} event - The event to subscribe to. Currently, only "batchModeStart" and "batchModeEnd" are supported.
+     * @param {"batchModeStart"|"batchModeEnd"|"beforeBatchModeEnd"} event - The event to subscribe to.
      * @param {function():void} callback - The function to be called.
      * @returns {()=>void} A function that unsubscribes the given function.
      */
@@ -42,28 +37,44 @@ class ModeControllerService {
     }
 
     /**
-     * Enables or disables batch mode. When batch mode is enabled, all changes to reactive items are batched together and notifications are only sent when batch mode is disabled.
-     * @type {boolean}
+     * Returns true if currently inside a batch (batch depth > 0).
+     * @returns {boolean}
      */
-    set batchMode(value) {
-        if (this.#batchMode === value) return;
-
-        if (value === false) this.batchModeEvents.emit("beforeBatchModeEnd");
-        this.#batchMode = value;
-        this.batchModeEvents.emit(value ? "batchModeStart" : "batchModeEnd");
+    get batchMode() {
+        return this.#batchDepth > 0;
     }
 
     /**
-     * Retrieves the current state of batch mode.
-     * @returns {boolean} The current state of batch mode, where true indicates that batch mode is enabled and false indicates that it is disabled.
+     * Enters a batch mode. Increments the batch depth.
+     * Emits "batchModeStart" when entering the first batch.
      */
-    get batchMode() {
-        return this.#batchMode;
+    enterBatch() {
+        const wasInBatch = this.batchMode;
+        this.#batchDepth++;
+        if (!wasInBatch) {
+            this.batchModeEvents.emit('batchModeStart');
+        }
+    }
+
+    /**
+     * Exits a batch mode. Decrements the batch depth.
+     * If exiting the last batch, emits "beforeBatchModeEnd" and then "batchModeEnd".
+     */
+    exitBatch() {
+        if (this.#batchDepth === 0) {return;}
+        const isLast = this.#batchDepth === 1;
+        if (isLast) {
+            this.batchModeEvents.emit('beforeBatchModeEnd');
+        }
+        this.#batchDepth--;
+        if (isLast) {
+            this.batchModeEvents.emit('batchModeEnd');
+        }
     }
 
     /**
      * Retrieves whether any subscribers are currently running.
-     * @returns {boolean} True if any subscribers are currently running, false otherwise.
+     * @returns {boolean}
      */
     get subscribersMode() {
         return this.#subscribersMode;
@@ -80,18 +91,17 @@ class ModeControllerService {
      * Sets the state to indicate that no subscribers are currently running.
      */
     endSubscribersMode() {
-        if (!this.#subscribersMode) return;
+        if (!this.#subscribersMode) {return;}
         this.#subscribersMode = false;
-        this.subscribersModeEvents.emit("subscribersModeEnd");
+        this.subscribersModeEvents.emit('subscribersModeEnd');
     }
 
     /**
      * Subscribes a function to be called once after all subscribers have finished running.
-     * The callback function is triggered when the "subscribersModeEnd" event is emitted.
-     * @param {Function} callback - The function to be called after subscribers have completed.
+     * @param {Function} callback
      */
     runAfterSubscribers(callback) {
-        this.subscribersModeEvents.once("subscribersModeEnd", callback);
+        this.subscribersModeEvents.once('subscribersModeEnd', callback);
     }
 }
 

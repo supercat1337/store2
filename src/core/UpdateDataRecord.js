@@ -1,7 +1,5 @@
 // @ts-check
 
-import { ReactivePrimitive } from "../reactives/reactivePrimitive.js";
-
 export class UpdateDataRecord {
     /** @type {"set"|"delete"} */
     verb;
@@ -52,7 +50,7 @@ export class UpdateDataRecordManager {
         );
 
         /** @type {string[]} */
-        let keysToDelete = [];
+        const keysToDelete = [];
 
         this.data.forEach((item, key) => {
             if (key.startsWith(itemName + ".")) {

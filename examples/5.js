@@ -1,6 +1,6 @@
 // @ts-check
 
-import { Atom, Collection, Computed, ReactiveProps } from "../src/index.js";
+import { Atom, Collection, Computed, shallowReactive } from "@supercat1337/store2";
 
 const a = new Atom(1, { name: "a" });
 
@@ -34,7 +34,7 @@ const e = new Computed(
     { name: "e" }
 );
 
-const f = new ReactiveProps({ a: 1, b: 1 }, { name: "f" });
+const f = new shallowReactive({ a: 1, b: 1 }, { name: "f" });
 
 const g = new Computed(
     () => {

@@ -1,6 +1,6 @@
 // @ts-check
 
-import { autorun, makeObservable } from "../src/index.js";
+import { autorun, makeObservable } from "@supercat1337/store2";
 
 class List {
     data = [];

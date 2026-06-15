@@ -1,84 +1,42 @@
 import { EventEmitterExt } from '@supercat1337/event-emitter-ext';
+import { EventEmitterLite } from '@supercat1337/event-emitter';
 import { Dictionary } from '@supercat1337/dictionary';
 
 // @ts-check
 
 /**
- * A class representing an id for a reactive item.
- */
-class ItemId {
-    /** @type {number} */
-    timestamp;
-
-    /** @type {number} */
-    innerIndex;
-
-    /**
-     * @param {number} timestamp - The timestamp of the id.
-     * @param {number} innerIndex - The inner index of the id.
-     */
-    constructor(timestamp, innerIndex) {
-        /** @type {number} */
-        this.timestamp = timestamp;
-
-        /** @type {number} */
-        this.innerIndex = innerIndex;
-    }
-
-    /**
-     * Returns a string representation of the id in the form of "timestamp-innerIndex".
-     * @returns {string} A string representation of the id.
-     */
-    toString() {
-        return `${this.timestamp}-${this.innerIndex}`;
-    }
-}
-
-/**
- * A service that generates unique ids for reactive items.
+ * A service that generates unique numeric identifiers for reactive items.
+ * Ensures deterministic ordering based on creation time.
  */
 class IdService {
     /** @type {number} */
-    lastTimestamp = Date.now();
-
-    /** @type {number} */
-    lastInnerIndex = 0;
+    #counter = 0;
 
     /**
-     * Generates a unique ItemId based on the current timestamp and an inner index.
-     * If multiple IDs are generated within the same millisecond, the inner index is incremented
-     * to ensure uniqueness. If the inner index reaches Number.MAX_SAFE_INTEGER, it resets to 0
-     * and the timestamp is slightly adjusted to maintain uniqueness.
-     *
-     * @returns {ItemId} A new unique ItemId object.
+     * Generates a new unique numeric identifier.
+     * @returns {number} A new unique number.
      */
     generateId() {
-        let timestamp = Date.now();
-
-        if (timestamp === this.lastTimestamp) {
-            this.lastInnerIndex++;
-        } else {
-            this.lastInnerIndex = 0;
-            this.lastTimestamp = timestamp;
-        }
-
-        return new ItemId(timestamp, this.lastInnerIndex);
+        return this.#counter++;
     }
 
     /**
-     * Compare two ids.
-     *
-     * @param {ItemId} id1 - The first id to compare.
-     * @param {ItemId} id2 - The second id to compare.
-     *
-     * @returns {number} - A negative number if id1 is less than id2, a positive number if id1 is greater than id2, and 0 if both ids are equal.
+     * Compares two numeric identifiers.
+     * @param {number} a - First identifier.
+     * @param {number} b - Second identifier.
+     * @returns {number} Negative if a < b, positive if a > b, zero if equal.
      */
-    compareIds(id1, id2) {
-        if (id1.timestamp < id2.timestamp) return -1;
-        if (id1.timestamp > id2.timestamp) return 1;
-        if (id1.innerIndex < id2.innerIndex) return -1;
-        if (id1.innerIndex > id2.innerIndex) return 1;
+    compareIds(a, b) {
+        if (a < b) {return -1;}
+        if (a > b) {return 1;}
         return 0;
+    }
+
+    /**
+     * Resets the counter to zero (useful for testing).
+     */
+    reset() {
+        this.#counter = 0;
     }
 }
 
@@ -105,7 +63,7 @@ function sortReactiveItems(a, b) {
  * @returns {boolean} true if the value is a plain object, false otherwise.
  */
 function isPlainObject(obj) {
-    return typeof obj === "object" && obj !== null && !Array.isArray(obj);
+    return typeof obj === 'object' && obj !== null && !Array.isArray(obj);
 }
 
 /**
@@ -132,26 +90,33 @@ function compareArrays(a, b) {
 /**
  * Checks if two plain objects are equal. If the objects do not have the same set of keys, then this function returns false.
  * Otherwise, this function checks if each value of the two objects is equal, using the compareAny function.
- * @param {Object} a - The first object to compare.
- * @param {Object} b - The second object to compare.
+ * @param {object} a - The first object to compare.
+ * @param {object} b - The second object to compare.
  * @returns {boolean} True if the two objects are equal, false otherwise.
  */
 function comparePlainObjects(a, b) {
-    if (a === b) return true;
-    if (!isPlainObject(a) || !isPlainObject(b)) return false;
+    if (a === b) {
+        return true;
+    }
+    if (!isPlainObject(a) || !isPlainObject(b)) {
+        return false;
+    }
 
-    let keysA = Object.keys(a);
-    let keysB = Object.keys(b);
+    const keysA = Object.keys(a);
+    const keysB = Object.keys(b);
 
-    if (keysA.length !== keysB.length) return false;
+    if (keysA.length !== keysB.length) {
+        return false;
+    }
 
     for (let i = 0; i < keysA.length; i++) {
-        let key = keysA[i];
-        let hasProperty = Object.prototype.hasOwnProperty.call(b, key);
+        const key = keysA[i];
+        const hasProperty = Object.prototype.hasOwnProperty.call(b, key);
         if (!hasProperty) {
             return false;
         }
 
+        // @ts-ignore
         if (!compareAny(a[key], b[key])) {
             return false;
         }
@@ -168,11 +133,19 @@ function comparePlainObjects(a, b) {
  * @returns {boolean}
  */
 function compareAny(a, b) {
-    if (a === b) return true;
-    if (typeof a != typeof b) return false;
+    if (a === b) {
+        return true;
+    }
+    if (typeof a !== typeof b) {
+        return false;
+    }
 
-    if (a === null || b === null) return false;
-    if (a === undefined || b === undefined) return false;
+    if (a === null || b === null) {
+        return false;
+    }
+    if (a === undefined || b === undefined) {
+        return false;
+    }
 
     if (Array.isArray(a) || Array.isArray(b)) {
         if (!(Array.isArray(a) && Array.isArray(b))) {
@@ -195,13 +168,17 @@ function compareAny(a, b) {
    window.addEventListener('resize', debounce((evt) => console.log(evt), 250));
  */
 function debounce(func, wait) {
-    var timeout;
-    var f = (...args) => {
-        var context = this;
-        var later = function () {
+    /** @type {ReturnType<typeof setTimeout>|null} */
+    let timeout;
+    // @ts-ignore
+    const f = (...args) => {
+        // @ts-ignore
+        const context = this;
+        const later = function () {
             timeout = null;
             func.apply(context, args);
         };
+        // @ts-ignore
         clearTimeout(timeout);
         timeout = setTimeout(later, wait);
     };
@@ -221,7 +198,7 @@ function clone(obj) {
     if (Array.isArray(obj)) {
         // @ts-ignore
         return obj.slice();
-    } else if (typeof obj === "object" && obj !== null) {
+    } else if (typeof obj === 'object' && obj !== null) {
         return Object.assign({}, obj);
     } else {
         return obj;
@@ -231,23 +208,479 @@ function clone(obj) {
 /**
  * Gets all property descriptors of an object, including its prototype and all its ancestors.
  * The descriptors are returned as a plain object.
- * @param {Object} obj - The object to get the property descriptors from.
+ * @param {object} obj - The object to get the property descriptors from.
+ * @param {number} [depth=0]
+ * @param {number} [maxDepth=100]
  * @returns {{[x: string]: TypedPropertyDescriptor<any>;} & { [x: string]: PropertyDescriptor;}} A plain object with all property descriptors of the object.
  */
-function getAllPropertyDescriptors(obj) {
-    if (!obj) {
+function getAllPropertyDescriptors(obj, depth = 0, maxDepth = 100) {
+    if (!obj || depth > maxDepth) {
         return Object.create(null);
-    } else {
-        const proto = Object.getPrototypeOf(obj);
-        return {
-            ...getAllPropertyDescriptors(proto),
-            ...Object.getOwnPropertyDescriptors(obj),
+    }
+    const proto = Object.getPrototypeOf(obj);
+    return {
+        ...getAllPropertyDescriptors(proto, depth + 1, maxDepth),
+        ...Object.getOwnPropertyDescriptors(obj),
+    };
+}
+
+/**
+ * Converts any value to an Error object.
+ *
+ * If the given value is already an instance of Error, it is returned unchanged.
+ * Otherwise, a new Error object is created using the string representation of the value.
+ *
+ * @param {unknown} e - The value to convert into an Error.
+ * @returns {Error} An Error object derived from the input value.
+ *
+ * @example
+ * // Returns the original Error
+ * const originalError = new Error('Something went wrong');
+ * getError(originalError) === originalError; // true
+ *
+ * @example
+ * // Converts a string to an Error
+ * const error = getError('Network failure');
+ * error.message; // 'Network failure'
+ * error instanceof Error; // true
+ *
+ * @example
+ * // Converts numbers or other types
+ * getError(42).message; // '42'
+ * getError(null).message; // 'null'
+ * getError(undefined).message; // 'undefined'
+ */
+function getError(e) {
+    return e instanceof Error ? e : new Error(String(e));
+}
+
+// @ts-check
+
+
+/**
+ * @typedef {()=>void} Unsubscriber
+ */
+
+class SubscribeController {
+    /** @type {EventEmitterExt<"change">} */
+    #eventEmitter;
+
+    /** @type {EventEmitterExt<"#has-listeners"|"#no-listeners"|"destroy">} */
+    #additionalEvents;
+    constructor() {
+        this.#eventEmitter = new EventEmitterExt();
+        this.#eventEmitter.registerEvents('change');
+
+        this.#additionalEvents = new EventEmitterExt();
+        this.#additionalEvents.registerEvents('destroy', '#has-listeners', '#no-listeners');
+        // @ts-ignore
+        this.#additionalEvents.noLimitsToEmit = true;
+    }
+
+    /**
+     * Returns an array of functions that have been subscribed to the subscribeController.
+     * @returns {Function[]} The functions that have been subscribed.
+     */
+    getSubscribers() {
+        return this.#eventEmitter.getListeners('change');
+    }
+
+    /**
+     * Subscribes a function to be called whenever the subscribeController schedules a task.
+     * The function is called with no arguments.
+     * @param {(updates: Map<string, import("./UpdateDataRecord.js").UpdateDataRecord>)=>void} fn - The function to be called.
+     * @param {{delay?:number, signal?:AbortSignal}} [options]
+     * @returns {Unsubscriber} A function that unsubscribes the given function.
+     */
+    subscribe(fn, options) {
+        /** @type {{delay?:number, signal?:AbortSignal}} */
+        const _options = Object.assign({ delay: 0, signal: undefined }, options);
+
+        const delay = _options.delay || 0;
+
+        /** @type {Function} */
+        const _fn = delay > 0 ? debounce(fn, delay) : fn;
+
+        const hasListeners = this.#eventEmitter.hasListeners('change');
+
+        const unsubscriberInner = this.#eventEmitter.on('change', _fn);
+
+        const unsubscriber = () => {
+            const hasListeners = this.#eventEmitter.hasListeners('change');
+            if (!hasListeners) {
+                return;
+            }
+
+            if (_options.signal instanceof AbortSignal) {
+                _options.signal.removeEventListener('abort', unsubscriber);
+            }
+
+            unsubscriberInner();
+
+            const hasListeners_2 = this.#eventEmitter.hasListeners('change');
+            if (!hasListeners_2) {
+                /*
+                runInAction(() => {
+                    this.#additionalEvents.emit("#no-listeners");
+                });
+                //*/
+                this.#additionalEvents.emit('#no-listeners');
+            }
         };
+
+        if (_options.signal instanceof AbortSignal) {
+            _options.signal.addEventListener('abort', unsubscriber);
+        }
+
+        // If there are no listeners, emit the #has-listeners event.
+        if (!hasListeners) {
+            /*
+            runInAction(() => {
+                this.#additionalEvents.emit("#has-listeners");
+            });
+            //*/
+
+            this.#additionalEvents.emit('#has-listeners');
+        }
+
+        return unsubscriber;
+    }
+
+    /**
+     * Removes all event listeners from the event emitter. This method is useful for
+     * cleaning up all subscribers that are no longer needed.
+     */
+    clearAllSubscribers() {
+        this.#eventEmitter.removeAllListeners('change');
+
+        this.#additionalEvents.removeAllListeners('destroy');
+        this.#additionalEvents.removeAllListeners('#has-listeners');
+        this.#additionalEvents.removeAllListeners('#no-listeners');
+    }
+
+    /**
+     * Removes all "change" event listeners from the event emitter. This method is useful for cleaning up
+     * "change" subscribers that are no longer needed.
+     */
+    clearSubscribers() {
+        this.#eventEmitter.removeAllListeners('change');
+    }
+
+    /**
+     * Returns true if there are any subscribers, false otherwise.
+     * @returns {boolean} Whether there are any subscribers.
+     */
+    hasSubscribers() {
+        return this.#eventEmitter.hasListeners('change');
+    }
+
+    /**
+     * Destroys the SubscribeController. This method is useful for cleaning up after a SubscribeController
+     * that is no longer needed. It calls clearSubscribers, which removes all subscribers.
+     */
+    destroy() {
+        this.#additionalEvents.emit('destroy');
+        this.#eventEmitter.unregisterAllEvents();
+        this.#additionalEvents.unregisterAllEvents();
+    }
+
+    /**
+     * Subscribes a function to be called whenever a subscriber is added to the subscribeController.
+     * The function is called with no arguments.
+     * @param {function():void} callback - The function to be called.
+     * @returns {Unsubscriber} A function that unsubscribes the given function.
+     */
+    onHasSubscribers(callback) {
+        return this.#additionalEvents.on('#has-listeners', callback);
+    }
+
+    /**
+     * Subscribes a function to be called whenever there are no longer any subscribers.
+     * The function is called with no arguments.
+     * @param {function():void} callback - The function to be called.
+     * @returns {Unsubscriber} A function that unsubscribes the given function.
+     */
+    onNoSubscribers(callback) {
+        return this.#additionalEvents.on('#no-listeners', callback);
+    }
+
+    /**
+     * Subscribes a function to be called when the SubscribeController is destroyed.
+     * The function is called with no arguments.
+     * @param {Function} callback - The function to be called.
+     * @returns {Unsubscriber} A function that unsubscribes the given function.
+     */
+    onDestroy(callback) {
+        return this.#additionalEvents.on('destroy', callback);
     }
 }
 
 // @ts-check
 
+
+class ModeControllerService {
+    computedMode = false;
+    untrackMode = false;
+    throwErrorInSubscribers = true;
+
+    #batchDepth = 0;
+    #subscribersMode = false;
+
+    /** @type {EventEmitterExt<"batchModeStart"|"batchModeEnd"|"beforeBatchModeEnd">} */
+    batchModeEvents;
+
+    /** @type {EventEmitterExt<"subscribersModeEnd">} */
+    subscribersModeEvents;
+
+    constructor() {
+        this.batchModeEvents = new EventEmitterExt();
+        this.batchModeEvents.registerEvents('batchModeStart', 'beforeBatchModeEnd', 'batchModeEnd');
+        this.batchModeEvents.setListenerRunnerStrategy(1);
+
+        this.subscribersModeEvents = new EventEmitterExt();
+        this.subscribersModeEvents.noLimitsToEmit = true;
+        this.subscribersModeEvents.registerEvents('subscribersModeEnd');
+    }
+
+    /**
+     * Subscribes a function to be called whenever the given event is triggered.
+     * @param {"batchModeStart"|"batchModeEnd"|"beforeBatchModeEnd"} event - The event to subscribe to.
+     * @param {function():void} callback - The function to be called.
+     * @returns {()=>void} A function that unsubscribes the given function.
+     */
+    on(event, callback) {
+        return this.batchModeEvents.on(event, callback);
+    }
+
+    /**
+     * Returns true if currently inside a batch (batch depth > 0).
+     * @returns {boolean}
+     */
+    get batchMode() {
+        return this.#batchDepth > 0;
+    }
+
+    /**
+     * Enters a batch mode. Increments the batch depth.
+     * Emits "batchModeStart" when entering the first batch.
+     */
+    enterBatch() {
+        const wasInBatch = this.batchMode;
+        this.#batchDepth++;
+        if (!wasInBatch) {
+            this.batchModeEvents.emit('batchModeStart');
+        }
+    }
+
+    /**
+     * Exits a batch mode. Decrements the batch depth.
+     * If exiting the last batch, emits "beforeBatchModeEnd" and then "batchModeEnd".
+     */
+    exitBatch() {
+        if (this.#batchDepth === 0) {return;}
+        const isLast = this.#batchDepth === 1;
+        if (isLast) {
+            this.batchModeEvents.emit('beforeBatchModeEnd');
+        }
+        this.#batchDepth--;
+        if (isLast) {
+            this.batchModeEvents.emit('batchModeEnd');
+        }
+    }
+
+    /**
+     * Retrieves whether any subscribers are currently running.
+     * @returns {boolean}
+     */
+    get subscribersMode() {
+        return this.#subscribersMode;
+    }
+
+    /**
+     * Sets the state to indicate that subscribers are currently running.
+     */
+    startSubscribersMode() {
+        this.#subscribersMode = true;
+    }
+
+    /**
+     * Sets the state to indicate that no subscribers are currently running.
+     */
+    endSubscribersMode() {
+        if (!this.#subscribersMode) {return;}
+        this.#subscribersMode = false;
+        this.subscribersModeEvents.emit('subscribersModeEnd');
+    }
+
+    /**
+     * Subscribes a function to be called once after all subscribers have finished running.
+     * @param {Function} callback
+     */
+    runAfterSubscribers(callback) {
+        this.subscribersModeEvents.once('subscribersModeEnd', callback);
+    }
+}
+
+const modeController = new ModeControllerService();
+
+// @ts-check
+
+
+/**
+ * Controller that manages changed reactive items and coordinates subscriber notifications.
+ * Handles batching, dependency recalculation, and error aggregation.
+ */
+class ChangedItemsController {
+    /** @type {Set<ReactivePrimitive>} */
+    items = new Set();
+
+    /**
+     * Adds a reactive item to the set of changed items.
+     * If not in batch mode, immediately runs subscribers and clears the set.
+     * @param {ReactivePrimitive} item - The reactive item that changed.
+     */
+    addItem(item) {
+        this.items.add(item);
+        if (!modeController.batchMode) {
+            this.runSubscribers();
+            this.clear();
+        }
+    }
+
+    /**
+     * @param {ReactivePrimitive} item
+     */
+    removeItem(item) {
+        this.items.delete(item);
+    }
+
+    /**
+     * Removes all items from the changed items set.
+     */
+    clear() {
+        this.items.clear();
+    }
+
+    /**
+     * Runs all subscribers for the changed items.
+     * Processes dependency trees, recalculates stale computed values,
+     * and invokes subscriber callbacks with update records.
+     * Handles errors and aggregates them if multiple occur.
+     */
+    runSubscribers() {
+        /** @type {Set<ReactivePrimitive>} */
+        const changedItemsWithUpdates = new Set();
+
+        // get atoms whose value has changed. compare values
+        this.items.forEach(item => {
+            if (modeController.batchMode === true) {
+                if (item.engine.checkChangesTemporary()) {
+                    changedItemsWithUpdates.add(item);
+                }
+            } else {
+                if (item.engine.checkChangesOldValues()) {
+                    changedItemsWithUpdates.add(item);
+                }
+            }
+        });
+
+        /** @type {Set<ReactivePrimitive>} */
+        const itemsToRecalc = new Set();
+
+        // get reactive items whose dependents have subscribers
+        changedItemsWithUpdates.forEach(item => {
+            item.engine.getDeepDependents().forEach(dep => {
+                if (dep.hasSubscribers()) {
+                    itemsToRecalc.add(dep);
+                }
+            });
+        });
+
+        // changed items will be recalculated and added to this.items
+        Array.from(itemsToRecalc)
+            .sort(sortReactiveItems)
+            .forEach(item => {
+                item.getValue();
+            });
+
+        itemsToRecalc.clear();
+        changedItemsWithUpdates.clear();
+
+        if (modeController.batchMode === true) {
+            this.items.forEach(item => {
+                if (item.engine.checkChangesTemporary()) {
+                    changedItemsWithUpdates.add(item);
+                }
+            });
+        } else {
+            this.items.forEach(item => {
+                if (item.engine.checkChangesOldValues()) {
+                    changedItemsWithUpdates.add(item);
+                }
+            });
+        }
+
+        // create an array of reactive elements, sorted by ID (order of creation)
+        const changedItemsWithUpdatesSorted = Array.from(changedItemsWithUpdates)
+            .filter(item => item.hasSubscribers())
+            .sort(sortReactiveItems);
+
+        modeController.startSubscribersMode();
+
+        const usedSubscribers = new Set();
+        const errors = [];
+
+        for (let i = 0; i < changedItemsWithUpdatesSorted.length; i++) {
+            const item = changedItemsWithUpdatesSorted[i];
+
+            const itemSubscribers = item.engine.subscribeController.getSubscribers();
+
+            for (const subscriber of itemSubscribers) {
+                if (usedSubscribers.has(subscriber)) {
+                    continue;
+                }
+
+                usedSubscribers.add(subscriber);
+                try {
+                    subscriber(item.engine.updates);
+                } catch (e) {
+                    const err = getError(e);
+                    const error = new Error(`Error in ${item.name}: ${err.message}`, { cause: item });
+                    error.stack = err.stack;
+                    errors.push(error);
+                }
+            }
+
+            item.engine.clearUpdates();
+        }
+
+        this.items.forEach(item => {
+            item.engine.clearUpdates();
+        });
+
+        usedSubscribers.clear();
+        this.items.clear();
+
+        modeController.endSubscribersMode();
+
+        if (modeController.throwErrorInSubscribers) {
+            for (let i = 0; i < errors.length; i++) {
+                const error = errors[i];
+                throw error;
+            }
+        }
+    }
+}
+
+// Hook into batch mode lifecycle
+modeController.on('beforeBatchModeEnd', () => {
+    changedItemsController.runSubscribers();
+    changedItemsController.clear();
+});
+
+const changedItemsController = new ChangedItemsController();
+
+// @ts-check
 
 class UpdateDataRecord {
     /** @type {"set"|"delete"} */
@@ -299,7 +732,7 @@ class UpdateDataRecordManager {
         );
 
         /** @type {string[]} */
-        let keysToDelete = [];
+        const keysToDelete = [];
 
         this.data.forEach((item, key) => {
             if (key.startsWith(itemName + ".")) {
@@ -315,419 +748,94 @@ class UpdateDataRecordManager {
 
 // @ts-check
 
-
 /**
- * @typedef {()=>void} Unsubscriber
+ * BatchSnapshot stores the original values of properties at the start of a batch operation.
+ * It allows detecting which properties have actually changed after a series of mutations
+ * inside a batch, and whether they have reverted to their original values.
  */
+class BatchSnapshot {
+    /**
+     * Map storing original values for each property key.
+     * @type {Map<string, any>}
+     */
+    #initialValues = new Map();
 
-class SubscribeController {
-    /** @type {EventEmitterExt<"change">} */
-    #eventEmitter;
+    /**
+     * Reference to the reactive item this snapshot belongs to.
+     * Used to access the equality comparison function.
+     * @type {ReactivePrimitive}
+     */
+    #reactiveItem;
 
-    /** @type {EventEmitterExt<"#has-listeners"|"#no-listeners"|"destroy">} */
-    #additionalEvents;
-    constructor() {
-        this.#eventEmitter = new EventEmitterExt();
-        this.#eventEmitter.registerEvents("change");
-
-        this.#additionalEvents = new EventEmitterExt();
-        this.#additionalEvents.registerEvents(
-            "destroy",
-            "#has-listeners",
-            "#no-listeners"
-        );
-        // @ts-ignore
-        this.#additionalEvents.noLimitsToEmit = true;
+    /**
+     * Creates a new BatchSnapshot instance.
+     * @param {ReactivePrimitive} reactiveItem - The reactive item to snapshot.
+     */
+    constructor(reactiveItem) {
+        this.#reactiveItem = reactiveItem;
     }
 
     /**
-     * Returns an array of functions that have been subscribed to the subscribeController.
-     * @returns {Function[]} The functions that have been subscribed.
+     * Records the original value for a property if not already recorded in this batch.
+     * @param {string} property - The property key.
+     * @param {any} value - The original value at the start of the batch.
      */
-    getSubscribers() {
-        return this.#eventEmitter.getListeners("change");
-    }
-
-    /**
-     * Subscribes a function to be called whenever the subscribeController schedules a task.
-     * The function is called with no arguments.
-     * @param {(updates: Map<string, UpdateDataRecord>)=>void} fn - The function to be called.
-     * @param {{delay?:number, signal?:AbortSignal}} [options]
-     * @returns {Unsubscriber} A function that unsubscribes the given function.
-     */
-    subscribe(fn, options) {
-        /** @type {{delay?:number, signal?:AbortSignal}} */
-        let _options = Object.assign({ delay: 0, signal: undefined }, options);
-
-        /** @type {Function} */
-        let _fn;
-
-        let delay = _options.delay || 0;
-
-        _fn = delay > 0 ? debounce(fn, delay) : fn;
-
-        let hasListeners = this.#eventEmitter.hasListeners("change");
-
-        let unsubscriberInner = this.#eventEmitter.on("change", _fn);
-
-        let unsubscriber = () => {
-            let hasListeners = this.#eventEmitter.hasListeners("change");
-            if (!hasListeners) {
-                return;
-            }
-
-            if (_options.signal instanceof AbortSignal) {
-                _options.signal.removeEventListener("abort", unsubscriber);
-            }
-
-            unsubscriberInner();
-
-            let hasListeners_2 = this.#eventEmitter.hasListeners("change");
-            if (!hasListeners_2) {
-                /*
-                runInAction(() => {
-                    this.#additionalEvents.emit("#no-listeners");
-                });
-                //*/
-                this.#additionalEvents.emit("#no-listeners");
-            }
-        };
-
-        if (_options.signal instanceof AbortSignal) {
-            _options.signal.addEventListener("abort", unsubscriber);
-        }
-
-        // If there are no listeners, emit the #has-listeners event.
-        if (!hasListeners) {
-            /*
-            runInAction(() => {
-                this.#additionalEvents.emit("#has-listeners");
-            });
-            //*/
-
-            this.#additionalEvents.emit("#has-listeners");
-        }
-
-        return unsubscriber;
-    }
-
-    /**
-     * Removes all event listeners from the event emitter. This method is useful for
-     * cleaning up all subscribers that are no longer needed.
-     */
-    clearAllSubscribers() {
-        this.#eventEmitter.removeAllListeners("change");
-
-        this.#additionalEvents.removeAllListeners("destroy");
-        this.#additionalEvents.removeAllListeners("#has-listeners");
-        this.#additionalEvents.removeAllListeners("#no-listeners");
-    }
-
-    /**
-     * Removes all "change" event listeners from the event emitter. This method is useful for cleaning up
-     * "change" subscribers that are no longer needed.
-     */
-    clearSubscribers() {
-        this.#eventEmitter.removeAllListeners("change");
-    }
-
-    /**
-     * Returns true if there are any subscribers, false otherwise.
-     * @returns {boolean} Whether there are any subscribers.
-     */
-    hasSubscribers() {
-        return this.#eventEmitter.hasListeners("change");
-    }
-
-    /**
-     * Destroys the SubscribeController. This method is useful for cleaning up after a SubscribeController
-     * that is no longer needed. It calls clearSubscribers, which removes all subscribers.
-     */
-    destroy() {
-        this.#additionalEvents.emit("destroy");
-        this.#eventEmitter.unregisterAllEvents();
-        this.#additionalEvents.unregisterAllEvents();
-    }
-
-    /**
-     * Subscribes a function to be called whenever a subscriber is added to the subscribeController.
-     * The function is called with no arguments.
-     * @param {function():void} callback - The function to be called.
-     * @returns {Unsubscriber} A function that unsubscribes the given function.
-     */
-    onHasSubscribers(callback) {
-        return this.#additionalEvents.on("#has-listeners", callback);
-    }
-
-    /**
-     * Subscribes a function to be called whenever there are no longer any subscribers.
-     * The function is called with no arguments.
-     * @param {function():void} callback - The function to be called.
-     * @returns {Unsubscriber} A function that unsubscribes the given function.
-     */
-    onNoSubscribers(callback) {
-        return this.#additionalEvents.on("#no-listeners", callback);
-    }
-
-    /**
-     * Subscribes a function to be called when the SubscribeController is destroyed.
-     * The function is called with no arguments.
-     * @param {Function} callback - The function to be called.
-     * @returns {Unsubscriber} A function that unsubscribes the given function.
-     */
-    onDestroy(callback) {
-        return this.#additionalEvents.on("destroy", callback);
-    }
-}
-
-// @ts-check
-
-
-class ModeControllerService {
-    computedMode = false;
-
-    untrackMode = false;
-
-    throwErrorInSubscribers = true;
-
-    #batchMode = false;
-    #subscribersMode = false;
-    /** @type {EventEmitterExt<"batchModeStart"|"batchModeEnd"|"beforeBatchModeEnd">} */
-    batchModeEvents;
-
-    /** @type {EventEmitterExt<"subscribersModeEnd">} */
-    subscribersModeEvents;
-
-    constructor() {
-        this.batchModeEvents = new EventEmitterExt();
-        this.batchModeEvents.registerEvents(
-            "batchModeStart",
-            "beforeBatchModeEnd",
-            "batchModeEnd"
-        );
-        this.batchModeEvents.setListenerRunnerStrategy(1);
-
-        this.subscribersModeEvents = new EventEmitterExt();
-        this.subscribersModeEvents.noLimitsToEmit = true;
-        this.subscribersModeEvents.registerEvents("subscribersModeEnd");
-    }
-
-    /**
-     * Subscribes a function to be called whenever the given event is triggered.
-     * @param {"batchModeStart"|"batchModeEnd"|"beforeBatchModeEnd"} event - The event to subscribe to. Currently, only "batchModeStart" and "batchModeEnd" are supported.
-     * @param {function():void} callback - The function to be called.
-     * @returns {()=>void} A function that unsubscribes the given function.
-     */
-    on(event, callback) {
-        return this.batchModeEvents.on(event, callback);
-    }
-
-    /**
-     * Enables or disables batch mode. When batch mode is enabled, all changes to reactive items are batched together and notifications are only sent when batch mode is disabled.
-     * @type {boolean}
-     */
-    set batchMode(value) {
-        if (this.#batchMode === value) return;
-
-        if (value === false) this.batchModeEvents.emit("beforeBatchModeEnd");
-        this.#batchMode = value;
-        this.batchModeEvents.emit(value ? "batchModeStart" : "batchModeEnd");
-    }
-
-    /**
-     * Retrieves the current state of batch mode.
-     * @returns {boolean} The current state of batch mode, where true indicates that batch mode is enabled and false indicates that it is disabled.
-     */
-    get batchMode() {
-        return this.#batchMode;
-    }
-
-    /**
-     * Retrieves whether any subscribers are currently running.
-     * @returns {boolean} True if any subscribers are currently running, false otherwise.
-     */
-    get subscribersMode() {
-        return this.#subscribersMode;
-    }
-
-    /**
-     * Sets the state to indicate that subscribers are currently running.
-     */
-    startSubscribersMode() {
-        this.#subscribersMode = true;
-    }
-
-    /**
-     * Sets the state to indicate that no subscribers are currently running.
-     */
-    endSubscribersMode() {
-        if (!this.#subscribersMode) return;
-        this.#subscribersMode = false;
-        this.subscribersModeEvents.emit("subscribersModeEnd");
-    }
-
-    /**
-     * Subscribes a function to be called once after all subscribers have finished running.
-     * The callback function is triggered when the "subscribersModeEnd" event is emitted.
-     * @param {Function} callback - The function to be called after subscribers have completed.
-     */
-    runAfterSubscribers(callback) {
-        this.subscribersModeEvents.once("subscribersModeEnd", callback);
-    }
-}
-
-const modeController = new ModeControllerService();
-
-// @ts-check
-
-
-class ChangedItemsController {
-    /** @type {Set<ReactivePrimitive>} */
-    items = new Set();
-
-    /**
-     * Adds an item to the set of changed items. If not in batch mode, it updates
-     * the old values of the items and clears the set.
-     *
-     * @param {ReactivePrimitive} item - The reactive item to add.
-     */
-    addItem(item) {
-        this.items.add(item);
-
-        if (!modeController.batchMode) {
-            this.runSubscribers();
-            this.clear();
+    record(property, value) {
+        if (!this.#initialValues.has(property)) {
+            this.#initialValues.set(property, value);
         }
     }
 
     /**
-     * Removes all items from the set of changed items.
+     * Returns the original value recorded for a property.
+     * @param {string} property - The property key.
+     * @returns {any | undefined} The original value, or undefined if not recorded.
+     */
+    getOriginal(property) {
+        return this.#initialValues.get(property);
+    }
+
+    /**
+     * Checks whether a property has been recorded in this snapshot.
+     * @param {string} property - The property key.
+     * @returns {boolean} True if the property was recorded.
+     */
+    has(property) {
+        return this.#initialValues.has(property);
+    }
+
+    /**
+     * Returns an array of property keys that have changed compared to their original values.
+     * Uses the reactive item's equality comparison function.
+     * @param {(property: string) => any} getCurrentValue - Function that returns the current value for a given property.
+     * @returns {string[]} Array of property keys that actually changed.
+     */
+    getChangedProperties(getCurrentValue) {
+        const changed = [];
+        for (const [prop, original] of this.#initialValues.entries()) {
+            const current = getCurrentValue(prop);
+            if (!this.#reactiveItem.equals(original, current)) {
+                changed.push(prop);
+            }
+        }
+        return changed;
+    }
+
+    /**
+     * Clears all recorded initial values.
      */
     clear() {
-        this.items.clear();
+        this.#initialValues.clear();
     }
 
     /**
-     * Runs all subscribers of the items in the set of changed items. If not in batch mode, it clears the set of changed items after running the subscribers.
-     * If in batch mode, it also runs the subscribers of the items that have changed since the last time this method was called.
-     * All subscribers are run in the order of the items' creation IDs. If an error occurs in a subscriber, it is thrown after all subscribers have been run.
+     * Returns the number of recorded properties.
+     * @returns {number}
      */
-    runSubscribers() {
-        /** @type {Set<ReactivePrimitive>} */
-        let effectedItems = new Set();
-
-        // get atoms whose value has changed. compare values
-        this.items.forEach((item) => {
-            if (modeController.batchMode == true) {
-                if (item.engine.checkChangesTemporary()) {
-                    effectedItems.add(item);
-                }
-            } else {
-                if (item.engine.checkChangesOldValues()) {
-                    effectedItems.add(item);
-                }
-            }
-        });
-
-        /** @type {Set<ReactivePrimitive>} */
-        let itemsToRecalc = new Set();
-
-        // get reactive items whose dependents have subscribers
-        effectedItems.forEach((item) => {
-            item.engine.getDeepDependents().forEach((dep) => {
-                if (dep.hasSubscribers()) {
-                    itemsToRecalc.add(dep);
-                }
-            });
-        });
-
-        // changed items will be recalculated and added to this.items
-        Array.from(itemsToRecalc)
-            .sort(sortReactiveItems)
-            .forEach((item) => {
-                item.getValue();
-            });
-
-        itemsToRecalc.clear();
-        effectedItems.clear();
-
-        this.items.forEach((item) => {
-            if (modeController.batchMode == true) {
-                if (item.engine.temporaryOldValues.size > 0) {
-                    if (item.engine.checkChangesTemporary()) {
-                        effectedItems.add(item);
-                    }
-                } else {
-                    effectedItems.add(item);
-                }
-            } else {
-                if (item.engine.checkChangesOldValues()) {
-                    effectedItems.add(item);
-                }
-            }
-        });
-
-        // create an array of reactive elements, sorted by ID (order of creation)
-        let effectedItemsSorted = Array.from(effectedItems)
-            .filter((item) => item.hasSubscribers())
-            .sort(sortReactiveItems);
-
-        modeController.startSubscribersMode();
-
-        let usedSubscribers = new Set();
-        let errors = [];
-
-        for (let i = 0; i < effectedItemsSorted.length; i++) {
-            let item = effectedItemsSorted[i];
-
-            let itemSubscribers =
-                item.engine.subscribeController.getSubscribers();
-
-            for (let subscriber of itemSubscribers) {
-                if (usedSubscribers.has(subscriber)) {
-                    continue;
-                }
-
-                usedSubscribers.add(subscriber);
-                try {
-                    subscriber(item.engine.updates);
-                } catch (e) {
-                    let error = new Error(
-                        `Error in ${item.name}: ${e.message}`,
-                        { cause: item }
-                    );
-                    error.stack = e.stack;
-                    errors.push(error);
-                }
-            }
-
-            item.engine.clearUpdates();
-        }
-
-        this.items.forEach((item) => {
-            item.engine.clearUpdates();
-        });
-
-        usedSubscribers.clear();
-        this.items.clear();
-
-        modeController.endSubscribersMode();
-
-        if (modeController.throwErrorInSubscribers) {
-            for (let i = 0; i < errors.length; i++) {
-                let error = errors[i];
-                throw error;
-            }
-        }
+    get size() {
+        return this.#initialValues.size;
     }
 }
-
-modeController.on("beforeBatchModeEnd", () => {
-    changedItemsController.runSubscribers();
-    changedItemsController.clear();
-});
-
-const changedItemsController = new ChangedItemsController();
 
 // @ts-check
 
@@ -743,123 +851,237 @@ const EngineMessages = {
 const ATOM = 1;
 const COMPUTED = 2;
 const COLLECTION = 3;
-const REACTIVEPROPS_OBJECT = 4;
-
-/** @typedef {(...args:any)=>boolean} CompareFunction */
+const SHALLOW_REACTIVE = 4;
 
 class Engine {
     /**
      * The set of dependencies of the engine.
      * @type {Set<ReactivePrimitive>}
-     * */
-    dependencies = new Set(); // dependencies
+     */
+    dependencies = new Set();
 
     /**
      * The set of dependents of the engine.
      * @type {Set<ReactivePrimitive>}
-     * */
-    dependents = new Set(); // dependents
+     */
+    dependents = new Set();
 
     /**
-     * A unique identifier for the engine. It is used to determine the order in which reactive items were created.
-     * @type {ItemId}
-     * */
+     * Unique identifier for ordering.
+     * @type {number}
+     */
     id = idService.generateId();
 
     /**
-     * The version of the value of the reactive item.
+     * Version number (currently unused, kept for potential future use).
      * @type {number}
      */
     version = 0;
 
     /**
-     * The reference to the reactive item.
+     * Reference to the reactive item.
      * @type {ReactivePrimitive}
-     * */
+     */
     reactiveItem;
 
     /**
-     * The flag that indicates whether the Engine should recalculate the value of the reactive item.
+     * Flag indicating that the value should be recalculated.
      * @type {boolean}
-     * */
+     */
     shouldRecalc = false;
 
     /**
-     * Indicates whether the Engine has been destroyed.
+     * Indicates whether the engine has been destroyed.
      * @type {boolean}
-     * */
+     */
     isDestroyed = false;
 
     /**
-     * The error state of the Engine.
      * @type {null|Error}
-     * */
-    error = null;
+     */
+    #error = null;
 
     subscribeController = new SubscribeController();
 
     /**
      * The type of the reactive item.
      * @type {number}
-     * */
+     */
     type;
 
-    /** @type {Map<string, UpdateDataRecord>} */
+    /**
+     * Map of pending updates (property -> UpdateDataRecord).
+     * @type {Map<string, UpdateDataRecord>}
+     */
     updates = new Map();
 
-    oldValues = new Map();
-
-    // Holds previous values when batchMode is active
-    temporaryOldValues = new Map();
+    /**
+     * Snapshot of original values when inside a batch.
+     * @type {BatchSnapshot|null}
+     */
+    #batchSnapshot = null;
 
     /**
-     * A function that compares two values to determine if they are equal.
+     * Comparison function for equality.
      * @type {CompareFunction|null}
-     * */
+     */
     compareFn = null;
 
     /**
-     * Prevents updates from being propagated when the engine is setting properties of the reactive item.
+     * Prevents updates from being propagated (used during mass updates).
      * @type {boolean}
-     * */
-    muteUpdates = false;
+     */
+    suppressNotifications = false;
 
     /**
-     * Initializes an Engine instance with a given reactive item.
-     * @param {ReactivePrimitive} reactiveItem - The reactive item to be managed by the engine.
-     * @param {ATOM|COMPUTED|COLLECTION|REACTIVEPROPS_OBJECT} type - The type of the reactive item.
+     * Creates an Engine instance.
+     * @param {ReactivePrimitive} reactiveItem - The reactive item.
+     * @param {ATOM|COMPUTED|COLLECTION|SHALLOW_REACTIVE} type - The type.
      */
     constructor(reactiveItem, type) {
         this.reactiveItem = reactiveItem;
         this.type = type;
     }
 
+    /** @type {Error|null} */
+    get error() {
+        return this.#error;
+    }
+
     /**
-     * Adds the given dependencies to the engine. The engine will be considered as needing an update if any of the
-     * dependencies have changed.
-     * @param {Set<ReactivePrimitive>} dependencies - The dependencies to add.
+     * Records a change attempt. In batch mode, stores the original value.
+     * @param {string} property - The property key.
+     * @param {any} oldValue - The value before the change.
+     */
+    #recordChange(property, oldValue) {
+        if (modeController.batchMode) {
+            if (!this.#batchSnapshot) {
+                this.#batchSnapshot = new BatchSnapshot(this.reactiveItem);
+            }
+            this.#batchSnapshot.record(property, oldValue);
+        }
+    }
+
+    /**
+     * Determines whether a change actually affects the final value (considering batch).
+     * @param {string} property - The property key.
+     * @param {any} newValue - The new value.
+     * @returns {boolean} True if the change is effective.
+     */
+    isEffectiveChange(property, newValue) {
+        let effectiveOld;
+        if (modeController.batchMode && this.#batchSnapshot?.has(property)) {
+            effectiveOld = this.#batchSnapshot.getOriginal(property);
+        } else {
+            // When not in batch or property not recorded, we treat oldValue as unknown.
+            // In practice, this method is called after recordChange, so oldValue is known.
+            // We'll rely on the caller passing the correct oldValue, but here we need a baseline.
+            // For simplicity, we assume that if no snapshot, the change is always effective?
+            // Better to have the caller pass oldValue. We'll change signature.
+            // But to keep compatibility with existing calls, we'll require oldValue parameter.
+            throw new Error('isEffectiveChange requires oldValue when not in batch mode');
+        }
+        return !this.reactiveItem.equals(effectiveOld, newValue);
+    }
+
+    /**
+     * Alternative version that accepts explicit oldValue (preferred).
+     * @param {string} property - The property key.
+     * @param {any} oldValue - The previous value (immediate before this change).
+     * @param {any} newValue - The new value.
+     * @returns {boolean}
+     */
+    isEffectiveChangeWithOld(property, oldValue, newValue) {
+        if (modeController.batchMode && this.#batchSnapshot?.has(property)) {
+            const original = this.#batchSnapshot.getOriginal(property);
+            return !this.reactiveItem.equals(original, newValue);
+        }
+        return !this.reactiveItem.equals(oldValue, newValue);
+    }
+
+    /**
+     * Commits a change: creates an UpdateDataRecord, adds to updates, and schedules notification.
+     * @param {string} property - The property key.
+     * @param {"set"|"delete"} verb - The operation.
+     * @param {any} oldValue - The previous value (immediate before this change).
+     * @param {any} newValue - The new value.
+     * @returns {boolean} True if committed (i.e., value actually changed).
+     */
+    #commitChange(property, verb, oldValue, newValue) {
+        let reportedOld = oldValue;
+        let compareOld = oldValue;
+        if (modeController.batchMode && this.#batchSnapshot?.has(property)) {
+            const original = this.#batchSnapshot.getOriginal(property);
+            reportedOld = original;
+            compareOld = original;
+        }
+
+        // 1. Проверяем, произошла ли реальная мутация (изменение значения)
+        const hasMutation =
+            property === '' ? !this.reactiveItem.equals(oldValue, newValue) : oldValue !== newValue;
+
+        if (!hasMutation) {
+            return false;
+        }
+
+        // 2. Всегда уведомляем зависимых и добавляем элемент в changedItemsController
+        //    (даже если в batch и значение позже вернётся к исходному)
+        this.notifyDependents(EngineMessages.DEPENDENCY_CHANGED);
+        changedItemsController.addItem(this.reactiveItem);
+
+        // 3. Определяем, изменилось ли значение относительно стабильного (или старого вне batch)
+        const isEffective =
+            property === ''
+                ? !this.reactiveItem.equals(compareOld, newValue)
+                : compareOld !== newValue;
+
+        if (!isEffective) {
+            // Значение вернулось к исходному – удаляем запись обновления
+            this.updates.delete(property);
+            return false;
+        }
+
+        // 4. Создаём или обновляем запись в updates
+        const record = new UpdateDataRecord(verb, reportedOld, newValue, this.reactiveItem);
+        this.updates.set(property, record);
+        this.version++;
+        return true;
+    }
+
+    /**
+     * Legacy method for backward compatibility. Delegates to recordChange + #commitChange.
+     * @param {string} property - The property key.
+     * @param {"set"|"delete"} verb - The operation.
+     * @param {any} oldValue - The previous value.
+     * @param {any} value - The new value.
+     * @returns {boolean} True if an update was added.
+     */
+    addUpdate(property, verb, oldValue, value) {
+        this.#recordChange(property, oldValue);
+        return this.#commitChange(property, verb, oldValue, value);
+    }
+
+    /**
+     * Adds dependencies to this engine.
+     * @param {Set<ReactivePrimitive>} dependencies
      */
     addDependencies(dependencies) {
-        let array = [];
-
+        const array = [];
         for (const dependency of dependencies) {
             if (!this.dependencies.has(dependency)) {
                 array.push(dependency);
-
                 dependency.engine.addDependent(this.reactiveItem);
             }
         }
-
         array.sort(sortReactiveItems);
-
         for (let i = 0; i < array.length; i++) {
             this.addDependency(array[i]);
         }
     }
 
     /**
-     * Adds a single dependency to the engine. The engine will be considered as needing an update if the dependency changes.
-     * @param {ReactivePrimitive} dependency - The dependency to add.
+     * Adds a single dependency.
+     * @param {ReactivePrimitive} dependency
      */
     addDependency(dependency) {
         if (!this.dependencies.has(dependency)) {
@@ -868,145 +1090,151 @@ class Engine {
     }
 
     /**
-     * Adds a single dependent to the engine. The engine will notify the dependent whenever an update is needed.
-     * @param {ReactivePrimitive} dependent - The dependent to add.
-     * @returns {boolean} Whether the dependent was successfully added. If the engine is destroyed, the dependent is not added and the method returns false.
+     * Adds a dependent.
+     * @param {ReactivePrimitive} dependent
+     * @returns {boolean}
      */
     addDependent(dependent) {
-        if (this.isDestroyed) return false;
-
+        if (this.isDestroyed) {
+            return false;
+        }
         if (!this.dependents.has(dependent)) {
             this.dependents.add(dependent);
         }
-
         return true;
     }
 
     /**
-     * Returns a set of all dependents of the engine, including all dependents of the dependents of the engine. This
-     * method is useful for finding all atoms, computed values and collections that are dependent on a given reactive
-     * item.
-     * @returns {Set<ReactivePrimitive>} A set of all dependents of the engine.
+     * Removes a dependent.
+     * @param {ReactivePrimitive} dependent
      */
-    getDeepDependents() {
-        const dependents = new Set(this.dependents);
-
-        for (const dependent of this.dependents) {
-            for (const deepDependent of dependent.engine.dependents) {
-                dependents.add(deepDependent);
-            }
-        }
-
-        return dependents;
+    removeDependent(dependent) {
+        this.dependents.delete(dependent);
     }
 
     /**
-     * Returns an array of all dependents of the engine, including all dependents of the dependents of the engine, sorted
-     * by engine ID. This method is useful for finding all atoms, computed values and collections that are dependent on a
-     * given reactive item, in a specific order.
-     * @returns {Array<ReactivePrimitive>} An array of all dependents of the engine, sorted by engine ID.
+     * Returns all dependents recursively.
+     * @returns {Set<ReactivePrimitive>}
+     */
+    getDeepDependents() {
+        const result = new Set();
+        const queue = [this.reactiveItem];
+        const visited = new Set();
+        while (queue.length) {
+            const current = queue.shift();
+            if (!current || visited.has(current)) {
+                continue;
+            }
+            visited.add(current);
+            for (const dependent of current.engine.dependents) {
+                if (!result.has(dependent)) {
+                    result.add(dependent);
+                    queue.push(dependent);
+                }
+            }
+        }
+        return result;
+    }
+
+    /**
+     * Returns sorted array of deep dependents.
+     * @returns {Array<ReactivePrimitive>}
      */
     getDeepDependentsArray() {
-        let array = Array.from(this.getDeepDependents());
+        const array = Array.from(this.getDeepDependents());
         array.sort(sortReactiveItems);
         return array;
     }
 
     /**
-     * Notifies all dependents of the engine that a change has occurred.
-     * @param {EngineMessages} message - An optional message to pass to the dependents.
-     * @param { {sender: ReactivePrimitive, recipients: Set<ReactivePrimitive>} } [ctx] - An optional context to pass to the dependents.
+     * Notifies dependents of a message.
+     * @param {EngineMessages} message
+     * @param {{sender: ReactivePrimitive, recipients: Set<ReactivePrimitive>}} [ctx]
      */
     notifyDependents(message, ctx) {
         if (ctx === undefined) {
-            ctx = {
-                sender: this.reactiveItem,
-                recipients: new Set(),
-            };
+            ctx = { sender: this.reactiveItem, recipients: new Set() };
         }
-
-        this.dependents.forEach((dependent) => {
+        for (const dependent of this.dependents) {
             ctx.recipients.add(dependent);
             dependent.engine.getMessage(message, ctx);
-        });
+        }
     }
 
     /**
-     * Notifies all dependencies of the engine that a change has occurred.
-     * @param {EngineMessages} message - The message to pass to the dependencies.
-     * @param { {sender: ReactivePrimitive, recipients: Set<ReactivePrimitive>} } ctx - The context to pass to the dependencies.
+     * Notifies dependencies (reverse direction).
+     * @param {EngineMessages} message
+     * @param {{sender: ReactivePrimitive, recipients: Set<ReactivePrimitive>}} ctx
      */
     notifyDependencies(message, ctx) {
-        this.dependencies.forEach((dependent) => {
-            ctx.recipients.add(dependent);
-            dependent.engine.getMessage(message, ctx);
-        });
+        for (const dependency of this.dependencies) {
+            ctx.recipients.add(dependency);
+            dependency.engine.getMessage(message, ctx);
+        }
     }
 
     /**
-     * Processes a message that has been sent to the engine. If the message is {@link DEPENDENCY_CHANGED}, the engine
-     * notifies all dependents of the change. If the message is {@link DEPENDENCY_DESTROYED}, the engine destroys itself. If
-     * the message is {@link HAS_ERROR}, the engine forwards the error to all dependents.
-     * @param {EngineMessages} message - The message to process.
-     * @param { {sender: ReactivePrimitive, recipients: Set<ReactivePrimitive>} } ctx - The context to pass to the dependents.
+     * Handles incoming messages.
+     * @param {EngineMessages} message
+     * @param {{sender: ReactivePrimitive, recipients: Set<ReactivePrimitive>}} ctx
      */
     getMessage(message, ctx) {
-        if (message == EngineMessages.DEPENDENT_DESTROYED) {
-            this.dependents.delete(ctx.sender);
-        }
-
-        if (message == EngineMessages.DEPENDENCY_CHANGED) {
-            this.error = null;
-            this.shouldRecalc = true;
-            this.notifyDependents(message, ctx);
-        }
-
-        if (message == EngineMessages.DEPENDENCY_DESTROYED) {
-            this.destroy(ctx);
-        }
-
-        if (message == EngineMessages.HAS_ERROR) {
-            this.setError(ctx.sender.engine.error, ctx);
+        switch (message) {
+            case EngineMessages.DEPENDENT_DESTROYED:
+                this.dependents.delete(ctx.sender);
+                break;
+            case EngineMessages.DEPENDENCY_CHANGED:
+                this.#error = null;
+                this.shouldRecalc = true;
+                this.notifyDependents(message, ctx);
+                break;
+            case EngineMessages.DEPENDENCY_DESTROYED:
+                this.destroy(ctx);
+                break;
+            case EngineMessages.HAS_ERROR:
+                this.shouldRecalc = true;
+                this.setError(ctx.sender.engine.error, ctx);
+                break;
         }
     }
 
     /**
-     * Sets the error state of the Engine to the given error, increments the version, and notifies dependents of the error.
-     * @param {Error|null} error - The error to set.
-     * @param {{sender: ReactivePrimitive, recipients: Set<ReactivePrimitive>}} [ctx] - An optional context to pass to the dependents.
+     * Sets an error and notifies dependents.
+     * @param {Error|null} error
+     * @param {{sender: ReactivePrimitive, recipients: Set<ReactivePrimitive>}} [ctx]
      */
     setError(error, ctx) {
-        if (error === null) return;
-
-        if (ctx === undefined) {
-            ctx = {
-                sender: this.reactiveItem,
-                recipients: new Set(),
-            };
+        if (error === null) {
+            return;
         }
-
+        if (ctx === undefined) {
+            ctx = { sender: this.reactiveItem, recipients: new Set() };
+        }
         this.version++;
-        this.error = error;
+        this.#error = error;
         this.shouldRecalc = true;
         this.notifyDependents(EngineMessages.HAS_ERROR, ctx);
     }
 
     /**
-     * Destroys the Engine, clearing all dependencies, dependents and subscribers, and marking the Engine as destroyed.
-     * This method is useful for cleaning up after an Engine that is no longer needed.
+     * Clears the current error.
+     */
+    clearError() {
+        this.#error = null;
+    }
+
+    /**
+     * Destroys the engine.
      * @param {{sender: ReactivePrimitive, recipients: Set<ReactivePrimitive>}} [ctx]
      */
     destroy(ctx) {
-        if (this.isDestroyed) return;
-
-        if (ctx === undefined) {
-            ctx = {
-                sender: this.reactiveItem,
-                recipients: new Set(),
-            };
+        if (this.isDestroyed) {
+            return;
         }
-
-        this.error = null;
+        if (ctx === undefined) {
+            ctx = { sender: this.reactiveItem, recipients: new Set() };
+        }
+        this.#error = null;
         this.notifyDependents(EngineMessages.DEPENDENCY_DESTROYED, ctx);
         this.notifyDependencies(EngineMessages.DEPENDENT_DESTROYED, ctx);
         this.isDestroyed = true;
@@ -1014,137 +1242,114 @@ class Engine {
         this.dependents.clear();
         this.subscribeController.destroy();
         this.clearUpdates();
+        if (this.#batchSnapshot) {
+            this.#batchSnapshot.clear();
+            this.#batchSnapshot = null;
+        }
     }
 
     /**
-     * Adds an update to the Engine's update log. The update log is an array of objects with the following properties:
-     * - property: The name of the property that changed.
-     * - verb: The verb that describes the change. For example "set" or "added".
-     * - oldValue: The value of the property before the change.
-     * - value: The new value of the property.
-     * @param {string} property - The name of the property that changed.
-     * @param {"set"|"delete"} verb - The verb that describes the change.
-     * @param {any} oldValue - The value of the property before the change.
-     * @param {any} value - The new value of the property.
-     */
-    addUpdate(property, verb, oldValue, value) {
-        if (modeController.batchMode == true) {
-            if (this.temporaryOldValues.get(property) === undefined) {
-                this.temporaryOldValues.set(property, oldValue);
-            }
-        }
-
-        this.oldValues.set(property, oldValue);
-
-        if (modeController.batchMode) {
-            oldValue = this.temporaryOldValues.get(property);
-        }
-
-        if (property == "") {
-            this.updates.clear();
-        }
-
-        if (property == "" && this.reactiveItem.equals(oldValue, value)) {
-            this.updates.delete(property);
-            return;
-        }
-
-        let updateRecord = new UpdateDataRecord(
-            verb,
-            oldValue,
-            value,
-            this.reactiveItem
-        );
-        this.updates.set(property, updateRecord);
-    }
-
-    /**
-     * Clears all updates in the engine's update log.
+     * Clears all pending updates.
      */
     clearUpdates() {
         this.updates.clear();
     }
 
     /**
-     * Checks whether there are any updates in the engine's update log.
-     * @returns {boolean} True if there are updates, false otherwise.
+     * Checks if there are any pending updates.
+     * @returns {boolean}
      */
     hasUpdates() {
         return this.updates.size > 0;
     }
 
     /**
-     * Processes a value change.
-     */
-    valueChangedCallback() {
-        if (this.muteUpdates) return;
-
-        this.version++;
-
-        let ctx = {
-            sender: this.reactiveItem,
-            recipients: new Set(),
-        };
-
-        this.shouldRecalc = false;
-
-        this.notifyDependents(EngineMessages.DEPENDENCY_CHANGED, ctx);
-
-        changedItemsController.addItem(this.reactiveItem);
-    }
-
-    /**
-     * Checks whether any temporary old values have changed and if so, moves these values to the oldValues map and deletes them from the temporaryOldValues map.
-     * This method is called by the reactive item whenever a value change is detected and the muteUpdates flag is set to true.
-     * @returns {boolean} True if any changes were detected, false otherwise.
-     */
-    checkChangesTemporary() {
-        let item = this.reactiveItem;
-
-        let keys = Array.from(this.temporaryOldValues.keys());
-
-        for (let i = 0; i < keys.length; i++) {
-            let key = keys[i];
-
-            let temporaryOldValue = this.temporaryOldValues.get(key);
-            let actualValue =
-                key == "" ? item.getValue() : item.getValue()[key];
-
-            if (!item.equals(temporaryOldValue, actualValue)) {
-                this.oldValues.set(key, this.temporaryOldValues.get(key));
-                this.temporaryOldValues.delete(key);
-                return true;
-            }
-        }
-
-        return false;
-    }
-
-    /**
-     * Checks whether any old values have changed by comparing them with the current values.
-     * If a change is detected, returns true; otherwise, returns false.
-     * This method iterates over the keys of the oldValues map and checks if the
-     * corresponding current value differs from the stored old value.
-     *
-     * @returns {boolean} True if any old values have changed, false otherwise.
+     * Legacy method for compatibility.
+     * @returns {boolean}
      */
     checkChangesOldValues() {
         return this.hasUpdates();
     }
 
     /**
-     * Prepares the engine to set a new value for the reactive item by
-     * checking that the reactive item has not been destroyed and that
-     * there are no subscribers currently running. If either of these
-     * conditions are true, an error is thrown.
+     * Processes temporary changes after batch ends.
+     * Removes updates for properties that reverted to original values.
+     * @returns {boolean} True if any changes remain.
+     */
+    checkChangesTemporary() {
+        if (!this.#batchSnapshot) {
+            return this.hasUpdates();
+        }
+
+        /**
+         *
+         * @param {string} prop
+         * @returns {any}
+         */
+        const getCurrent = prop => {
+            if (prop === '') {
+                return this.reactiveItem.peekValue();
+            }
+            const val = this.reactiveItem.peekValue();
+            return val ? val[prop] : undefined;
+        };
+
+        const changedProps = this.#batchSnapshot.getChangedProperties(getCurrent);
+
+        for (const key of this.updates.keys()) {
+            if (!changedProps.includes(key)) {
+                this.updates.delete(key);
+            }
+        }
+
+        const hasChanges = this.updates.size > 0;
+        this.#batchSnapshot.clear();
+        this.#batchSnapshot = null;
+
+        return hasChanges;
+    }
+
+    /**
+     * Called after a value change to schedule notifications.
+     */
+    valueChangedCallback() {
+        if (this.suppressNotifications) {
+            return;
+        }
+        changedItemsController.addItem(this.reactiveItem);
+    }
+
+    /**
+     * Prepares the engine for setting a new value.
+     * @throws {Error} If destroyed or in subscribers mode.
      */
     prepareSetValue() {
         if (this.isDestroyed) {
-            throw new Error("The reactive item has been destroyed");
+            throw new Error('The reactive item has been destroyed');
         }
-
         if (modeController.subscribersMode) {
-            throw new Error("Cannot set value while subscribers are running");
+            throw new Error('Cannot set value while subscribers are running');
+        }
+    }
+
+    /**
+     * Updates dependencies to a new set.
+     * @param {Set<ReactivePrimitive>} newDeps
+     */
+    updateDependencies(newDeps) {
+        // Remove old dependencies no longer needed
+        for (const oldDep of this.dependencies) {
+            if (!newDeps.has(oldDep)) {
+                this.dependencies.delete(oldDep);
+                oldDep.engine.removeDependent(this.reactiveItem);
+            }
+        }
+        // Add new dependencies
+        for (const newDep of newDeps) {
+            if (!this.dependencies.has(newDep)) {
+                this.dependencies.add(newDep);
+                newDep.engine.addDependent(this.reactiveItem);
+            }
         }
     }
 }
@@ -1153,11 +1358,12 @@ class Engine {
 
 
 class Tracker {
-    #isTurnedOn = false;
+    #isActive = false;
     /** @type {Set<ReactivePrimitive>} */
     #store = new Set();
+    #eventEmitter = new EventEmitterLite();
 
-    /** @type {Object} */
+    /** @type {object} */
     ctx = {};
 
     /**
@@ -1183,14 +1389,26 @@ class Tracker {
      * Adds a reactive item to the tracker's store if the tracker is turned on. If the tracker is not turned on, this
      * method does nothing.
      * @param {ReactivePrimitive} item - The reactive item to add to the tracker's store.
-     * @param {string} [key=""]
+     * @param {string} [_key=""]
      */
-    add(item, key = "") {
-        if (modeController.untrackMode) return;
-
-        if (this.#isTurnedOn) {
-            this.#store.add(item);
+    add(item, _key = '') {
+        if (modeController.untrackMode) {
+            return;
         }
+
+        if (this.#isActive) {
+            this.#store.add(item);
+            this.#eventEmitter.emit('add', item);
+        }
+    }
+
+    /**
+     *
+     * @param {(reactiveItem:ReactivePrimitive)=>void} callback
+     * @returns {()=>void}
+     */
+    onAdd(callback) {
+        return this.#eventEmitter.on('add', callback);
     }
 
     /**
@@ -1198,21 +1416,22 @@ class Tracker {
      * @returns {boolean} true if the tracker is on, false if it is off.
      */
     isTurnedOn() {
-        return this.#isTurnedOn;
+        return this.#isActive;
     }
 
     /**
      * Turns the tracker on and clears its store. If the tracker is already turned on, an error is thrown.
-     * @param {Object} [ctx={}] - The context to use when the tracker is turned on.
+     * @param {object} [ctx={}] - The context to use when the tracker is turned on.
      * are tracked. If filter is a function, it is called with each reactive item as its argument, and if it returns false, the
      * reactive item is not tracked.
      */
     turnOn(ctx = {}) {
-        if (this.#isTurnedOn)
-            throw new Error("The tracker is already turned on");
+        if (this.#isActive) {
+            throw new Error('The tracker is already turned on');
+        }
 
         this.ctx = ctx;
-        this.#isTurnedOn = true;
+        this.#isActive = true;
         this.#store.clear();
     }
 
@@ -1221,31 +1440,31 @@ class Tracker {
      * anything to any registered listeners. The tracker is off by default.
      */
     turnOff() {
-        this.#isTurnedOn = false;
+        this.#isActive = false;
     }
 }
 
 /**
- * The getValueTracker is a utility instance that monitors reactive items that are used when a computed item is created. It is used
+ * The dependencyTracker is a utility instance that monitors reactive items that are used when a computed item is created. It is used
  * to track the dependencies of a computed item, so that it can be recalculated when any of the dependencies change.
  */
-const getValueTracker = new Tracker();
+const dependencyTracker = new Tracker();
 
 /**
- * Executes the specified function with the given arguments while tracking
- * all reactive items accessed during its execution. The tracked items are
- * returned as a set, representing the dependencies used by the function.
- * This is useful for identifying which reactive items a function depends on.
- *
- * @param {Function} fn - The function to execute and track for reactive item usage.
- * @param {...any} args - The arguments to pass to the function.
- * @returns {Set<ReactivePrimitive>} A set of reactive items accessed during the function execution.
+ * Executes the specified function and tracks reactive items.
+ * Returns a Set of used reactive items.
+ * @param {Function} fn - The function to execute and track.
+ * @param {...any} args - Arguments to pass to the function.
+ * @returns {Set<ReactivePrimitive>} Set of reactive items accessed.
  */
 function getSetOfUsedReactiveItems(fn, ...args) {
-    getValueTracker.turnOn();
-    fn(...args);
-    getValueTracker.turnOff();
-    return getValueTracker.data;
+    dependencyTracker.turnOn();
+    try {
+        fn(...args);
+    } finally {
+        dependencyTracker.turnOff();
+    }
+    return dependencyTracker.data;
 }
 
 // @ts-check
@@ -1257,17 +1476,25 @@ function getSetOfUsedReactiveItems(fn, ...args) {
  * @private
  */
 class ReactivePrimitive {
-    /** @type {Engine} */
     engine;
 
-    name = "";
+    name = '';
+
+    /**
+     *
+     * @param {1|2|3|4} type
+     */
+    constructor(type) {
+        this.engine = new Engine(this, type);
+    }
 
     /**
      * Subscribes a function to be called whenever the value of this reactive item changes.
-     * @param {(updates: Map<string, UpdateDataRecord>)=>void} fn - The function to be called whenever the value of this reactive item changes.
-     * @param {Object} [options] - Optional options.
+     * @param {(updates: Map<string, import("./../core/UpdateDataRecord.js").UpdateDataRecord>)=>void} fn - The function to be called whenever the value of this reactive item changes.
+     * @param {object} [options] - Optional options.
      * @param {number} [options.delay] - The delay in milliseconds before the function is called.
      * @param {AbortSignal} [options.signal] - The signal to abort the subscription.
+     * @returns {()=>void}
      */
     subscribe(fn, options) {
         return this.engine.subscribeController.subscribe(fn, options);
@@ -1277,14 +1504,14 @@ class ReactivePrimitive {
      * Removes all "change" subscribers. Listeners for "#has-subscribers" and "#no-subscribers" are not removed.
      */
     clearSubscribers() {
-        return this.engine.subscribeController.clearSubscribers();
+        this.engine.subscribeController.clearSubscribers();
     }
 
     /**
      * Removes all subscribers, including listeners for "#has-subscribers" and "#no-subscribers" events.
      */
     clearAllSubscribers() {
-        return this.engine.subscribeController.clearAllSubscribers();
+        this.engine.subscribeController.clearAllSubscribers();
     }
 
     /**
@@ -1297,24 +1524,28 @@ class ReactivePrimitive {
 
     /**
      * Retrieves the current value of the reactive item.
-     * @param {Object} [options] - Optional options.
-     * @param {boolean} [options.untracked=false] - If `true`, the value will not be added to the getValueTracker.
+     * @param {object} [options] - Optional options.
+     * @param {boolean} [options.untracked=false] - If `true`, the value will not be added to the dependencyTracker.
      * @returns {any} The current value of the reactive item.
      */
     getValue(options) {
-        if (this.engine === undefined) {
-            throw new Error("Not implemented");
-        }
-
         if (this.engine.isDestroyed) {
-            throw new Error("The reactive item has been destroyed");
+            throw new Error('The reactive item has been destroyed');
         }
 
-        let _options = Object.assign({ untracked: false }, options);
+        const _options = Object.assign({ untracked: false }, options);
 
-        if (_options.untracked == false) {
-            getValueTracker.add(this);
+        if (_options.untracked === false) {
+            dependencyTracker.add(this);
         }
+    }
+
+    /**
+     * Retrieves the current value of the reactive item.
+     * @returns {any} The current value of the reactive item.
+     */
+    peekValue() {
+        return this.getValue({ untracked: true });
     }
 
     /**
@@ -1337,11 +1568,11 @@ class ReactivePrimitive {
     hasError() {
         try {
             this.getValue();
-        } catch (error) {
-            this.engine.error = error;
+        } catch (e) {
+            this.engine.setError(getError(e));
         }
 
-        return this.engine.error != null;
+        return this.engine.error !== null;
     }
 
     /**
@@ -1371,12 +1602,12 @@ class ReactivePrimitive {
      * @returns {()=>void} A function that unsubscribes the given function.
      */
     onDestroy(fn) {
-        let that = this;
+        const that = this;
         const callback = () => {
             fn(that);
         };
 
-        let unsubscriber = this.engine.subscribeController.onDestroy(callback);
+        const unsubscriber = this.engine.subscribeController.onDestroy(callback);
         return unsubscriber;
     }
 
@@ -1398,7 +1629,9 @@ class ReactivePrimitive {
      * @returns {boolean} True if the two values are equal, false otherwise.
      */
     equals(a, b) {
-        if (b === undefined) b = this.getValue();
+        if (b === undefined) {
+            b = this.getValue();
+        }
 
         if (this.engine.compareFn) {
             return this.engine.compareFn(a, b);
@@ -1420,7 +1653,7 @@ class ReactivePrimitive {
 
 /**
  * Atom is a reactive primitive that holds a value. It is the base unit of reactive state.
- * @extends ReactivePrimitive
+ * @augments ReactivePrimitive
  * @template T
  * @example
  * ```js
@@ -1468,41 +1701,31 @@ class Atom extends ReactivePrimitive {
     /** @type {T} */
     #currentValue;
 
-    options = {
-        name: "",
-        compareFunction: null,
-    };
-
     /**
      * Initializes an Atom instance with a given value.
      * @param {T} value - The initial value of the Atom.
-     * @param {Object} [options] - Options.
+     * @param {object} [options] - Options.
      * @param {string} [options.name] - The name of the Atom.
-     * @param {(a:T, b:T)=>boolean} [options.compareFunction] - A function that compares two values for equality.
+     * @param {((a:T, b:T)=>boolean)|null} [options.compareFunction] - A function that compares two values for equality.
      */
-    constructor(value, options) {
-        super();
+    constructor(
+        value,
+        options = {
+            name: '',
+            compareFunction: null,
+        }
+    ) {
+        super(ATOM);
 
         if (value instanceof ReactivePrimitive) {
             throw new Error(
-                `Atom${
-                    this.name ? ` (${this.name})` : ""
-                }: value must not be a reactive item`
+                `Atom${this.name ? ` (${this.name})` : ''}: value must not be a reactive item`
             );
         }
 
-        this.options = Object.assign({}, this.options, options);
-
-        if (this.options.name) this.name = this.options.name;
-
+        this.name = options.name || '';
+        this.engine.compareFn = options.compareFunction || null;
         this.#currentValue = value;
-
-        this.engine = new Engine(this, ATOM);
-        if (this.options.compareFunction)
-            this.engine.compareFn = this.options.compareFunction;
-
-        //this.engine.addUpdate("", "set", undefined, this.#currentValue);
-        this.engine.oldValues.set("", undefined);
     }
 
     /**
@@ -1513,14 +1736,11 @@ class Atom extends ReactivePrimitive {
     set value(value) {
         if (value instanceof ReactivePrimitive) {
             throw new Error(
-                `Atom${
-                    this.name ? ` (${this.name})` : ""
-                }: value must not be a reactive item`
+                `Atom${this.name ? ` (${this.name})` : ''}: value must not be a reactive item`
             );
         }
 
-        /** @type {Engine} */
-        let engine = this.engine;
+        const engine = this.engine;
 
         engine.prepareSetValue();
 
@@ -1528,18 +1748,19 @@ class Atom extends ReactivePrimitive {
             return;
         }
 
-        let oldValue = this.#currentValue;
+        const oldValue = this.#currentValue;
         this.#currentValue = clone(value);
 
-        let newValue = this.#currentValue;
-        engine.addUpdate("", "set", oldValue, newValue);
-        engine.valueChangedCallback();
+        const newValue = this.#currentValue;
+        if (engine.addUpdate('', 'set', oldValue, newValue)) {
+            engine.valueChangedCallback();
+        }
     }
 
     /**
      * Retrieves the current value of the Atom. If the engine is destroyed, an error is thrown.
      * Tracks the Atom for dependency management.
-     * @param {{untracked?: boolean}} [options] - Optional options. If `untracked` is `false`, the Atom value will be added to the getValueTracker.
+     * @param {{untracked?: boolean}} [options] - Optional options. If `untracked` is `false`, the Atom value will be added to the dependencyTracker.
      * @returns {T} The current value of the Atom.
      */
     getValue(options) {
@@ -1591,7 +1812,7 @@ class Atom extends ReactivePrimitive {
 /**
  * Computed is a reactive primitive that holds a value that is computed from other reactive values.
  * It is the base unit of reactive state.
- * @extends ReactivePrimitive
+ * @augments ReactivePrimitive
  * @template {unknown} T
  * @example
  * ```js
@@ -1643,72 +1864,46 @@ class Computed extends ReactivePrimitive {
     #fn;
 
     /** @type {string} */
-    #cachedDependentsVersionString = "";
+    __cachedDependentsVersionString = '';
 
     options = {
-        name: "",
-        isHardFunction: false,
-        compareFunction: null,
+        smartRecompute: false,
     };
 
     /**
      * Initializes an Atom instance with a given value.
      * @param {function():T} fn - function that returns the value of the Computed
-     * @param {Object} [options] - Options
+     * @param {object} [options] - Options
      * @param {string} [options.name] - The name of the Computed instance.
-     * @param {(a:T, b:T)=>boolean} [options.compareFunction] - A function that compares two values for equality.
-     * @param {boolean} [options.isHardFunction] - Indicates whether the computed is a hard function. If true, it prevents calling the function by comparing the string representation of the dependencies.
+     * @param {((a:T, b:T)=>boolean)|null} [options.compareFunction] - A function that compares two values for equality.
+     * @param {boolean} [options.smartRecompute] - When true, the computed value will be
+     *        recalculated only when the version string of its dependencies changes,
+     *        rather than on every dependency notification. This avoids unnecessary
+     *        recalculations when dependencies change but their final values remain
+     *        the same (e.g., toggling back and forth). Defaults to false.
      */
-    constructor(fn, options) {
-        super();
+    constructor(
+        fn,
+        options = {
+            name: '',
+            compareFunction: null,
+            smartRecompute: false,
+        }
+    ) {
+        super(COMPUTED);
 
-        this.options = Object.assign({}, this.options, options);
+        this.options = {
+            smartRecompute: options.smartRecompute ?? false,
+        };
 
-        if (this.options.name) this.name = this.options.name;
-
-        this.engine = new Engine(this, COMPUTED);
-        if (this.options.compareFunction)
-            this.engine.compareFn = this.options.compareFunction;
-
+        this.name = options.name || '';
+        this.engine.compareFn = options.compareFunction || null;
         this.#fn = fn;
 
-        getValueTracker.turnOn();
-        modeController.computedMode = true;
-        try {
-            let value = fn();
+        this.#currentValue = this.#collectDependenciesAndInitValue();
 
-            if (value instanceof ReactivePrimitive) {
-                throw new Error(
-                    `Computed${
-                        this.name ? ` (${this.name})` : ""
-                    }: Return value must not be a reactive item`
-                );
-            }
-
-            this.#currentValue = value;
-            this.engine.oldValues.set("", this.#currentValue);
-        } catch (error) {
-            this.engine.error = error;
-        }
-
-        modeController.computedMode = false;
-        getValueTracker.turnOff();
-
-        if (this.engine.error) {
-            throw this.engine.error;
-        }
-
-        if (getValueTracker.data.size == 0) {
-            throw new Error(
-                `Computed${this.name ? ` (${this.name})` : ""}: No dependencies`
-            );
-        }
-
-        this.engine.addDependencies(getValueTracker.data);
-
-        if (this.options.isHardFunction) {
-            this.#cachedDependentsVersionString =
-                this.#getDependentsVersionString();
+        if (this.options.smartRecompute) {
+            this.__cachedDependentsVersionString = this.#getDependenciesVersionString();
         }
     }
 
@@ -1716,25 +1911,57 @@ class Computed extends ReactivePrimitive {
      * Returns a string representation of the dependencies of the Computed value.
      * @returns {string}
      */
-    #getDependentsVersionString() {
+    #getDependenciesVersionString() {
         /** @type {string[]} */
-        let result = [];
-        /** @type {Engine} */
-        let engine = this.engine;
+        const result = [];
+        const engine = this.engine;
 
-        engine.dependencies.forEach((dependency) => {
+        engine.dependencies.forEach(dependency => {
+            // If a dependency is stale (shouldRecalc = true), we must recalculate it
+            // to get its most recent version. This is necessary for smartRecompute
+            // to correctly detect changes in the dependency graph.
             if (dependency.engine.shouldRecalc) {
-                dependency.getValue();
+                dependency.getValue(); // side effect: forces recomputation
             }
 
-            result.push(
-                dependency.engine.id.toString() +
-                    ":" +
-                    dependency.engine.version
-            );
+            result.push(dependency.engine.id.toString() + ':' + dependency.engine.version);
         });
 
-        return result.join(";");
+        return result.join(';');
+    }
+
+    #collectDependenciesAndInitValue() {
+        dependencyTracker.turnOn();
+        modeController.computedMode = true;
+        /** @type {T} */
+        let value;
+        try {
+            value = this.#fn();
+            if (value instanceof ReactivePrimitive) {
+                throw new Error(
+                    `Computed${
+                        this.name ? ` (${this.name})` : ''
+                    }: Return value must not be a reactive item`
+                );
+            }
+        } catch (e) {
+            this.engine.setError(getError(e));
+        }
+
+        modeController.computedMode = false;
+        dependencyTracker.turnOff();
+
+        if (this.engine.error) {
+            throw this.engine.error;
+        }
+
+        if (dependencyTracker.data.size === 0) {
+            throw new Error(`Computed${this.name ? ` (${this.name})` : ''}: No dependencies`);
+        }
+
+        this.engine.addDependencies(dependencyTracker.data);
+        // @ts-ignore
+        return value;
     }
 
     /**
@@ -1743,23 +1970,25 @@ class Computed extends ReactivePrimitive {
      * @returns {boolean} true if the Computed value needs to be recalculated, false if it does not.
      */
     isStale() {
-        /** @type {Engine} */
-        let engine = this.engine;
+        const engine = this.engine;
 
-        if (engine.error != null) return true;
+        if (engine.error !== null) {
+            return true;
+        }
 
-        if (engine.shouldRecalc) return true;
+        if (engine.shouldRecalc) {
+            return true;
+        }
 
         return false;
     }
 
     #areDependenciesStale() {
-        /** @type {Engine} */
-        let engine = this.engine;
+        const engine = this.engine;
 
-        let dependentsVersionString = this.#getDependentsVersionString();
-        if (dependentsVersionString != this.#cachedDependentsVersionString) {
-            this.#cachedDependentsVersionString = dependentsVersionString;
+        const dependentsVersionString = this.#getDependenciesVersionString();
+        if (dependentsVersionString !== this.__cachedDependentsVersionString) {
+            this.__cachedDependentsVersionString = dependentsVersionString;
             engine.shouldRecalc = true;
 
             return true;
@@ -1769,21 +1998,23 @@ class Computed extends ReactivePrimitive {
     }
 
     /**
-     * @param {{untracked?: boolean}} [options] - Optional options. If `untracked` is `false`, the Computed value will be added to the getValueTracker.
+     * @param {{untracked?: boolean}} [options] - Optional options. If `untracked` is `false`, the Computed value will be added to the dependencyTracker.
      * @returns {T} The current value of the Computed value.
      */
     getValue(options) {
         super.getValue(options);
 
-        /** @type {Engine} */
-        let engine = this.engine;
+        const engine = this.engine;
+
+        // If there's an error and dependencies haven't changed, rethrow the same error without recalculating
+        if (engine.error !== null && !engine.shouldRecalc) {
+            throw engine.error;
+        }
 
         if (modeController.computedMode) {
             if (this.isStale()) {
                 throw new Error(
-                    `Computed${
-                        this.name ? ` (${this.name})` : ""
-                    }: Dependencies cannot be stale`,
+                    `Computed${this.name ? ` (${this.name})` : ''}: Dependencies cannot be stale`,
                     { cause: this }
                 );
             }
@@ -1794,7 +2025,7 @@ class Computed extends ReactivePrimitive {
             return this.#currentValue;
         }
 
-        if (this.options.isHardFunction) {
+        if (this.options.smartRecompute) {
             if (!this.#areDependenciesStale()) {
                 engine.shouldRecalc = false;
                 return this.#currentValue;
@@ -1810,6 +2041,14 @@ class Computed extends ReactivePrimitive {
      */
     get value() {
         return this.getValue();
+    }
+
+    /**
+     *
+     * @returns {T}
+     */
+    peekValue() {
+        return this.#currentValue;
     }
 
     /**
@@ -1844,11 +2083,17 @@ class Computed extends ReactivePrimitive {
     }
 
     #calc() {
-        /** @type {Engine} */
-        let engine = this.engine;
+        const engine = this.engine;
 
         engine.shouldRecalc = false;
-        engine.error = null;
+        engine.clearError();
+
+        // Collect new dependencies if dynamic mode is enabled
+        /** @type {Set<ReactivePrimitive>} */
+        const newDeps = new Set();
+        const unsubscribe = dependencyTracker.onAdd(item => {
+            newDeps.add(item);
+        });
 
         let value;
 
@@ -1856,27 +2101,31 @@ class Computed extends ReactivePrimitive {
         try {
             value = this.#fn();
         } catch (e) {
+            const error = getError(e);
             engine.setError(
-                new Error(
-                    `Computed${this.name ? ` (${this.name})` : ""}: ` +
-                        e.message,
-                    { cause: this }
-                )
+                new Error(`Computed${this.name ? ` (${this.name})` : ''}: ` + error.message, {
+                    cause: this,
+                })
             );
             throw engine.error;
+        } finally {
+            unsubscribe();
         }
 
         if (this.equals(this.#currentValue, value)) {
+            // Value didn't actually change – remove any pending update
+            this.engine.clearUpdates();
             return this.#currentValue;
         }
 
-        let oldValue = this.#currentValue;
+        const oldValue = this.#currentValue;
         this.#currentValue = clone(value);
 
-        let newValue = this.#currentValue;
-        engine.addUpdate("", "set", oldValue, newValue);
-
-        engine.valueChangedCallback();
+        const newValue = this.#currentValue;
+        //this.engine.version++;
+        if (engine.addUpdate('', 'set', oldValue, newValue)) {
+            engine.valueChangedCallback();
+        }
 
         return this.#currentValue;
     }
@@ -1886,237 +2135,186 @@ class Computed extends ReactivePrimitive {
 
 
 /**
- * Collection is a reactive primitive that holds an array of values. It is the base unit of reactive state.
- * @extends ReactivePrimitive
- * @template {unknown} T
+ * Collection is a reactive primitive that holds an array of values.
+ * It provides reactivity for array operations (push, pop, splice, etc.)
+ * and allows tracking changes to individual elements and the array length.
+ *
+ * @template T
+ * @augments ReactivePrimitive
  * @example
  * ```js
- * let c = new Collection([1, 2, 3]);
- * c.subscribe((updates) => {
- *     console.log("updated", updates);
+ * const coll = new Collection([1, 2, 3]);
+ * coll.subscribe((updates) => {
+ *     console.log('Collection changed:', Array.from(updates.keys()));
  * });
- *
- * let len = new Computed(() => c.data.length);
- *
- * len.subscribe((updates) => {
- *     console.log("len updated", updates);
- * });
- *
- * c.data.push(4);
+ * coll.value.push(4); // triggers reactivity
  * ```
  */
 class Collection extends ReactivePrimitive {
     /** @type {T[]} */
     #target;
-
     /** @type {T[]} */
     #proxy;
-
+    /** @type {number} */
     #length = 0;
-
     /** @type {ProxyHandler<T[]>} */
     #handler;
 
-    options = {
-        name: "",
-        compareFunction: null,
-    };
-
     /**
-     * Initializes a Collection instance with a given value.
-     * @param {T[]} value - The initial value of the Collection.
-     * @param {Object} [options] - Options.
-     * @param {string} [options.name] - The name of the Collection.
-     * @param {(a:T, b:T)=>boolean} [options.compareFunction] - A function to compare elements.
+     * Initializes a Collection instance with an initial array.
+     *
+     * @param {T[]} value - The initial array value.
+     * @param {object} [options] - Configuration options.
+     * @param {string} [options.name] - The name of the Collection (for debugging).
+     * @param {CompareFunction|null} [options.compareFunction] - Custom equality function for values.
      */
-    constructor(value, options) {
-        super();
-
-        this.options = Object.assign({}, this.options, options);
-
-        if (this.options.name) this.name = this.options.name;
-
-        this.#initHandler();
-
+    constructor(value, options = { name: '', compareFunction: null }) {
+        super(COLLECTION);
+        this.name = options.name || '';
+        this.engine.compareFn = options.compareFunction || null;
+        this.#handler = this.#initHandler();
         this.#target = [];
         this.#proxy = new Proxy(this.#target, this.#handler);
-
-        this.engine = new Engine(this, COLLECTION);
-
-        if (this.options.compareFunction)
-            this.engine.compareFn = this.options.compareFunction;
-
         this.#length = value.length;
-
-        // copy array
+        // Copy initial values
         for (let i = 0; i < value.length; i++) {
             this.#target[i] = value[i];
         }
     }
 
+    /**
+     * Initializes the proxy handler for array interception.
+     *
+     * @returns {ProxyHandler<T[]>} The proxy handler object.
+     */
     #initHandler = () => {
-        let that = this;
-
-        /** @type {ProxyHandler<T[]>} */
-        this.#handler = {
+        const that = this;
+        return {
             /**
-             * Sets a property on the Collection. If the property already exists, its value is updated. If not, a new property is added.
-             * @param {T[]} target - The Collection to set the property on.
-             * @param {string} key - The key of the property to set.
-             * @param {any} value - The value to set for the property.
-             * @returns {boolean} true if the property was successfully set.
+             * Intercepts property assignments on the array.
+             *
+             * @param {T[]} target - The target array.
+             * @param {string|symbol} key - The property key.
+             * @param {any} value - The value to set.
+             * @returns {boolean} True if the operation succeeded.
              */
             set: (target, key, value) => {
-                /** @type {Engine} */
-                let engine = that.engine;
+                // Ignore symbol keys
+                if (typeof key === 'symbol') {return true;}
+
+                const engine = that.engine;
                 engine.prepareSetValue();
+                if (target[/** @type {any} */ (key)] === value) {return true;}
 
-                if (target[key] === value) return true;
-
-                if (key != "length") {
-                    let oldValue = target[key];
-
-                    //console.log("key ", key);
-                    if (that.equals(oldValue, value)) return true;
-
-                    target[key] = value;
-
-                    if (that.#length != target.length) {
-                        let newLength = target.length;
-                        let oldLength = that.#length;
-
+                if (key !== 'length') {
+                    const oldValue = target[/** @type {any} */ (key)];
+                    if (that.equals(oldValue, value)) {return true;}
+                    target[/** @type {any} */ (key)] = value;
+                    if (that.#length !== target.length) {
+                        const newLength = target.length;
+                        const oldLength = that.#length;
                         that.#length = newLength;
-
-                        engine.addUpdate("length", "set", oldLength, newLength);
+                        engine.addUpdate('length', 'set', oldLength, newLength);
                     }
-
-                    engine.addUpdate(key, "set", oldValue, value);
-                    engine.valueChangedCallback();
+                    engine.addUpdate(key, 'set', oldValue, value);
                 } else {
-                    // if key is "length"
-                    let newLength = value;
-                    let oldLength = that.#length;
-
+                    const newLength = /** @type {number} */ (value);
+                    const oldLength = that.#length;
+                    if (newLength === oldLength) {return true;}
                     if (newLength < oldLength) {
-                        //engine.updates.delete("length");
-
                         for (let i = newLength; i < oldLength; i++) {
-                            let itemValue = that.#target[i];
-                            engine.addUpdate(
-                                i.toString(),
-                                "delete",
-                                itemValue,
-                                undefined
-                            );
+                            const itemValue = that.#target[i];
+                            engine.addUpdate(i.toString(), 'delete', itemValue, undefined);
                         }
-
                         that.#target.length = newLength;
                     } else if (newLength > oldLength) {
                         that.#target.length = newLength;
-
                         for (let i = oldLength; i < newLength; i++) {
-                            engine.addUpdate(
-                                i.toString(),
-                                "set",
-                                that.#target[i],
-                                undefined
-                            );
+                            engine.addUpdate(i.toString(), 'set', that.#target[i], undefined);
                         }
                     }
-
                     that.#length = newLength;
-                    engine.addUpdate("length", "set", oldLength, newLength);
-
-                    engine.valueChangedCallback();
+                    engine.addUpdate('length', 'set', oldLength, newLength);
                 }
-
-                return true;
-            },
-
-            /**
-             * Gets a property from the Collection. If the property is not found, undefined is returned.
-             * @param {T[]} target - The Collection to get the property from.
-             * @param {string} key - The key of the property to get.
-             * @returns {any} The value of the property, or undefined if it was not found.
-             */
-            get: (target, key) => {
-                that.getValue();
-
-                if (typeof target[key] == "function") return target[key];
-
-                return target[key];
-            },
-
-            /**
-             * Deletes a property from the Collection. If the property is not found, an error is thrown.
-             * @param {T[]} target - The Collection to delete the property from.
-             * @param {string} key - The key of the property to delete.
-             * @returns {boolean} true if the property was deleted, false if it was not.
-             */
-            deleteProperty: (target, key) => {
-                if (modeController.subscribersMode) {
-                    throw new Error(
-                        `Collection${
-                            this.name ? ` (${this.name})` : ""
-                        }: Cannot delete property while subscribers are running`
-                    );
-                }
-
-                /** @type {Engine} */
-                let engine = that.engine;
-
-                engine.addUpdate(key, "delete", target[key], undefined);
-                delete target[key];
 
                 engine.valueChangedCallback();
 
+                return true;
+            },
+            /**
+             * Intercepts property accesses on the array.
+             *
+             * @param {T[]} target - The target array.
+             * @param {string|symbol} key - The property key.
+             * @returns {any} The property value.
+             */
+            get: (target, key) => {
+                that.getValue();
+                // Ignore symbol keys
+                if (typeof key === 'symbol') {return undefined;}
+                if (typeof target[/** @type {any} */ (key)] === 'function') {
+                    return target[/** @type {any} */ (key)];
+                }
+                return target[/** @type {any} */ (key)];
+            },
+            /**
+             * Intercepts property deletions on the array.
+             *
+             * @param {T[]} target - The target array.
+             * @param {string|symbol} key - The property key.
+             * @returns {boolean} True if the operation succeeded.
+             */
+            deleteProperty: (target, key) => {
+                if (typeof key === 'symbol') {return true;}
+                if (modeController.subscribersMode) {
+                    throw new Error(
+                        `Collection${this.name ? ` (${this.name})` : ''}: Cannot delete property while subscribers are running`
+                    );
+                }
+                const engine = that.engine;
+                if (engine.addUpdate(key, 'delete', target[/** @type {any} */ (key)], undefined)) {
+                    delete target[/** @type {any} */ (key)];
+                    engine.valueChangedCallback();
+                }
                 return true;
             },
         };
     };
 
     /**
-     * Sets the value of the Collection. If the new value is the same as the current value, no action is taken.
-     * Updates the current value to the new value if they are different.
-     * @param {T[]} value - The new value to set for the Collection.
+     * Sets the entire array, replacing all elements.
+     * Only triggers reactivity if the new array differs from the current one.
+     *
+     * @param {T[]} value - The new array value.
      */
     set value(value) {
         if (!Array.isArray(value)) {
             throw new Error(
-                `Collection${
-                    this.name ? ` (${this.name})` : ""
-                }: Value must be an array`
+                `Collection${this.name ? ` (${this.name})` : ''}: Value must be an array`
             );
         }
-
-        let engine = /** @type {Engine} */ this.engine;
-
+        const current = this.getValue({ untracked: true });
+        // Shallow compare to avoid unnecessary updates
+        if (this.equals(current, value)) {return;}
+        const engine = this.engine;
         engine.prepareSetValue();
-
-        if (value === this.getValue()) {
-            return;
-        }
-
-        engine.muteUpdates = true;
-
+        engine.suppressNotifications = true;
         this.#proxy.length = value.length;
-
         for (let i = 0; i < value.length; i++) {
             this.#proxy[i] = value[i];
         }
 
-        engine.muteUpdates = false;
-
+        engine.suppressNotifications = false;
         this.#target = value;
-
         engine.valueChangedCallback();
     }
 
     /**
-     * Retrieves the proxied value of the Collection. If the engine is destroyed, an error is thrown.
-     * Tracks the Collection for dependency management.
-     * @param {{untracked?: boolean}} [options] - Optional options. If `untracked` is `false`, the Collection value will be added to the getValueTracker.
-     * @returns {T[]} The proxied value of the Collection.
+     * Returns the proxied array value.
+     * Tracks this Collection as a dependency when accessed.
+     *
+     * @param {{untracked?: boolean}} [options] - If `untracked` is true, does not add to dependency tracker.
+     * @returns {T[]} The reactive array proxy.
      */
     getValue(options) {
         super.getValue(options);
@@ -2124,34 +2322,37 @@ class Collection extends ReactivePrimitive {
     }
 
     /**
-     * Retrieves the proxied value of the Collection. If the engine is destroyed, an error is thrown.
-     * Tracks the Collection for dependency management.
-     * @returns {T[]} The proxied value of the Collection.
+     * Returns the proxied array value (same as getValue()).
+     *
+     * @returns {T[]} The reactive array proxy.
      */
     get value() {
         return this.getValue();
     }
 
     /**
-     * Sets the value of the Collection. This is a synonym for `set value(value)`.
-     * @param {T[]} value - The new value to set for the Collection.
+     * Alias for `value` setter.
+     *
+     * @param {T[]} value - The new array value.
      */
     set data(value) {
         this.value = value;
     }
 
     /**
-     * Retrieves the proxied value of the Collection. If the engine is destroyed, an error is thrown.
-     * Tracks the Collection for dependency management.
-     * @returns {T[]} The proxied value of the Collection.
+     * Alias for `value` getter.
+     *
+     * @returns {T[]} The reactive array proxy.
      */
     get data() {
         return this.getValue();
     }
 
     /**
-     * Returns the raw, unproxied value of the Collection. This is generally not recommended as it breaks reactivity.
-     * @returns {T[]} The raw, unproxied value of the Collection.
+     * Returns the raw, unproxied target array.
+     * Warning: Mutating the raw array directly does NOT trigger reactivity.
+     *
+     * @returns {T[]} The raw array.
      */
     getRawValue() {
         return this.#target;
@@ -2162,13 +2363,13 @@ class Collection extends ReactivePrimitive {
 
 
 /**
- * ReactiveProps is a reactive primitive that holds a shallow object. It is the base unit of reactive state.
+ * ShallowReactive is a reactive primitive that holds a shallow object. It is the base unit of reactive state.
  * It is a shallow reactive object, meaning that it only tracks changes to the properties of the object itself, not its nested properties.
- * @extends ReactivePrimitive
+ * @augments ReactivePrimitive
  * @template {{[key:string]:any}} T
  *  * @example
  * ```js
- * const b = new ReactiveProps({ foo: 1 });
+ * const b = new ShallowReactive({ foo: 1 });
  *
  * let bar = 0;
  *
@@ -2194,7 +2395,7 @@ class Collection extends ReactivePrimitive {
  * }
  *
  * let bar = 0;
- * const b = new ReactiveProps(new A(), { name: "b" });
+ * const b = new ShallowReactive(new A(), { name: "b" });
  *
  * b.subscribe(() => {
  *     bar++;
@@ -2217,7 +2418,7 @@ class Collection extends ReactivePrimitive {
  * // Outputs: 2
  * ```
  */
-class ReactiveProps extends ReactivePrimitive {
+class ShallowReactive extends ReactivePrimitive {
     /** @type {T} */
     #target;
 
@@ -2227,75 +2428,68 @@ class ReactiveProps extends ReactivePrimitive {
     /** @type {ProxyHandler<T>} */
     #handler;
 
-    options = {
-        name: "",
-        compareFunction: null,
-    };
-
     /**
-     * Initializes a ReactiveProps instance with a given value.
-     * @param {T} value - The initial value of the ReactiveProps.
-     * @param {Object} [options] - Options.
-     * @param {string} [options.name] - The name of the ReactiveProps.
+     * Initializes a ShallowReactive instance with a given value.
+     * @param {T} value - The initial value of the ShallowReactive.
+     * @param {object} [options] - Options.
+     * @param {string} [options.name] - The name of the ShallowReactive.
      */
-    constructor(value, options) {
-        super();
+    constructor(
+        value,
+        options = {
+            name: '',
+        }
+    ) {
+        super(SHALLOW_REACTIVE);
 
+        this.name = options.name || '';
         if (!isPlainObject(value)) {
             throw new Error(
-                `ReactiveProps${
-                    this.name ? ` (${this.name})` : ""
-                }: value must be an object`
+                `ShallowReactive${this.name ? ` (${this.name})` : ''}: value must be an object`
             );
         }
 
-        this.options = Object.assign({}, this.options, options);
-
-        if (this.options.name) this.name = this.options.name;
-
-        this.#initHandler();
-
+        this.#handler = this.#initHandler();
         this.#target = value;
 
         this.#proxy = new Proxy(this.#target, this.#handler);
-
-        this.engine = new Engine(this, REACTIVEPROPS_OBJECT);
     }
 
     #initHandler() {
-        let that = this;
+        const that = this;
 
         /** @type {ProxyHandler<T>} */
-        this.#handler = {
+        return {
             /**
-             * Sets a property on the ReactiveProps. If the property already exists, its value is updated. If not, a new property is added.
-             * @param {T} target - The ReactiveProps to set the property on.
+             * Sets a property on the ShallowReactive. If the property already exists, its value is updated. If not, a new property is added.
+             * @param {T} target - The ShallowReactive to set the property on.
              * @param {string} key - The key of the property to set.
              * @param {any} value - The value to set for the property.
-             * @param {Proxy} receiver - The proxy or object that initiated the operation.
              * @returns {boolean} true if the property was successfully set.
              */
-            set: (target, key, value, receiver) => {
-                /** @type {Engine} */
-                let engine = that.engine;
+            set: (target, key, value) => {
+                const engine = that.engine;
                 engine.prepareSetValue();
 
-                let oldValue = target[key];
+                const oldValue = target[key];
 
-                if (that.equals(oldValue, value)) return true;
+                if (that.equals(oldValue, value)) {
+                    return true;
+                }
 
-                // @ts-expect-error
+                // @ts-ignore
                 target[key] = value;
 
-                engine.addUpdate(key, "set", oldValue, value);
-                engine.valueChangedCallback();
+                if (engine.addUpdate(key, 'set', oldValue, value)) {
+                    engine.valueChangedCallback();
+                }
 
                 return true;
             },
 
             /**
-             * Gets a property from the ReactiveProps. If the property is not found, undefined is returned.
-             * @param {T} target - The ReactiveProps to get the property from.
+             * Gets a property from the ShallowReactive. If the property is not found, undefined is returned.
+             * @param {T} target - The ShallowReactive to get the property from.
              * @param {string} key - The key of the property to get.
              * @returns {any} The value of the property, or undefined if it was not found.
              */
@@ -2305,27 +2499,26 @@ class ReactiveProps extends ReactivePrimitive {
             },
 
             /**
-             * Deletes a property from the ReactiveProps. If the property is not found, an error is thrown.
-             * @param {T} target - The ReactiveProps to delete the property from.
+             * Deletes a property from the ShallowReactive. If the property is not found, an error is thrown.
+             * @param {T} target - The ShallowReactive to delete the property from.
              * @param {string} key - The key of the property to delete.
              * @returns {boolean} true if the property was deleted, false if it was not.
              */
             deleteProperty: (target, key) => {
                 if (modeController.subscribersMode) {
                     throw new Error(
-                        `ReactiveProps${
-                            this.name ? ` (${this.name})` : ""
+                        `ShallowReactive${
+                            this.name ? ` (${this.name})` : ''
                         }: Cannot delete property while subscribers are running`
                     );
                 }
 
-                /** @type {Engine} */
-                let engine = that.engine;
+                const engine = that.engine;
 
-                engine.addUpdate(key, "delete", target[key], undefined);
-                delete target[key];
-
-                engine.valueChangedCallback();
+                if (engine.addUpdate(key, 'delete', target[key], undefined)) {
+                    delete target[key];
+                    engine.valueChangedCallback();
+                }
 
                 return true;
             },
@@ -2333,10 +2526,10 @@ class ReactiveProps extends ReactivePrimitive {
     }
 
     /**
-     * Retrieves the proxied value of the ReactiveProps. If the engine is destroyed, an error is thrown.
-     * Tracks the ReactiveProps for dependency management.
-     * @param {{untracked?: boolean}} [options] - Optional options. If `untracked` is `false`, the ReactiveProps value will be added to the getValueTracker.
-     * @returns {T} The proxied value of the ReactiveProps.
+     * Retrieves the proxied value of the ShallowReactive. If the engine is destroyed, an error is thrown.
+     * Tracks the ShallowReactive for dependency management.
+     * @param {{untracked?: boolean}} [options] - Optional options. If `untracked` is `false`, the ShallowReactive value will be added to the dependencyTracker.
+     * @returns {T} The proxied value of the ShallowReactive.
      */
     getValue(options) {
         super.getValue(options);
@@ -2344,67 +2537,67 @@ class ReactiveProps extends ReactivePrimitive {
     }
 
     /**
-     * Sets the value of the ReactiveProps. If the value is an object, it will be proxied and reactive.
-     * @param {T} value - The new value of the ReactiveProps.
+     * Sets the value of the ShallowReactive. If the value is an object, it will be proxied and reactive.
+     * @param {T} value - The new value of the ShallowReactive.
      */
     setValue(value) {
         this.getValue({ untracked: true });
 
-        this.engine.muteUpdates = true;
-        let currentKeys = Object.keys(this.#proxy);
-        let newKeys = Object.keys(value);
-        let keysToDelete = currentKeys.filter((key) => !newKeys.includes(key));
-        keysToDelete.forEach((key) => delete this.#proxy[key]);
+        this.engine.suppressNotifications = true;
+        const currentKeys = Object.keys(this.#proxy);
+        const newKeys = Object.keys(value);
+        const keysToDelete = currentKeys.filter(key => !newKeys.includes(key));
+        keysToDelete.forEach(key => delete this.#proxy[key]);
 
         for (let i = 0; i < newKeys.length; i++) {
-            let key = newKeys[i];
+            const key = newKeys[i];
 
-            // @ts-expect-error
+            // @ts-ignore
             this.#proxy[key] = value[key];
         }
 
-        this.engine.muteUpdates = false;
+        this.engine.suppressNotifications = false;
         this.engine.valueChangedCallback();
     }
 
     /**
-     * Sets the value of the ReactiveProps. If the value is an object, it will be proxied and reactive.
-     * @param {T} value - The new value of the ReactiveProps.
+     * Sets the value of the ShallowReactive. If the value is an object, it will be proxied and reactive.
+     * @param {T} value - The new value of the ShallowReactive.
      */
     set value(value) {
         this.setValue(value);
     }
 
     /**
-     * Sets the value of the ReactiveProps. If the value is an object, it will be proxied and reactive.
+     * Sets the value of the ShallowReactive. If the value is an object, it will be proxied and reactive.
      * This is a synonym for `set value(value)`.
-     * @param {T} value - The new value of the ReactiveProps.
+     * @param {T} value - The new value of the ShallowReactive.
      */
     set data(value) {
         this.setValue(value);
     }
 
     /**
-     * Retrieves the proxied value of the ReactiveProps. If the engine is destroyed, an error is thrown.
-     * Tracks the ReactiveProps for dependency management.
-     * @returns {T} The proxied value of the ReactiveProps.
+     * Retrieves the proxied value of the ShallowReactive. If the engine is destroyed, an error is thrown.
+     * Tracks the ShallowReactive for dependency management.
+     * @returns {T} The proxied value of the ShallowReactive.
      */
     get value() {
         return this.getValue();
     }
 
     /**
-     * Retrieves the proxied value of the ReactiveProps. If the engine is destroyed, an error is thrown.
-     * Tracks the ReactiveProps for dependency management.
-     * @returns {T} The proxied value of the ReactiveProps.
+     * Retrieves the proxied value of the ShallowReactive. If the engine is destroyed, an error is thrown.
+     * Tracks the ShallowReactive for dependency management.
+     * @returns {T} The proxied value of the ShallowReactive.
      */
     get data() {
         return this.getValue();
     }
 
     /**
-     * Returns the raw, unproxied value of the ReactiveProps. This is generally not recommended as it breaks reactivity.
-     * @returns {T} The raw, unproxied value of the ReactiveProps.
+     * Returns the raw, unproxied value of the ShallowReactive. This is generally not recommended as it breaks reactivity.
+     * @returns {T} The raw, unproxied value of the ShallowReactive.
      */
     getRawValue() {
         return this.#target;
@@ -2436,7 +2629,7 @@ class ReactiveProps extends ReactivePrimitive {
  * });
  *
  * // mute updates
- * store.muteUpdates();
+ * store.suppressNotifications();
  * childStore.removeItem("childStore");
  * a.value = 3;
  * b.value = 4;
@@ -2485,7 +2678,7 @@ class Store {
     /** @type {Dictionary<()=>void>} */
     #unsubscribers = new Dictionary();
 
-    /** @type {Map<string, UpdateDataRecord>} */
+    /** @type {Map<string, import("./../core/UpdateDataRecord.js").UpdateDataRecord>} */
     #updates;
 
     /** @type {UpdateDataRecordManager} */
@@ -2497,34 +2690,36 @@ class Store {
 
     constructor() {
         this.eventEmitter = new EventEmitterExt();
-        this.eventEmitter.registerEvents("change", "destroy", "clear-updates");
+        this.eventEmitter.registerEvents('change', 'destroy', 'clear-updates');
         this.eventEmitter.setListenerRunnerStrategy(1);
 
         this.#updates = new Map();
         this.#updatesManager = new UpdateDataRecordManager(this.#updates);
 
-        let that = this;
-        this.eventEmitter.on("clear-updates", () => {
+        const that = this;
+        this.eventEmitter.on('clear-updates', () => {
             //console.log("clear-updates");
             //console.log(that.#updates);
             that.#updates.clear();
         });
 
         this.#subscriber = (
-            /** @type {Map<string, UpdateDataRecord>} */ updates,
+            /** @type {Map<string, import("./../core/UpdateDataRecord.js").UpdateDataRecord>} */ updates,
             /** @type {Store} */ store
         ) => {
-            let storeName = that.#keys.get(store) || "";
+            const storeName = that.#keys.get(store) || '';
 
             updates.forEach((update, localKey) => {
-                if (!update.reactiveItem) return;
+                if (!update.reactiveItem) {
+                    return;
+                }
 
-                if (storeName == "") {
-                    let key = that.#keys.get(update.reactiveItem);
-                    let fullPath = localKey == "" ? key : key + "." + localKey;
+                if (storeName === '') {
+                    const key = that.#keys.get(update.reactiveItem);
+                    const fullPath = localKey === '' ? key : key + '.' + localKey;
                     that.#updates.set(fullPath, update);
                 } else {
-                    let fullPath = storeName + "." + localKey;
+                    const fullPath = storeName + '.' + localKey;
                     that.#updates.set(fullPath, update);
                 }
             });
@@ -2559,8 +2754,8 @@ class Store {
     }
 
     #notifySubscribers() {
-        this.eventEmitter.emit("change");
-        this.eventEmitter.emit("clear-updates");
+        this.eventEmitter.emit('change');
+        this.eventEmitter.emit('clear-updates');
     }
 
     /**
@@ -2571,18 +2766,17 @@ class Store {
      */
     #addReactiveItem(key, reactiveItem) {
         if (this.#items.has(key)) {
-            throw new Error(
-                `Item with key ${key} already exists in the store.`
-            );
+            throw new Error(`Item with key ${key} already exists in the store.`);
         }
 
         this.#items.set(key, reactiveItem);
         this.#keys.set(reactiveItem, key);
 
-        let that = this;
-        let unsubscriber = reactiveItem.subscribe(this.#subscriber);
+        const that = this;
+        // @ts-ignore
+        const unsubscriber = reactiveItem.subscribe(this.#subscriber);
 
-        let unsubscriber2 = reactiveItem.onDestroy(() => {
+        const unsubscriber2 = reactiveItem.onDestroy(() => {
             /*
             that.#updates.set(
                 key,
@@ -2609,19 +2803,17 @@ class Store {
      */
     #addStore(storeName, store) {
         if (this.#childStores.has(storeName)) {
-            throw new Error(
-                `Child store with key ${storeName} already exists in this store.`
-            );
+            throw new Error(`Child store with key ${storeName} already exists in this store.`);
         }
 
         this.#childStores.set(storeName, store);
-        let that = this;
+        const that = this;
 
         this.#keys.set(store, storeName);
 
-        let unsubscriber = store.subscribe(this.#subscriber);
+        const unsubscriber = store.subscribe(this.#subscriber);
 
-        let unsubscriber2 = store.onDestroy(() => {
+        const unsubscriber2 = store.onDestroy(() => {
             that.#removeChildStore(storeName);
             //that.#notifySubscribers();
         });
@@ -2644,7 +2836,7 @@ class Store {
      */
     addItems(items) {
         if (this.isDestroyed) {
-            throw new Error("Cannot add items to a destroyed store.");
+            throw new Error('Cannot add items to a destroyed store.');
         }
 
         for (const [key, item] of Object.entries(items)) {
@@ -2663,39 +2855,12 @@ class Store {
      * @returns {void}
      */
     #destroyChildStore(key) {
-        let childStore = this.#childStores.get(key);
+        const childStore = this.#childStores.get(key);
         if (!childStore) {
             return;
         }
-
+        this.#removeChildStore(key);
         childStore.destroy();
-        this.#childStores.delete(key);
-        this.#unsubscribers.iterate(key, (unsubscriber) => {
-            unsubscriber();
-        });
-    }
-
-    /**
-     * Destroys the reactive item with the given key. This method is useful for cleaning up after a reactive item
-     * that is no longer needed. It calls destroy on the reactive item and removes the item from the store.
-     * @param {string} key - The key of the item to destroy.
-     * @returns {boolean} true if the item was destroyed, false otherwise.
-     */
-    #destroyReactiveItem(key) {
-        let item = this.#items.get(key);
-        if (!item) {
-            return false;
-        }
-
-        item.destroy();
-
-        this.#unsubscribers.iterate(key, (unsubscriber) => {
-            unsubscriber();
-        });
-
-        this.#items.delete(key);
-
-        return true;
     }
 
     /**
@@ -2711,43 +2876,60 @@ class Store {
     }
 
     /**
-     * Removes the reactive item with the given key from the store. This method does not call destroy on the item.
-     * @param {string} key - The key of the item to remove.
-     * @returns {void}
+     * Removes a reactive item from the store WITHOUT destroying it.
+     * @param {string} key
      */
     #removeReactiveItem(key) {
-        let item = this.#items.get(key);
-        if (!item) {
-            return;
-        }
+        const item = this.#items.get(key);
+        if (!item) {return;}
 
-        this.#updatesManager.removeItem(key);
-        /*
-        this.#updates.set(
-            key,
-            new UpdateDataRecord("delete", undefined, undefined, undefined)
-        );
-*/
-        this.#notifySubscribers();
+        // Remove from store maps
         this.#items.delete(key);
-        this.#unsubscribers.iterate(key, (unsubscriber) => {
+        this.#keys.delete(item);
+
+        // Unsubscribe from the item's change events
+        this.#unsubscribers.iterate(key, unsubscriber => {
             unsubscriber();
         });
+        this.#unsubscribers.remove(key);
+
+        // Notify about removal (but do NOT destroy the item)
+        this.#updatesManager.removeItem(key);
+        this.#notifySubscribers();
     }
 
     /**
-     * Removes the child store with the given key from this store.
-     * @param {string} key - The key of the child store to remove.
-     * @returns {void}
+     * Removes a child store WITHOUT destroying it.
+     * @param {string} key
      */
     #removeChildStore(key) {
-        this.#updatesManager.removeItem(key);
-        this.#notifySubscribers();
+        const store = this.#childStores.get(key);
+        if (!store) {return;}
 
-        this.#unsubscribers.iterate(key, (unsubscriber) => {
+        this.#childStores.delete(key);
+        this.#keys.delete(store);
+
+        this.#unsubscribers.iterate(key, unsubscriber => {
             unsubscriber();
         });
-        this.#childStores.delete(key);
+        this.#unsubscribers.remove(key);
+
+        this.#updatesManager.removeItem(key);
+        this.#notifySubscribers();
+    }
+
+    /**
+     * Removes and DESTROYS a reactive item.
+     * @param {string} key
+     */
+    #destroyReactiveItem(key) {
+        const item = this.#items.get(key);
+        if (!item) {return;}
+
+        this.#removeReactiveItem(key);
+
+        // Finally destroy the reactive item
+        item.destroy();
     }
 
     /**
@@ -2773,9 +2955,7 @@ class Store {
      * in the store and clears the store of all items.
      */
     destroy() {
-        if (this.#isDestroyed) {
-            return;
-        }
+        if (this.#isDestroyed) {return;}
 
         this.#items.forEach((item, key) => {
             this.#destroyReactiveItem(key);
@@ -2785,14 +2965,19 @@ class Store {
         this.#childStores.forEach((childStore, key) => {
             this.#destroyChildStore(key);
         });
-
         this.#childStores.clear();
 
-        this.eventEmitter.emit("destroy", this);
+        // Clear updates map to release memory
+        this.#updates.clear();
+
+        // Clear the reference to the updates manager (optional, helps GC)
+        // @ts-ignore
+        this.#updatesManager = null;
+
+        this.eventEmitter.emit('destroy', this);
         this.eventEmitter.unregisterAllEvents();
 
         this.#isDestroyed = true;
-
         this.#unsubscribers.removeAll();
     }
 
@@ -2867,20 +3052,18 @@ class Store {
      * Possible values can be "all", "reactives", or "stores" (if applicable).
      * @returns {Array<string>} An array containing the names of items that match the filter.
      */
-    getItemNames(filter = "all") {
+    getItemNames(filter = 'all') {
         if (this.isDestroyed) {
             return [];
         }
 
-        if (filter === "reactives") {
+        if (filter === 'reactives') {
             return Array.from(this.#items.keys());
-        } else if (filter === "stores") {
+        } else if (filter === 'stores') {
             return Array.from(this.#childStores.keys());
         }
 
-        return Array.from(this.#items.keys()).concat(
-            Array.from(this.#childStores.keys())
-        );
+        return Array.from(this.#items.keys()).concat(Array.from(this.#childStores.keys()));
     }
 
     /**
@@ -2890,19 +3073,19 @@ class Store {
      * Possible values can be "all", "reactives", or "stores" (if applicable).
      * @returns {Map<string, ReactivePrimitive|Store>} A Map containing the items that match the filter.
      */
-    getItems(filter = "all") {
+    getItems(filter = 'all') {
         if (this.isDestroyed) {
             return new Map();
         }
 
-        if (filter === "reactives") {
+        if (filter === 'reactives') {
             return this.#items;
-        } else if (filter === "stores") {
+        } else if (filter === 'stores') {
             return this.#childStores;
         }
 
         /** @type {Map<string, ReactivePrimitive|Store>} */
-        let result = new Map(this.#items);
+        const result = new Map(this.#items);
 
         this.#childStores.forEach((store, key) => {
             result.set(key, store);
@@ -2912,9 +3095,10 @@ class Store {
     }
 
     #itemsAsPlainObject() {
-        let object = {};
+        const object = {};
 
         this.#items.forEach((item, key) => {
+            // @ts-ignore
             object[key] = item.getValue();
         });
 
@@ -2922,9 +3106,10 @@ class Store {
     }
 
     #childStoresAsPlainObject() {
-        let object = {};
+        const object = {};
 
         this.#childStores.forEach((store, key) => {
+            // @ts-ignore
             object[key] = store.asPlainObject();
         });
 
@@ -2936,7 +3121,7 @@ class Store {
      *
      * @param {"all"|"reactives"|"stores"} [filter="all"] - The filter to apply when retrieving items. Default is "all".
      * Possible values can be "all", "reactives", or "stores" (if applicable).
-     * @returns {Object} A plain object containing the values of the items that match the filter.
+     * @returns {object} A plain object containing the values of the items that match the filter.
      * @example
      * ```js
      * const store = new Store();
@@ -2967,18 +3152,18 @@ class Store {
      * // output: {}
      * ```
      */
-    asPlainObject(filter = "all") {
+    asPlainObject(filter = 'all') {
         if (this.isDestroyed) {
             return {};
         }
 
-        if (filter === "reactives") {
+        if (filter === 'reactives') {
             return this.#itemsAsPlainObject();
-        } else if (filter === "stores") {
+        } else if (filter === 'stores') {
             return this.#childStoresAsPlainObject();
         }
 
-        let object = {
+        const object = {
             ...this.#itemsAsPlainObject(),
             ...this.#childStoresAsPlainObject(),
         };
@@ -2988,7 +3173,7 @@ class Store {
     /**
      * Subscribes a function to be called whenever the value of this Store changes.
      * The function is called with a Map of updates, where the keys are the names of the items that changed, and the values are UpdateDataRecord objects.
-     * @param {(update: Map<string, UpdateDataRecord>, store: Store)=>void} fn - The function to be called whenever the value of this Atom changes.
+     * @param {(update: Map<string, import("../core/UpdateDataRecord.js").UpdateDataRecord>, store: Store)=>void} fn - The function to be called whenever the value of this Atom changes.
      * @returns {()=>void} A function that unsubscribes the given function.
      * @example
      * ```js
@@ -3024,9 +3209,9 @@ class Store {
             return () => {};
         }
 
-        let that = this;
+        const that = this;
 
-        return this.eventEmitter.on("change", () => {
+        return this.eventEmitter.on('change', () => {
             fn(that.#updates, that);
         });
     }
@@ -3042,14 +3227,14 @@ class Store {
             return () => {};
         }
 
-        return this.eventEmitter.on("destroy", fn);
+        return this.eventEmitter.on('destroy', fn);
     }
 
     /**
      * Mutes the event emitter, preventing any updates from being triggered.
      * Any updates that are scheduled while muted will be queued and executed when unmuteUpdates is called.
      */
-    muteUpdates() {
+    suppressNotifications() {
         this.eventEmitter.mute();
     }
 
@@ -3074,40 +3259,42 @@ class Store {
 
 
 /**
- * ReactiveList is a class that represents a reactive list of items.
- * It allows adding, removing, and updating items in the list while maintaining reactivity.
+ * @template T
+ * @typedef {T extends object ? ShallowReactive<T> : Atom<T>} ReactiveWrapper
+ */
+
+/**
+ * Type guard to check if an item is a reactive wrapper with a `value` property.
+ * @param {any} item
+ * @returns {item is Atom<any> | ShallowReactive<any>}
+ */
+function isReactiveWrapper(item) {
+    return item instanceof Atom || item instanceof ShallowReactive;
+}
+
+/**
+ * ReactiveList is a reactive array-like structure that stores values of any type.
+ * It automatically chooses the appropriate reactive primitive:
+ * - Objects and arrays are wrapped with `ShallowReactive` (shallow property tracking).
+ * - Primitives (numbers, strings, booleans, etc.) are wrapped with `Atom`.
+ *
+ * The list supports adding, removing, updating, and splicing items while maintaining
+ * full reactivity. Subscribers are notified only once per batch of changes.
+ *
  * @template {{[key:string]:any}} T
+ *
  * @example
  * ```js
  * const list = new ReactiveList();
- * const item1 = { name: "item1" };
- * const item2 = { name: "item2" };
- * const item3 = { name: "item3" };
  *
- * list.subscribe((updates) => {
- *     console.log("updates: ", Array.from(updates.keys()));
- *     console.log("list.length = ", list.length);
- *     console.log("list.items = ", list.getItems());
- *     console.log("=====================================");
+ * list.subscribe(() => {
+ *     console.log('List changed:', list.getItems());
  * });
  *
- * list.setItems([item1, item2, item3]);
- * // Outputs:
- * // updates:  [ '0.name', '1.name', '2.name', 'length' ]
- * // list.length =  3
- * // list.items =  [ { name: 'item1' }, { name: 'item2' }, { name: 'item3' } ]
- *
- * list.setItems([item1]);
- * // Outputs:
- * // updates:  [ '1', '2', 'length' ]
- * // list.length =  1
- * // list.items =  [ { name: 'item1' } ]
- *
- * list.setItem(0, { name: "updated" });
- * // Outputs:
- * // updates:  [ '0.name' ]
- * // list.length =  1
- * // list.items =  [ { name: 'updated' } ]
+ * list.add(1, 2, 3);                // numbers -> stored as Atom
+ * list.setItem(1, 42);
+ * list.splice(0, 1);
+ * list.setItems([{ a: 1 }, { b: 2 }]); // objects -> stored as ShallowReactive
  * ```
  */
 class ReactiveList {
@@ -3117,96 +3304,101 @@ class ReactiveList {
     /** @type {Store} */
     #store;
 
+    /**
+     * Creates a new empty ReactiveList.
+     */
     constructor() {
         this.#store = new Store();
-        this.#store.muteUpdates();
+        this.#store.suppressNotifications();
 
-        this.#lengthAtom = new Atom(0, {
-            name: "length",
-        });
+        this.#lengthAtom = new Atom(0, { name: 'length' });
         this.#store.addItems({ length: this.#lengthAtom });
         this.#store.unmuteUpdates();
     }
 
     /**
-     * Adds the given values to the reactive list as ReactiveProps items.
-     * Updates the internal store and the length atom accordingly.
-     * @param {...T} values - The values to add to the list.
+     * Creates a reactive wrapper for the given value.
+     * Uses ShallowReactive for objects/arrays, Atom for primitives.
+     *
+     * @param {any} value - The value to wrap.
+     * @param {string} name - The name to assign to the reactive item (used for debugging).
+     * @returns {ReactiveWrapper<any>} The reactive wrapper.
+     */
+    #createReactiveItem(value, name) {
+        if (isPlainObject(value) || Array.isArray(value)) {
+            return new ShallowReactive(value, { name });
+        }
+        // @ts-ignore
+        return new Atom(value, { name });
+    }
+
+    /**
+     * Updates the value of a reactive wrapper.
+     * Works for both Atom and ShallowReactive.
+     *
+     * @param {ReactiveWrapper<any>} wrapper - The reactive wrapper.
+     * @param {any} newValue - The new value to set.
+     */
+    #updateReactiveItem(wrapper, newValue) {
+        // Both Atom and ShallowReactive have a `value` setter.
+        wrapper.value = newValue;
+    }
+
+    /**
+     * Adds one or more items to the end of the list.
+     *
+     * @param {...T} values - The values to add.
      */
     add(...values) {
-        if (this.isDestroyed) {
-            throw new Error("The reactive list has been destroyed");
-        }
+        if (this.isDestroyed) {throw new Error('ReactiveList has been destroyed');}
+        if (values.length === 0) {return;}
 
-        // Check if the values are empty
-        if (values.length === 0) return;
+        const startIndex = this.#lengthAtom.value;
+        const alreadyMuted = this.#store.isMuted();
+        this.#store.suppressNotifications();
 
-        let startIndex = this.#lengthAtom.value;
-        /** @type {{[key:string]:ReactiveProps}} */
-        let reactives = {};
-
-        let alreadyMuted = this.#store.isMuted();
-        this.#store.muteUpdates();
-
+        /** @type {{[key:string]: ReactiveWrapper<any>}} */
+        const wrappers = {};
         for (let i = 0; i < values.length; i++) {
-            values[i];
-            reactives[startIndex + i] = new ReactiveProps(
-                {},
-                { name: (startIndex + i).toString() }
-            );
+            const idx = startIndex + i;
+            const wrapper = this.#createReactiveItem(values[i], idx.toString());
+            wrappers[idx] = wrapper;
         }
 
-        this.#store.addItems(reactives);
-        let that = this;
-
-        that.#lengthAtom.value = that.#lengthAtom.value + values.length;
+        this.#store.addItems(wrappers);
         for (let i = 0; i < values.length; i++) {
-            reactives[startIndex + i].value = values[i];
+            const idx = startIndex + i;
+            this.#updateReactiveItem(wrappers[idx], values[i]);
         }
+        this.#lengthAtom.value += values.length;
 
-        if (!alreadyMuted) {
-            that.#store.unmuteUpdates();
-        }
+        if (!alreadyMuted) {this.#store.unmuteUpdates();}
     }
 
     /**
-     * Retrieves the value of the ReactiveProps item at the specified index.
-     * @param {number} index - The index of the item to retrieve from the reactive list.
-     * @returns {T|undefined} The value of the item at the specified index, or undefined if no item exists at that index.
+     * Retrieves the value at the given index.
+     *
+     * @param {number} index - The index of the item to retrieve.
+     * @returns {T | undefined} The value, or undefined if the index is out of bounds.
      */
     getItem(index) {
-        if (this.isDestroyed) {
-            throw new Error("The reactive list has been destroyed");
-        }
-
-        let item = /** @type {ReactiveProps|null} */ (
-            this.#store.getItem(index.toString())
-        );
-
-        if (item) {
-            return item.value;
-        }
-
-        return undefined;
+        if (this.isDestroyed) {throw new Error('ReactiveList has been destroyed');}
+        const item = this.#store.getItem(index.toString());
+        if (!isReactiveWrapper(item)) {return undefined;}
+        return item.value;
     }
 
     /**
-     * Retrieves all items from the reactive list as an array of values.
-     * The order of the items in the array matches the order of the items in the reactive list.
-     * If the reactive list has been destroyed, an empty array is returned.
-     * @returns {T[]} An array of values from the reactive list.
+     * Returns a shallow copy of all items in the list as a plain array.
+     *
+     * @returns {T[]} An array containing all values.
      */
     getItems() {
-        if (this.isDestroyed) {
-            throw new Error("The reactive list has been destroyed");
-        }
-
-        let items = [];
+        if (this.isDestroyed) {throw new Error('ReactiveList has been destroyed');}
+        const items = [];
         for (let i = 0; i < this.#lengthAtom.value; i++) {
-            let item = /** @type {ReactiveProps|null} */ (
-                this.#store.getItem(i.toString())
-            );
-            if (item) {
+            const item = this.#store.getItem(i.toString());
+            if (isReactiveWrapper(item)) {
                 items.push(item.value);
             }
         }
@@ -3214,200 +3406,127 @@ class ReactiveList {
     }
 
     /**
-     * Sets the value of the ReactiveProps item at the specified index.
-     * If the item exists at the given index, its value is updated.
-     * @param {number} index - The index of the item to update in the reactive list.
-     * @param {T} value - The new value to set for the item at the specified index.
+     * Updates the value at the specified index.
+     *
+     * @param {number} index - The index to update.
+     * @param {T} value - The new value.
      */
     setItem(index, value) {
-        if (this.isDestroyed) {
-            throw new Error("The reactive list has been destroyed");
-        }
-
-        let alreadyMuted = this.#store.isMuted();
-        this.#store.muteUpdates();
-        let item = /** @type {ReactiveProps|null} */ (
-            this.#store.getItem(index.toString())
-        );
-
-        if (item) {
-            item.value = value;
-        }
-
-        if (!alreadyMuted) {
-            this.#store.unmuteUpdates();
-        }
+        if (this.isDestroyed) {throw new Error('ReactiveList has been destroyed');}
+        const wrapper = this.#store.getItem(index.toString());
+        if (!isReactiveWrapper(wrapper)) {return;}
+        const alreadyMuted = this.#store.isMuted();
+        this.#store.suppressNotifications();
+        wrapper.value = value;
+        if (!alreadyMuted) {this.#store.unmuteUpdates();}
     }
 
     /**
-     * Retrieves the length of the reactive list.
-     * @returns {number} The length of the reactive list.
+     * Returns the current length of the list.
+     *
+     * @returns {number}
      */
     get length() {
-        if (this.isDestroyed) {
-            return 0;
-        }
-
+        if (this.isDestroyed) {throw new Error('ReactiveList has been destroyed');}
         return this.#lengthAtom.value;
     }
 
     /**
-     * Sets multiple items in the reactive list, updating existing items or adding new ones as necessary.
-     * If the new number of items is less than the current length of the list, the excess items are destroyed.
-     * Operates within a batch to optimize performance and prevent unnecessary reactivity triggers.
+     * Replaces the entire content of the list with the given array.
      *
-     * @param {T[]} values - The new values to set in the reactive list.
+     * @param {T[]} values - The new array of values.
      */
     setItems(values) {
-        if (this.isDestroyed) {
-            throw new Error("The reactive list has been destroyed");
-        }
+        if (this.isDestroyed) {throw new Error('ReactiveList has been destroyed');}
+        const alreadyMuted = this.#store.isMuted();
+        this.#store.suppressNotifications();
 
-        if (values.length === 0) {
-            this.clear();
-            return;
-        }
+        const currentLen = this.#lengthAtom.value;
+        const newLen = values.length;
 
-        let isAlreadyMuted = this.#store.isMuted();
-        this.#store.muteUpdates();
-
-        if (values.length < this.#lengthAtom.value) {
-            for (let i = values.length; i < this.#lengthAtom.value; i++) {
+        if (newLen < currentLen) {
+            // Remove tail items
+            for (let i = newLen; i < currentLen; i++) {
                 this.#store.destroyItem(i.toString());
             }
-
-            this.#lengthAtom.value = values.length;
-
-            for (let i = 0; i < values.length; i++) {
-                let item = /** @type {ReactiveProps} */ (
-                    this.#store.getItem(i.toString())
-                );
-                item.value = values[i];
+            this.#lengthAtom.value = newLen;
+            // Update remaining items
+            for (let i = 0; i < newLen; i++) {
+                const wrapper = this.#store.getItem(i.toString());
+                if (isReactiveWrapper(wrapper)) {
+                    wrapper.value = values[i];
+                }
             }
         } else {
-            // If the new number of items is greater than the current length,
-            // we need to add new items to the list.
-
-            let currentLength = this.#lengthAtom.value;
-
             // Update existing items
-            for (let i = 0; i < currentLength; i++) {
-                let item = /** @type {ReactiveProps} */ (
-                    this.#store.getItem(i.toString())
-                );
-                item.value = values[i];
+            for (let i = 0; i < currentLen; i++) {
+                const wrapper = this.#store.getItem(i.toString());
+                if (isReactiveWrapper(wrapper)) {
+                    wrapper.value = values[i];
+                }
             }
-
-            /** @type {{[key:string]:ReactiveProps}} */
-            let reactives = {};
-
-            for (let i = currentLength; i < values.length; i++) {
-                reactives[i] = new ReactiveProps({}, { name: i.toString() });
+            // Create and add new items
+            /** @type {{[key:string]: ReactiveWrapper<any>}} */
+            const wrappers = {};
+            for (let i = currentLen; i < newLen; i++) {
+                wrappers[i] = this.#createReactiveItem(values[i], i.toString());
             }
-
-            this.#store.addItems(reactives);
-
-            for (let i = currentLength; i < values.length; i++) {
-                reactives[i].value = values[i];
+            this.#store.addItems(wrappers);
+            for (let i = currentLen; i < newLen; i++) {
+                this.#updateReactiveItem(wrappers[i], values[i]);
             }
-
-            this.#lengthAtom.value = values.length;
+            this.#lengthAtom.value = newLen;
         }
 
-        if (!isAlreadyMuted) {
-            this.#store.unmuteUpdates();
-        }
+        if (!alreadyMuted) {this.#store.unmuteUpdates();}
     }
 
     /**
-     * Cleans up the reactive list by destroying all items in the internal store.
-     * This method is useful when the reactive list is no longer needed and resources should be freed.
-     */
-    destroy() {
-        this.#store.destroy();
-    }
-
-    /**
-     * Returns true if the reactive list has been destroyed, and false otherwise.
-     * This property is useful for determining whether it is safe to interact with the reactive list.
-     * A destroyed reactive list will not respond to any methods or properties except for this one.
-     * @type {boolean}
-     */
-    get isDestroyed() {
-        return this.#store.isDestroyed;
-    }
-
-    /**
-     * Subscribes a function to be called whenever the value of this reactive list changes.
-     * The function is called with a Map of updates, where the keys are the names of the items that changed, and the values are UpdateDataRecord objects.
-     * @param {(update: Map<string, UpdateDataRecord>)=>void} fn - The function to be called whenever the value of this reactive list changes.
-     * @returns {()=>void} A function that unsubscribes the given function.
-     */
-    subscribe(fn) {
-        if (this.isDestroyed) {
-            throw new Error("The reactive list has been destroyed");
-        }
-
-        return this.#store.subscribe(fn);
-    }
-
-    /**
-     * Removes a specified number of items from the reactive list, starting at a given index.
-     * The function operates within a batch to optimize performance and prevent unnecessary reactivity triggers.
+     * Removes elements from the list starting at `startIndex` and removing `count` items.
+     * Remaining elements are shifted left. The operation is batched to emit only one notification.
      *
-     * @param {number} startIndex - The index at which to start removing items from the list.
-     * @param {number} count - The number of items to remove from the list.
+     * @param {number} startIndex - The index at which to start removal.
+     * @param {number} count - The number of elements to remove.
      */
     splice(startIndex, count) {
-        if (this.isDestroyed) {
-            throw new Error("The reactive list has been destroyed");
-        }
+        if (this.isDestroyed) {throw new Error('ReactiveList has been destroyed');}
+        if (count <= 0) {return;}
 
-        if (count <= 0) {
-            return;
-        }
+        const oldLen = this.#lengthAtom.value;
+        if (startIndex < 0 || startIndex >= oldLen) {return;}
 
-        let listLength = this.#lengthAtom.value;
+        const actualCount = Math.min(count, oldLen - startIndex);
+        if (actualCount === 0) {return;}
 
-        if (startIndex < 0 || startIndex >= listLength) {
-            return;
-        }
+        const newLen = oldLen - actualCount;
+        const alreadyMuted = this.#store.isMuted();
+        this.#store.suppressNotifications();
 
-        count =
-            startIndex + count > listLength ? listLength - startIndex : count;
-
-        let alreadyMuted = this.#store.isMuted();
-        this.#store.muteUpdates();
-
-        for (let i = startIndex; i < listLength; i++) {
-            let currentItem = /** @type {ReactiveProps} */ (
-                this.#store.getItem(i.toString())
-            );
-
-            let itemWithValue = /** @type {ReactiveProps} */ (
-                this.#store.getItem((i + count).toString())
-            );
-
-            if (itemWithValue) {
-                currentItem.value = itemWithValue.value;
+        // Shift elements left
+        for (let i = startIndex; i < newLen; i++) {
+            const srcIndex = i + actualCount;
+            const srcItem = this.#store.getItem(srcIndex.toString());
+            const destItem = this.#store.getItem(i.toString());
+            if (isReactiveWrapper(srcItem) && isReactiveWrapper(destItem)) {
+                destItem.value = srcItem.value;
+            } else if (isReactiveWrapper(destItem)) {
+                destItem.value = undefined;
             }
         }
 
-        // Destroy the items that are no longer needed
-        // and update the length atom.
-        for (let i = listLength - count; i < listLength; i++) {
+        // Destroy tail items
+        for (let i = newLen; i < oldLen; i++) {
             this.#store.destroyItem(i.toString());
         }
 
-        this.#lengthAtom.value = listLength - count;
+        this.#lengthAtom.value = newLen;
 
-        if (!alreadyMuted) {
-            this.#store.unmuteUpdates();
-        }
+        if (!alreadyMuted) {this.#store.unmuteUpdates();}
     }
 
     /**
-     * Removes the item at the given index from the reactive list.
+     * Removes the item at the given index.
+     *
      * @param {number} index - The index of the item to remove.
      */
     removeItem(index) {
@@ -3415,26 +3534,55 @@ class ReactiveList {
     }
 
     /**
-     * Removes the last item from the reactive list.
+     * Removes the last item of the list.
      */
     removeLastItem() {
         this.splice(this.#lengthAtom.value - 1, 1);
     }
 
     /**
-     * Removes the first item from the reactive list.
+     * Removes the first item of the list.
      */
     removeFirstItem() {
         this.splice(0, 1);
     }
 
     /**
-     * Clears all items from the reactive list.
-     * This method removes all items from the list using the splice operation,
-     * effectively resetting the list to an empty state.
+     * Removes all items from the list.
      */
     clear() {
         this.splice(0, this.#lengthAtom.value);
+    }
+
+    /**
+     * Destroys the list, releasing all internal resources.
+     * After destruction, any method call (except `isDestroyed`) will throw an error.
+     */
+    destroy() {
+        if (this.isDestroyed) {return;}
+        this.#store.destroy();
+        // No need to nullify #lengthAtom; it will be inaccessible because isDestroyed becomes true.
+    }
+
+    /**
+     * Indicates whether the list has been destroyed.
+     *
+     * @returns {boolean}
+     */
+    get isDestroyed() {
+        return this.#store.isDestroyed;
+    }
+
+    /**
+     * Subscribes a callback to be invoked whenever the list changes.
+     * The callback receives a Map of updates with details about changed items.
+     *
+     * @param {(updates: Map<string, import("../core/UpdateDataRecord.js").UpdateDataRecord>) => void} fn - The callback function.
+     * @returns {() => void} A function to unsubscribe the callback.
+     */
+    subscribe(fn) {
+        if (this.isDestroyed) {throw new Error('ReactiveList has been destroyed');}
+        return this.#store.subscribe(fn);
     }
 }
 
@@ -3446,8 +3594,8 @@ class ReactiveList {
  * This allows the function to be re-executed whenever any of its dependencies change, maintaining
  * up-to-date results.
  *
- * @param {(updates?:Map<string, UpdateDataRecord>)=>void} fn - The function to track and reactively execute.
- * @param {Object} [options] - The options for the autorun function.
+ * @param {(updates?:Map<string, import("./../core/UpdateDataRecord.js").UpdateDataRecord>)=>void} fn - The function to track and reactively execute.
+ * @param {object} [options] - The options for the autorun function.
  * @param {string} [options.name] - An optional name for the autorun.
  * @param {number} [options.delay] - The number of milliseconds to delay the execution of the callback function.
  * @param {AbortSignal} [options.signal] - An optional AbortSignal to cancel the autorun.
@@ -3482,13 +3630,13 @@ class ReactiveList {
  * ```
  */
 function autorun(fn, options) {
-    let _options = Object.assign(
+    const _options = Object.assign(
         {
             name: undefined,
             delay: 0,
             signal: undefined,
             onError: undefined,
-            type: "autorun",
+            type: 'autorun',
         },
         options
     );
@@ -3496,7 +3644,7 @@ function autorun(fn, options) {
     if (modeController.untrackMode) {
         throw new Error(
             `Autorun${
-                _options.name ? ` (${_options.name})` : ""
+                _options.name ? ` (${_options.name})` : ''
             }: cannot initialize when untrackMode is on.`
         );
     }
@@ -3511,8 +3659,8 @@ function autorun(fn, options) {
  * change, allowing for reactive updates based on the data function.
  *
  * @param {()=>any} dataFunction - The function whose reactive dependencies are tracked.
- * @param {(updates?:Map<string, UpdateDataRecord>)=>void} fn - The callback function to execute when tracked dependencies change.
- * @param {Object} [options] - The options for the reaction function.
+ * @param {(updates?:Map<string, import("../core/UpdateDataRecord.js").UpdateDataRecord>)=>void} fn - The callback function to execute when tracked dependencies change.
+ * @param {object} [options] - The options for the reaction function.
  * @param {string} [options.name] - An optional name for the reaction.
  * @param {number} [options.delay] - The number of milliseconds to delay the execution of the callback function.
  * @param {AbortSignal} [options.signal] - An optional signal to abort the reaction.
@@ -3551,15 +3699,15 @@ function autorun(fn, options) {
  * ```
  */
 function reaction(dataFunction, fn, options) {
-    let _options = Object.assign(
-        { name: undefined, delay: 0, signal: undefined, type: "reaction" },
+    const _options = Object.assign(
+        { name: undefined, delay: 0, signal: undefined, type: 'reaction' },
         options
     );
 
     if (modeController.untrackMode) {
         throw new Error(
             `Reaction${
-                _options.name ? ` (${_options.name})` : ""
+                _options.name ? ` (${_options.name})` : ''
             }: cannot initialize when untrackMode is on.`
         );
     }
@@ -3569,24 +3717,24 @@ function reaction(dataFunction, fn, options) {
         _options.delay = 0;
     }
 
-    let items;
-    let unsubscribers = [];
+    /** @type {Function[]} */
+    const unsubscribers = [];
 
-    items = getSetOfUsedReactiveItems(dataFunction);
+    const items = getSetOfUsedReactiveItems(dataFunction);
 
-    if (items.size == 0) {
+    if (items.size === 0) {
         throw new Error(
             `Autorun/Reaction${
-                _options.name ? ` (${_options.name})` : ""
+                _options.name ? ` (${_options.name})` : ''
             }: No reactive items found.`
         );
     }
 
-    for (let item of items) {
+    for (const item of items) {
         unsubscribers.push(item.subscribe(fn, _options));
     }
 
-    let unsubscriber = () => {
+    const unsubscriber = () => {
         for (let i = 0; i < unsubscribers.length; i++) {
             unsubscribers[i]();
         }
@@ -3599,7 +3747,7 @@ function reaction(dataFunction, fn, options) {
  * Automatically calls the given function whenever the given predicate evaluates to true.
  * @param {()=>boolean} predicate - The predicate that should be evaluated.
  * @param {()=>void} fn - The function to be called when the predicate evaluates to true.
- * @param {Object} [options] - Optional options.
+ * @param {object} [options] - Optional options.
  * @param {number} [options.timeout] - The number of milliseconds to wait before timing out.
  * @param {number} [options.delay] - The number of milliseconds to wait before calling the function.
  * @param {AbortSignal} [options.signal] - An AbortSignal to cancel the function call.
@@ -3626,21 +3774,22 @@ function reaction(dataFunction, fn, options) {
  * ```
  */
 function when(predicate, fn, options) {
-    let computed = new Computed(predicate);
-    let timeout = options?.timeout || 0;
+    const computed = new Computed(predicate);
+    const timeout = options?.timeout || 0;
+    /** @type {ReturnType<typeof setTimeout>|null} */
     let timer;
 
-    let mainUnsubscriber = function () {
+    const mainUnsubscriber = function () {
         if (timer) {
             clearTimeout(timer);
-            timer = undefined;
+            timer = null;
         }
 
         unsubscribe();
         computed.destroy();
     };
 
-    let unsubscribe = computed.subscribe(() => {
+    const unsubscribe = computed.subscribe(() => {
         if (computed.value) {
             //mainUnsubscriber();
             fn();
@@ -3659,7 +3808,7 @@ function when(predicate, fn, options) {
 /**
  * Waits until the given predicate evaluates to true.
  * @param {()=>boolean} predicate - The predicate that should be evaluated.
- * @param {Object} [options] - Optional options.
+ * @param {object} [options] - Optional options.
  * @param {number} [options.timeout] - The number of milliseconds to wait before timing out.
  * @returns {Promise<void>} A promise that resolves when the predicate evaluates to true.
  * @example
@@ -3677,22 +3826,23 @@ function when(predicate, fn, options) {
  * ```
  */
 function waitTrue(predicate, options) {
-    return new Promise((resolve) => {
-        let computed = new Computed(predicate);
-        let timeout = options?.timeout || 0;
+    return new Promise(resolve => {
+        const computed = new Computed(predicate);
+        const timeout = options?.timeout || 0;
+        /** @type {ReturnType<typeof setTimeout>|null} */
         let timer;
 
-        let mainUnsubscriber = function () {
+        const mainUnsubscriber = function () {
             if (timer) {
                 clearTimeout(timer);
-                timer = undefined;
+                timer = null;
             }
 
             unsubscribe();
             computed.destroy();
         };
 
-        let unsubscribe = computed.subscribe(() => {
+        const unsubscribe = computed.subscribe(() => {
             if (computed.value) {
                 mainUnsubscriber();
                 resolve();
@@ -3743,6 +3893,8 @@ function runInAction(fn) {
  * Executes the specified function while batching notifications to reactive items.
  * This is useful for operations that make multiple changes to reactive items, as
  * it prevents the notifications from being sent until all changes have been made.
+ * Supports nested batch calls.
+ *
  * @param {Function} fn - The function to execute while batching notifications.
  * @returns {void}
  * @example
@@ -3769,17 +3921,12 @@ function runInAction(fn) {
  * ```
  */
 function batch(fn) {
-    let batchMode = modeController.batchMode;
-    modeController.batchMode = true;
-
+    modeController.enterBatch();
     try {
         fn();
-    } catch (e) {
-        modeController.batchMode = batchMode;
-        throw e;
+    } finally {
+        modeController.exitBatch();
     }
-
-    modeController.batchMode = batchMode;
 }
 
 /**
@@ -3812,7 +3959,7 @@ function batch(fn) {
  * ```
  */
 function untrack(fn) {
-    let untrackMode = modeController.untrackMode;
+    const untrackMode = modeController.untrackMode;
     let result;
     modeController.untrackMode = true;
     try {
@@ -3845,7 +3992,8 @@ function untrack(fn) {
  * ```
  */
 function getNow(interval = 1000) {
-    let atom = new Atom(0, { name: "now" });
+    const atom = new Atom(0, { name: 'now' });
+    /** @type {ReturnType<typeof setTimeout>} */
     let intervalId;
 
     atom.onHasSubscribers(() => {
@@ -3861,6 +4009,10 @@ function getNow(interval = 1000) {
         runInAction(() => {
             atom.value = 0;
         });
+    });
+
+    atom.onDestroy(() => {
+        clearInterval(intervalId);
     });
 
     return atom;
@@ -3899,7 +4051,7 @@ function getNow(interval = 1000) {
  */
 function fromPromise(promise) {
     /** @type {Atom<"pending"|"resolved"|"rejected">} */
-    let stateAtom = new Atom("pending", { name: "fromPromise" });
+    const stateAtom = new Atom('pending', { name: 'fromPromise' });
     /** @type {T} */
     let promiseResult;
 
@@ -3908,7 +4060,7 @@ function fromPromise(promise) {
 
     /**
      * Executes the appropriate function based on the current state of the promise.
-     * @param {Object} param0 - An object containing the functions to execute for each state.
+     * @param {object} param0 - An object containing the functions to execute for each state.
      * @param {(value: T)=>void} [param0.resolved] - The function to execute when the promise is resolved.
      * @param {(error: Error)=>void} [param0.rejected] - The function to execute when the promise is rejected.
      * @param {()=>void} [param0.pending] - The function to execute when the promise is pending.
@@ -3924,7 +4076,7 @@ function fromPromise(promise) {
         }
 
         stateAtom.subscribe(() => {
-            if (stateAtom.value === "resolved") {
+            if (stateAtom.value === 'resolved') {
                 try {
                     if (param0.resolved) {
                         param0.resolved(promiseResult);
@@ -3934,7 +4086,7 @@ function fromPromise(promise) {
                 }
             }
 
-            if (stateAtom.value === "rejected") {
+            if (stateAtom.value === 'rejected') {
                 try {
                     if (param0.rejected) {
                         param0.rejected(promiseError);
@@ -3946,13 +4098,13 @@ function fromPromise(promise) {
         });
 
         return promise
-            .then((value) => {
+            .then(value => {
                 promiseResult = value;
-                stateAtom.value = "resolved";
+                stateAtom.value = 'resolved';
             })
-            .catch((e) => {
+            .catch(e => {
                 promiseError = e;
-                stateAtom.value = "rejected";
+                stateAtom.value = 'rejected';
             })
             .finally(() => {
                 stateAtom.destroy();
@@ -3969,7 +4121,7 @@ function fromPromise(promise) {
  * returns a new Atom instance.
  * @template T
  * @param {T} value - The initial value of the Atom.
- * @param {Object} [options] - Options
+ * @param {object} [options] - Options
  * @param {string} [options.name] - The name of Atom.
  * @param {(a:T, b:T)=>boolean} [options.compareFunction] - A function that compares two values to determine if they are equal.
  * @returns {Atom<T>} A new Atom instance with the given value and options.
@@ -3992,10 +4144,10 @@ function atom(value, options) {
  * Creates a new Computed instance. Computed is a reactive primitive that holds a value that is computed from other reactive values.
  * @template T
  * @param {()=>T} fn - The function that returns the value of the Computed
- * @param {Object} [options] - Options
+ * @param {object} [options] - Options
  * @param {string} [options.name] - The name of Computed.
  * @param {(a:T, b:T)=>boolean} [options.compareFunction] - A function that compares two values to determine if they are equal.
- * @param {boolean} [options.isHardFunction] - Whether the function is a hard function. If true, it prevents calling the function by comparing the string representation of the dependencies.
+ * @param {boolean} [options.smartRecompute] - Whether the function is a hard function. If true, it prevents calling the function by comparing the string representation of the dependencies.
  * @returns {Computed<T>} A new Computed instance with the given function and options.
  * @example
  * ```js
@@ -4019,7 +4171,7 @@ function computed(fn, options) {
  * returns a new Collection instance.
  * @template T
  * @param {T[]} value - The array to observe.
- * @param {Object} [options] - Options
+ * @param {object} [options] - Options
  * @param {string} [options.name] - The name of Collection object.
  * @param {(a:T, b:T)=>boolean} [options.compareFunction] - A function that compares two values to determine if they are equal.
  * @returns {T[]} The observed array
@@ -4036,21 +4188,21 @@ function computed(fn, options) {
  * ```
  */
 function collection(value, options) {
-    let item = new Collection(value, options);
+    const item = new Collection(value, options);
     return item.value;
 }
 
 /**
- * Creates a new ReactiveProps instance. An ReactiveProps is a reactive primitive that holds a value. Same as `reactiveProps` but
- * returns a new ReactiveProps instance.
+ * Creates a new ShallowReactive instance. An ShallowReactive is a reactive primitive that holds a value. Same as `shallowReactive` but
+ * returns a new ShallowReactive instance.
  * @template T
  * @param {T} value - The object to observe.
- * @param {Object} [options] - Options to configure the observable behavior.
- * @param {string} [options.name] - The name of ReactiveProps object.
+ * @param {object} [options] - Options to configure the observable behavior.
+ * @param {string} [options.name] - The name of ShallowReactive object.
  * @returns {T} The observed object
  * @example
  * ```js
- * const obj = reactiveProps({ a: 1, b: 2 });
+ * const obj = shallowReactive({ a: 1, b: 2 });
  *
  * obj.subscribe(() => {
  *     console.log(obj.value);
@@ -4060,9 +4212,9 @@ function collection(value, options) {
  * // output: { a: 3, b: 2 }
  * ```
  */
-function reactiveProps(value, options) {
+function shallowReactive(value, options) {
     // @ts-ignore
-    let item = new ReactiveProps(value, options);
+    const item = new ShallowReactive(value, options);
     return /** @type {T} */ (item.value);
 }
 
@@ -4071,10 +4223,10 @@ function reactiveProps(value, options) {
  *
  * @template T
  * @param {T} obj - The object to be observed.
- * @param {{[key:string]:"atom"|"computed"|"collection"|"reactiveProps"|false}} annotations -
+ * @param {{[key:string]:"atom"|"computed"|"collection"|"shallowReactive"|false}} annotations -
  *        Annotations defining the type of reactivity for each property. Properties with a
  *        'false' annotation will be ignored.
- * @param {Object} [options] - Options to configure the observable behavior.
+ * @param {object} [options] - Options to configure the observable behavior.
  * @param {string} [options.name] - The name of the observable object. Defaults to an empty string. Using as prefix for reactive property names.
  * @returns {T} The input object with enhanced reactive properties.
  *
@@ -4153,72 +4305,79 @@ function reactiveProps(value, options) {
  */
 function makeObservable(obj, annotations, options) {
     /** @type {{[key:string]:ReactivePrimitive}} */
-    let reactiveStore = {};
-    let _options = Object.assign({ name: "" }, options);
+    const reactiveStore = {};
+    const _options = Object.assign({ name: '' }, options);
 
-    for (let key in annotations) {
+    for (const key in annotations) {
         if (annotations[key] === false) {
             continue;
         }
 
         if (
             /** @type {Array<string|boolean>} */ ([
-                "atom",
-                "collection",
-                "reactiveProps",
+                'atom',
+                'collection',
+                'shallowReactive',
             ]).includes(annotations[key])
         ) {
-            if (annotations[key] == "atom") {
+            if (annotations[key] === 'atom') {
+                // @ts-ignore
                 reactiveStore[key] = new Atom(obj[key], {
-                    name: _options.name + "." + key,
+                    name: _options.name + '.' + key,
                 });
             }
 
-            if (annotations[key] == "collection") {
+            if (annotations[key] === 'collection') {
+                // @ts-ignore
                 reactiveStore[key] = new Collection(obj[key], {
-                    name: _options.name + "." + key,
+                    name: _options.name + '.' + key,
                 });
             }
 
-            if (annotations[key] == "reactiveProps") {
-                reactiveStore[key] = new ReactiveProps(obj[key], {
-                    name: _options.name + "." + key,
+            if (annotations[key] === 'shallowReactive') {
+                // @ts-ignore
+                reactiveStore[key] = new ShallowReactive(obj[key], {
+                    name: _options.name + '.' + key,
                 });
             }
-
+            const existingDescriptor = Object.getOwnPropertyDescriptor(obj, key);
             Object.defineProperty(obj, key, {
                 get() {
                     return reactiveStore[key].getValue();
                 },
                 set(value) {
-                    // @ts-expect-error
+                    // @ts-ignore
                     reactiveStore[key].value = value;
                 },
+                enumerable: existingDescriptor?.enumerable ?? true,
+                configurable: existingDescriptor?.configurable ?? true,
             });
         }
     }
+    // @ts-ignore
+    const allDescriptors = getAllPropertyDescriptors(obj);
 
-    let allDescriptors = getAllPropertyDescriptors(obj);
-
-    for (let key in annotations) {
-        if (annotations[key] == "computed") {
+    for (const key in annotations) {
+        if (annotations[key] === 'computed') {
             // if class or plain object
             const descriptor = allDescriptors[key];
             //Object.getOwnPropertyDescriptor(obj.prototype || obj, key) || obj[key];  //
 
-            if (descriptor && typeof descriptor.get === "function") {
-                let f = descriptor.get;
+            if (descriptor && typeof descriptor.get === 'function') {
+                const f = descriptor.get;
                 reactiveStore[key] = new Computed(
                     function () {
                         return f.call(obj);
                     },
-                    { name: _options.name + "." + key }
+                    { name: _options.name + '.' + key }
                 );
-
+                const existingDescriptor = Object.getOwnPropertyDescriptor(obj, key);
                 Object.defineProperty(obj, key, {
                     get() {
                         return reactiveStore[key].getValue();
                     },
+                    enumerable: existingDescriptor?.enumerable ?? true,
+                    configurable: existingDescriptor?.configurable ?? true,
                 });
             }
         }
@@ -4234,8 +4393,8 @@ function makeObservable(obj, annotations, options) {
  * @template {{[key:string]:any}} R
  * @param {T} target - The object to be extended and observed.
  * @param {R} properties - The properties to add to the target object.
- * @param {{[key:string]:"atom"|"computed"|"collection"|"reactiveProps"|false}} [overrides] - Optional overrides to define the type of the reactive property. If an override is false, the key will be ignored.
- * @param {Object} [options] - Options to configure the observable behavior.
+ * @param {{[key:string]:"atom"|"computed"|"collection"|"shallowReactive"|false}} [overrides] - Optional overrides to define the type of the reactive property. If an override is false, the key will be ignored.
+ * @param {object} [options] - Options to configure the observable behavior.
  * @param {string} [options.name] - The name of the observable object. Defaults to an empty string. Using as prefix for reactive property names.
  * @returns {T & R} The extended object with observable properties.
  * @example
@@ -4266,16 +4425,8 @@ function makeObservable(obj, annotations, options) {
  * ```
  */
 function extendObservable(target, properties, overrides, options) {
-    Object.assign(
-        /** @type {T & R} */ (/** @type {unknown} */ (target)),
-        properties
-    );
-    makeAutoObservable(
-        target,
-        overrides,
-        options,
-        new Set(Object.keys(properties))
-    );
+    Object.assign(/** @type {T & R} */ (/** @type {unknown} */ (target)), properties);
+    makeAutoObservable(target, overrides, options, new Set(Object.keys(properties)));
     return /** @type {T & R} */ (target);
 }
 
@@ -4283,8 +4434,8 @@ function extendObservable(target, properties, overrides, options) {
  * Makes existing object properties observable. Same as {@link makeObservable} but infers all the properties.
  * @template T
  * @param {T} obj - The object to observe.
- * @param {{[key:string]:"atom"|"computed"|"collection"|"reactiveProps"|false}} [overrides] - The overrides to use to define type of the reactive property. If an override is false, the key will be ignored.
- * @param {Object} [options] - Options to configure the observable behavior.
+ * @param {{[key:string]:"atom"|"computed"|"collection"|"shallowReactive"|false}} [overrides] - The overrides to use to define type of the reactive property. If an override is false, the key will be ignored.
+ * @param {object} [options] - Options to configure the observable behavior.
  * @param {string} [options.name] - The name of the observable object. Defaults to an empty string. Using as prefix for reactive property names.
  * @param {Set<string>} [filter] - A set of property keys to selectively apply annotations.
  * @returns {T}
@@ -4318,19 +4469,20 @@ function extendObservable(target, properties, overrides, options) {
  * ```
  */
 function makeAutoObservable(obj, overrides = {}, options, filter) {
-    let _options = Object.assign({ name: "" }, options);
+    const _options = Object.assign({ name: '' }, options);
 
-    let allDescriptors = getAllPropertyDescriptors(obj);
-
-    /** @type {Set<string>} */
-    let atomKeys = new Set();
+    // @ts-ignore
+    const allDescriptors = getAllPropertyDescriptors(obj);
 
     /** @type {Set<string>} */
-    let computedKeys = new Set();
+    const atomKeys = new Set();
 
-    Object.entries(allDescriptors).forEach((descriptorObject) => {
-        let key = descriptorObject[0];
-        let descriptor = descriptorObject[1];
+    /** @type {Set<string>} */
+    const computedKeys = new Set();
+
+    Object.entries(allDescriptors).forEach(descriptorObject => {
+        const key = descriptorObject[0];
+        const descriptor = descriptorObject[1];
 
         if (filter !== undefined && !filter.has(key)) {
             return;
@@ -4349,43 +4501,46 @@ function makeAutoObservable(obj, overrides = {}, options, filter) {
         }
     });
 
-    /** @type {{[key:string]:"atom"|"computed"|"collection"|"reactiveProps"|false}} */
+    /** @type {{[key:string]:"atom"|"computed"|"collection"|"shallowReactive"|false}} */
     let annotations = {};
 
     let keys = [...atomKeys];
     for (let i = 0; i < keys.length; i++) {
-        let key = keys[i];
+        const key = keys[i];
 
         if (overrides[key] === false) {
             continue;
         }
 
-        if (typeof obj[key] === "function") {
+        // @ts-ignore
+        if (typeof obj[key] === 'function') {
             continue;
         }
 
+        // @ts-ignore
         if (Array.isArray(obj[key])) {
-            annotations[key] = "collection";
+            annotations[key] = 'collection';
             continue;
         }
 
+        // @ts-ignore
         if (isPlainObject(obj[key])) {
-            annotations[key] = "reactiveProps";
+            annotations[key] = 'shallowReactive';
             continue;
         }
 
-        annotations[key] = "atom";
+        annotations[key] = 'atom';
     }
 
     keys = [...computedKeys];
     for (let i = 0; i < keys.length; i++) {
-        let key = keys[i];
+        const key = keys[i];
 
         if (overrides[key] === false) {
             continue;
         }
 
-        annotations[key] = "computed";
+        annotations[key] = 'computed';
     }
 
     annotations = Object.assign({}, annotations, overrides);
@@ -4393,4 +4548,4 @@ function makeAutoObservable(obj, overrides = {}, options, filter) {
     return makeObservable(obj, annotations, _options);
 }
 
-export { Atom, Collection, Computed, ReactiveList, ReactivePrimitive, ReactiveProps, Store, atom, autorun, batch, collection, computed, extendObservable, fromPromise, getNow, makeAutoObservable, makeObservable, reaction, reactiveProps, runInAction, untrack, waitTrue, when };
+export { Atom, Collection, Computed, ReactiveList, ReactivePrimitive, ShallowReactive, Store, atom, autorun, batch, collection, computed, extendObservable, fromPromise, getNow, makeAutoObservable, makeObservable, reaction, runInAction, shallowReactive, untrack, waitTrue, when };

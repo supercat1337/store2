@@ -1,9 +1,8 @@
 // @ts-check
 
-import { compareAny } from "../helpers/tools.js";
-import { Engine } from "../core/Engine.js";
-import { getValueTracker } from "../services/trackers.js";
-import { UpdateDataRecord } from "../core/UpdateDataRecord.js";
+import { Engine } from '../core/Engine.js';
+import { compareAny, getError } from '../helpers/tools.js';
+import { dependencyTracker } from '../services/dependencyTracker.js';
 
 /**
  * ReactivePrimitive is the base class for all reactive items. It provides methods for subscribing to changes,
@@ -11,17 +10,25 @@ import { UpdateDataRecord } from "../core/UpdateDataRecord.js";
  * @private
  */
 class ReactivePrimitive {
-    /** @type {Engine} */
     engine;
 
-    name = "";
+    name = '';
+
+    /**
+     *
+     * @param {1|2|3|4} type
+     */
+    constructor(type) {
+        this.engine = new Engine(this, type);
+    }
 
     /**
      * Subscribes a function to be called whenever the value of this reactive item changes.
-     * @param {(updates: Map<string, UpdateDataRecord>)=>void} fn - The function to be called whenever the value of this reactive item changes.
-     * @param {Object} [options] - Optional options.
+     * @param {(updates: Map<string, import("./../core/UpdateDataRecord.js").UpdateDataRecord>)=>void} fn - The function to be called whenever the value of this reactive item changes.
+     * @param {object} [options] - Optional options.
      * @param {number} [options.delay] - The delay in milliseconds before the function is called.
      * @param {AbortSignal} [options.signal] - The signal to abort the subscription.
+     * @returns {()=>void}
      */
     subscribe(fn, options) {
         return this.engine.subscribeController.subscribe(fn, options);
@@ -31,14 +38,14 @@ class ReactivePrimitive {
      * Removes all "change" subscribers. Listeners for "#has-subscribers" and "#no-subscribers" are not removed.
      */
     clearSubscribers() {
-        return this.engine.subscribeController.clearSubscribers();
+        this.engine.subscribeController.clearSubscribers();
     }
 
     /**
      * Removes all subscribers, including listeners for "#has-subscribers" and "#no-subscribers" events.
      */
     clearAllSubscribers() {
-        return this.engine.subscribeController.clearAllSubscribers();
+        this.engine.subscribeController.clearAllSubscribers();
     }
 
     /**
@@ -51,24 +58,28 @@ class ReactivePrimitive {
 
     /**
      * Retrieves the current value of the reactive item.
-     * @param {Object} [options] - Optional options.
-     * @param {boolean} [options.untracked=false] - If `true`, the value will not be added to the getValueTracker.
+     * @param {object} [options] - Optional options.
+     * @param {boolean} [options.untracked=false] - If `true`, the value will not be added to the dependencyTracker.
      * @returns {any} The current value of the reactive item.
      */
     getValue(options) {
-        if (this.engine === undefined) {
-            throw new Error("Not implemented");
-        }
-
         if (this.engine.isDestroyed) {
-            throw new Error("The reactive item has been destroyed");
+            throw new Error('The reactive item has been destroyed');
         }
 
-        let _options = Object.assign({ untracked: false }, options);
+        const _options = Object.assign({ untracked: false }, options);
 
-        if (_options.untracked == false) {
-            getValueTracker.add(this);
+        if (_options.untracked === false) {
+            dependencyTracker.add(this);
         }
+    }
+
+    /**
+     * Retrieves the current value of the reactive item.
+     * @returns {any} The current value of the reactive item.
+     */
+    peekValue() {
+        return this.getValue({ untracked: true });
     }
 
     /**
@@ -91,11 +102,11 @@ class ReactivePrimitive {
     hasError() {
         try {
             this.getValue();
-        } catch (error) {
-            this.engine.error = error;
+        } catch (e) {
+            this.engine.setError(getError(e));
         }
 
-        return this.engine.error != null;
+        return this.engine.error !== null;
     }
 
     /**
@@ -125,12 +136,12 @@ class ReactivePrimitive {
      * @returns {()=>void} A function that unsubscribes the given function.
      */
     onDestroy(fn) {
-        let that = this;
+        const that = this;
         const callback = () => {
             fn(that);
         };
 
-        let unsubscriber = this.engine.subscribeController.onDestroy(callback);
+        const unsubscriber = this.engine.subscribeController.onDestroy(callback);
         return unsubscriber;
     }
 
@@ -152,7 +163,9 @@ class ReactivePrimitive {
      * @returns {boolean} True if the two values are equal, false otherwise.
      */
     equals(a, b) {
-        if (b === undefined) b = this.getValue();
+        if (b === undefined) {
+            b = this.getValue();
+        }
 
         if (this.engine.compareFn) {
             return this.engine.compareFn(a, b);

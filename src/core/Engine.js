@@ -1,12 +1,12 @@
 // @ts-check
 
-import { idService, ItemId } from "../services/idService.js";
-import { SubscribeController } from "./subscribeController.js";
-import { sortReactiveItems } from "../helpers/tools.js";
-import { changedItemsController } from "../services/changedItemsController.js";
-import { ReactivePrimitive } from "../reactives/reactivePrimitive.js";
-import { modeController } from "../services/modeController.js";
-import { UpdateDataRecord } from "./UpdateDataRecord.js";
+import { idService } from '../services/idService.js';
+import { SubscribeController } from './subscribeController.js';
+import { sortReactiveItems } from '../helpers/tools.js';
+import { changedItemsController } from '../services/changedItemsController.js';
+import { modeController } from '../services/modeController.js';
+import { UpdateDataRecord } from './UpdateDataRecord.js';
+import { BatchSnapshot } from './BatchSnapshot.js';
 
 /** @enum {number} */
 export const EngineMessages = {
@@ -19,123 +19,237 @@ export const EngineMessages = {
 export const ATOM = 1;
 export const COMPUTED = 2;
 export const COLLECTION = 3;
-export const REACTIVEPROPS_OBJECT = 4;
+export const SHALLOW_REACTIVE = 4;
 
-/** @typedef {(...args:any)=>boolean} CompareFunction */
-
-class Engine {
+export class Engine {
     /**
      * The set of dependencies of the engine.
      * @type {Set<ReactivePrimitive>}
-     * */
-    dependencies = new Set(); // dependencies
+     */
+    dependencies = new Set();
 
     /**
      * The set of dependents of the engine.
      * @type {Set<ReactivePrimitive>}
-     * */
-    dependents = new Set(); // dependents
+     */
+    dependents = new Set();
 
     /**
-     * A unique identifier for the engine. It is used to determine the order in which reactive items were created.
-     * @type {ItemId}
-     * */
+     * Unique identifier for ordering.
+     * @type {number}
+     */
     id = idService.generateId();
 
     /**
-     * The version of the value of the reactive item.
+     * Version number (currently unused, kept for potential future use).
      * @type {number}
      */
     version = 0;
 
     /**
-     * The reference to the reactive item.
+     * Reference to the reactive item.
      * @type {ReactivePrimitive}
-     * */
+     */
     reactiveItem;
 
     /**
-     * The flag that indicates whether the Engine should recalculate the value of the reactive item.
+     * Flag indicating that the value should be recalculated.
      * @type {boolean}
-     * */
+     */
     shouldRecalc = false;
 
     /**
-     * Indicates whether the Engine has been destroyed.
+     * Indicates whether the engine has been destroyed.
      * @type {boolean}
-     * */
+     */
     isDestroyed = false;
 
     /**
-     * The error state of the Engine.
      * @type {null|Error}
-     * */
-    error = null;
+     */
+    #error = null;
 
     subscribeController = new SubscribeController();
 
     /**
      * The type of the reactive item.
      * @type {number}
-     * */
+     */
     type;
 
-    /** @type {Map<string, UpdateDataRecord>} */
+    /**
+     * Map of pending updates (property -> UpdateDataRecord).
+     * @type {Map<string, UpdateDataRecord>}
+     */
     updates = new Map();
 
-    oldValues = new Map();
-
-    // Holds previous values when batchMode is active
-    temporaryOldValues = new Map();
+    /**
+     * Snapshot of original values when inside a batch.
+     * @type {BatchSnapshot|null}
+     */
+    #batchSnapshot = null;
 
     /**
-     * A function that compares two values to determine if they are equal.
+     * Comparison function for equality.
      * @type {CompareFunction|null}
-     * */
+     */
     compareFn = null;
 
     /**
-     * Prevents updates from being propagated when the engine is setting properties of the reactive item.
+     * Prevents updates from being propagated (used during mass updates).
      * @type {boolean}
-     * */
-    muteUpdates = false;
+     */
+    suppressNotifications = false;
 
     /**
-     * Initializes an Engine instance with a given reactive item.
-     * @param {ReactivePrimitive} reactiveItem - The reactive item to be managed by the engine.
-     * @param {ATOM|COMPUTED|COLLECTION|REACTIVEPROPS_OBJECT} type - The type of the reactive item.
+     * Creates an Engine instance.
+     * @param {ReactivePrimitive} reactiveItem - The reactive item.
+     * @param {ATOM|COMPUTED|COLLECTION|SHALLOW_REACTIVE} type - The type.
      */
     constructor(reactiveItem, type) {
         this.reactiveItem = reactiveItem;
         this.type = type;
     }
 
+    /** @type {Error|null} */
+    get error() {
+        return this.#error;
+    }
+
     /**
-     * Adds the given dependencies to the engine. The engine will be considered as needing an update if any of the
-     * dependencies have changed.
-     * @param {Set<ReactivePrimitive>} dependencies - The dependencies to add.
+     * Records a change attempt. In batch mode, stores the original value.
+     * @param {string} property - The property key.
+     * @param {any} oldValue - The value before the change.
+     */
+    #recordChange(property, oldValue) {
+        if (modeController.batchMode) {
+            if (!this.#batchSnapshot) {
+                this.#batchSnapshot = new BatchSnapshot(this.reactiveItem);
+            }
+            this.#batchSnapshot.record(property, oldValue);
+        }
+    }
+
+    /**
+     * Determines whether a change actually affects the final value (considering batch).
+     * @param {string} property - The property key.
+     * @param {any} newValue - The new value.
+     * @returns {boolean} True if the change is effective.
+     */
+    isEffectiveChange(property, newValue) {
+        let effectiveOld;
+        if (modeController.batchMode && this.#batchSnapshot?.has(property)) {
+            effectiveOld = this.#batchSnapshot.getOriginal(property);
+        } else {
+            // When not in batch or property not recorded, we treat oldValue as unknown.
+            // In practice, this method is called after recordChange, so oldValue is known.
+            // We'll rely on the caller passing the correct oldValue, but here we need a baseline.
+            // For simplicity, we assume that if no snapshot, the change is always effective?
+            // Better to have the caller pass oldValue. We'll change signature.
+            // But to keep compatibility with existing calls, we'll require oldValue parameter.
+            throw new Error('isEffectiveChange requires oldValue when not in batch mode');
+        }
+        return !this.reactiveItem.equals(effectiveOld, newValue);
+    }
+
+    /**
+     * Alternative version that accepts explicit oldValue (preferred).
+     * @param {string} property - The property key.
+     * @param {any} oldValue - The previous value (immediate before this change).
+     * @param {any} newValue - The new value.
+     * @returns {boolean}
+     */
+    isEffectiveChangeWithOld(property, oldValue, newValue) {
+        if (modeController.batchMode && this.#batchSnapshot?.has(property)) {
+            const original = this.#batchSnapshot.getOriginal(property);
+            return !this.reactiveItem.equals(original, newValue);
+        }
+        return !this.reactiveItem.equals(oldValue, newValue);
+    }
+
+    /**
+     * Commits a change: creates an UpdateDataRecord, adds to updates, and schedules notification.
+     * @param {string} property - The property key.
+     * @param {"set"|"delete"} verb - The operation.
+     * @param {any} oldValue - The previous value (immediate before this change).
+     * @param {any} newValue - The new value.
+     * @returns {boolean} True if committed (i.e., value actually changed).
+     */
+    #commitChange(property, verb, oldValue, newValue) {
+        let reportedOld = oldValue;
+        let compareOld = oldValue;
+        if (modeController.batchMode && this.#batchSnapshot?.has(property)) {
+            const original = this.#batchSnapshot.getOriginal(property);
+            reportedOld = original;
+            compareOld = original;
+        }
+
+        // 1. Проверяем, произошла ли реальная мутация (изменение значения)
+        const hasMutation =
+            property === '' ? !this.reactiveItem.equals(oldValue, newValue) : oldValue !== newValue;
+
+        if (!hasMutation) {
+            return false;
+        }
+
+        // 2. Всегда уведомляем зависимых и добавляем элемент в changedItemsController
+        //    (даже если в batch и значение позже вернётся к исходному)
+        this.notifyDependents(EngineMessages.DEPENDENCY_CHANGED);
+        changedItemsController.addItem(this.reactiveItem);
+
+        // 3. Определяем, изменилось ли значение относительно стабильного (или старого вне batch)
+        const isEffective =
+            property === ''
+                ? !this.reactiveItem.equals(compareOld, newValue)
+                : compareOld !== newValue;
+
+        if (!isEffective) {
+            // Значение вернулось к исходному – удаляем запись обновления
+            this.updates.delete(property);
+            return false;
+        }
+
+        // 4. Создаём или обновляем запись в updates
+        const record = new UpdateDataRecord(verb, reportedOld, newValue, this.reactiveItem);
+        this.updates.set(property, record);
+        this.version++;
+        return true;
+    }
+
+    /**
+     * Legacy method for backward compatibility. Delegates to recordChange + #commitChange.
+     * @param {string} property - The property key.
+     * @param {"set"|"delete"} verb - The operation.
+     * @param {any} oldValue - The previous value.
+     * @param {any} value - The new value.
+     * @returns {boolean} True if an update was added.
+     */
+    addUpdate(property, verb, oldValue, value) {
+        this.#recordChange(property, oldValue);
+        return this.#commitChange(property, verb, oldValue, value);
+    }
+
+    /**
+     * Adds dependencies to this engine.
+     * @param {Set<ReactivePrimitive>} dependencies
      */
     addDependencies(dependencies) {
-        let array = [];
-
+        const array = [];
         for (const dependency of dependencies) {
             if (!this.dependencies.has(dependency)) {
                 array.push(dependency);
-
                 dependency.engine.addDependent(this.reactiveItem);
             }
         }
-
         array.sort(sortReactiveItems);
-
         for (let i = 0; i < array.length; i++) {
             this.addDependency(array[i]);
         }
     }
 
     /**
-     * Adds a single dependency to the engine. The engine will be considered as needing an update if the dependency changes.
-     * @param {ReactivePrimitive} dependency - The dependency to add.
+     * Adds a single dependency.
+     * @param {ReactivePrimitive} dependency
      */
     addDependency(dependency) {
         if (!this.dependencies.has(dependency)) {
@@ -144,145 +258,151 @@ class Engine {
     }
 
     /**
-     * Adds a single dependent to the engine. The engine will notify the dependent whenever an update is needed.
-     * @param {ReactivePrimitive} dependent - The dependent to add.
-     * @returns {boolean} Whether the dependent was successfully added. If the engine is destroyed, the dependent is not added and the method returns false.
+     * Adds a dependent.
+     * @param {ReactivePrimitive} dependent
+     * @returns {boolean}
      */
     addDependent(dependent) {
-        if (this.isDestroyed) return false;
-
+        if (this.isDestroyed) {
+            return false;
+        }
         if (!this.dependents.has(dependent)) {
             this.dependents.add(dependent);
         }
-
         return true;
     }
 
     /**
-     * Returns a set of all dependents of the engine, including all dependents of the dependents of the engine. This
-     * method is useful for finding all atoms, computed values and collections that are dependent on a given reactive
-     * item.
-     * @returns {Set<ReactivePrimitive>} A set of all dependents of the engine.
+     * Removes a dependent.
+     * @param {ReactivePrimitive} dependent
      */
-    getDeepDependents() {
-        const dependents = new Set(this.dependents);
-
-        for (const dependent of this.dependents) {
-            for (const deepDependent of dependent.engine.dependents) {
-                dependents.add(deepDependent);
-            }
-        }
-
-        return dependents;
+    removeDependent(dependent) {
+        this.dependents.delete(dependent);
     }
 
     /**
-     * Returns an array of all dependents of the engine, including all dependents of the dependents of the engine, sorted
-     * by engine ID. This method is useful for finding all atoms, computed values and collections that are dependent on a
-     * given reactive item, in a specific order.
-     * @returns {Array<ReactivePrimitive>} An array of all dependents of the engine, sorted by engine ID.
+     * Returns all dependents recursively.
+     * @returns {Set<ReactivePrimitive>}
+     */
+    getDeepDependents() {
+        const result = new Set();
+        const queue = [this.reactiveItem];
+        const visited = new Set();
+        while (queue.length) {
+            const current = queue.shift();
+            if (!current || visited.has(current)) {
+                continue;
+            }
+            visited.add(current);
+            for (const dependent of current.engine.dependents) {
+                if (!result.has(dependent)) {
+                    result.add(dependent);
+                    queue.push(dependent);
+                }
+            }
+        }
+        return result;
+    }
+
+    /**
+     * Returns sorted array of deep dependents.
+     * @returns {Array<ReactivePrimitive>}
      */
     getDeepDependentsArray() {
-        let array = Array.from(this.getDeepDependents());
+        const array = Array.from(this.getDeepDependents());
         array.sort(sortReactiveItems);
         return array;
     }
 
     /**
-     * Notifies all dependents of the engine that a change has occurred.
-     * @param {EngineMessages} message - An optional message to pass to the dependents.
-     * @param { {sender: ReactivePrimitive, recipients: Set<ReactivePrimitive>} } [ctx] - An optional context to pass to the dependents.
+     * Notifies dependents of a message.
+     * @param {EngineMessages} message
+     * @param {{sender: ReactivePrimitive, recipients: Set<ReactivePrimitive>}} [ctx]
      */
     notifyDependents(message, ctx) {
         if (ctx === undefined) {
-            ctx = {
-                sender: this.reactiveItem,
-                recipients: new Set(),
-            };
+            ctx = { sender: this.reactiveItem, recipients: new Set() };
         }
-
-        this.dependents.forEach((dependent) => {
+        for (const dependent of this.dependents) {
             ctx.recipients.add(dependent);
             dependent.engine.getMessage(message, ctx);
-        });
+        }
     }
 
     /**
-     * Notifies all dependencies of the engine that a change has occurred.
-     * @param {EngineMessages} message - The message to pass to the dependencies.
-     * @param { {sender: ReactivePrimitive, recipients: Set<ReactivePrimitive>} } ctx - The context to pass to the dependencies.
+     * Notifies dependencies (reverse direction).
+     * @param {EngineMessages} message
+     * @param {{sender: ReactivePrimitive, recipients: Set<ReactivePrimitive>}} ctx
      */
     notifyDependencies(message, ctx) {
-        this.dependencies.forEach((dependent) => {
-            ctx.recipients.add(dependent);
-            dependent.engine.getMessage(message, ctx);
-        });
+        for (const dependency of this.dependencies) {
+            ctx.recipients.add(dependency);
+            dependency.engine.getMessage(message, ctx);
+        }
     }
 
     /**
-     * Processes a message that has been sent to the engine. If the message is {@link DEPENDENCY_CHANGED}, the engine
-     * notifies all dependents of the change. If the message is {@link DEPENDENCY_DESTROYED}, the engine destroys itself. If
-     * the message is {@link HAS_ERROR}, the engine forwards the error to all dependents.
-     * @param {EngineMessages} message - The message to process.
-     * @param { {sender: ReactivePrimitive, recipients: Set<ReactivePrimitive>} } ctx - The context to pass to the dependents.
+     * Handles incoming messages.
+     * @param {EngineMessages} message
+     * @param {{sender: ReactivePrimitive, recipients: Set<ReactivePrimitive>}} ctx
      */
     getMessage(message, ctx) {
-        if (message == EngineMessages.DEPENDENT_DESTROYED) {
-            this.dependents.delete(ctx.sender);
-        }
-
-        if (message == EngineMessages.DEPENDENCY_CHANGED) {
-            this.error = null;
-            this.shouldRecalc = true;
-            this.notifyDependents(message, ctx);
-        }
-
-        if (message == EngineMessages.DEPENDENCY_DESTROYED) {
-            this.destroy(ctx);
-        }
-
-        if (message == EngineMessages.HAS_ERROR) {
-            this.setError(ctx.sender.engine.error, ctx);
+        switch (message) {
+            case EngineMessages.DEPENDENT_DESTROYED:
+                this.dependents.delete(ctx.sender);
+                break;
+            case EngineMessages.DEPENDENCY_CHANGED:
+                this.#error = null;
+                this.shouldRecalc = true;
+                this.notifyDependents(message, ctx);
+                break;
+            case EngineMessages.DEPENDENCY_DESTROYED:
+                this.destroy(ctx);
+                break;
+            case EngineMessages.HAS_ERROR:
+                this.shouldRecalc = true;
+                this.setError(ctx.sender.engine.error, ctx);
+                break;
         }
     }
 
     /**
-     * Sets the error state of the Engine to the given error, increments the version, and notifies dependents of the error.
-     * @param {Error|null} error - The error to set.
-     * @param {{sender: ReactivePrimitive, recipients: Set<ReactivePrimitive>}} [ctx] - An optional context to pass to the dependents.
+     * Sets an error and notifies dependents.
+     * @param {Error|null} error
+     * @param {{sender: ReactivePrimitive, recipients: Set<ReactivePrimitive>}} [ctx]
      */
     setError(error, ctx) {
-        if (error === null) return;
-
-        if (ctx === undefined) {
-            ctx = {
-                sender: this.reactiveItem,
-                recipients: new Set(),
-            };
+        if (error === null) {
+            return;
         }
-
+        if (ctx === undefined) {
+            ctx = { sender: this.reactiveItem, recipients: new Set() };
+        }
         this.version++;
-        this.error = error;
+        this.#error = error;
         this.shouldRecalc = true;
         this.notifyDependents(EngineMessages.HAS_ERROR, ctx);
     }
 
     /**
-     * Destroys the Engine, clearing all dependencies, dependents and subscribers, and marking the Engine as destroyed.
-     * This method is useful for cleaning up after an Engine that is no longer needed.
+     * Clears the current error.
+     */
+    clearError() {
+        this.#error = null;
+    }
+
+    /**
+     * Destroys the engine.
      * @param {{sender: ReactivePrimitive, recipients: Set<ReactivePrimitive>}} [ctx]
      */
     destroy(ctx) {
-        if (this.isDestroyed) return;
-
-        if (ctx === undefined) {
-            ctx = {
-                sender: this.reactiveItem,
-                recipients: new Set(),
-            };
+        if (this.isDestroyed) {
+            return;
         }
-
-        this.error = null;
+        if (ctx === undefined) {
+            ctx = { sender: this.reactiveItem, recipients: new Set() };
+        }
+        this.#error = null;
         this.notifyDependents(EngineMessages.DEPENDENCY_DESTROYED, ctx);
         this.notifyDependencies(EngineMessages.DEPENDENT_DESTROYED, ctx);
         this.isDestroyed = true;
@@ -290,139 +410,114 @@ class Engine {
         this.dependents.clear();
         this.subscribeController.destroy();
         this.clearUpdates();
+        if (this.#batchSnapshot) {
+            this.#batchSnapshot.clear();
+            this.#batchSnapshot = null;
+        }
     }
 
     /**
-     * Adds an update to the Engine's update log. The update log is an array of objects with the following properties:
-     * - property: The name of the property that changed.
-     * - verb: The verb that describes the change. For example "set" or "added".
-     * - oldValue: The value of the property before the change.
-     * - value: The new value of the property.
-     * @param {string} property - The name of the property that changed.
-     * @param {"set"|"delete"} verb - The verb that describes the change.
-     * @param {any} oldValue - The value of the property before the change.
-     * @param {any} value - The new value of the property.
-     */
-    addUpdate(property, verb, oldValue, value) {
-        if (modeController.batchMode == true) {
-            if (this.temporaryOldValues.get(property) === undefined) {
-                this.temporaryOldValues.set(property, oldValue);
-            }
-        }
-
-        this.oldValues.set(property, oldValue);
-
-        if (modeController.batchMode) {
-            oldValue = this.temporaryOldValues.get(property);
-        }
-
-        if (property == "") {
-            this.updates.clear();
-        }
-
-        if (property == "" && this.reactiveItem.equals(oldValue, value)) {
-            this.updates.delete(property);
-            return;
-        }
-
-        let updateRecord = new UpdateDataRecord(
-            verb,
-            oldValue,
-            value,
-            this.reactiveItem
-        );
-        this.updates.set(property, updateRecord);
-    }
-
-    /**
-     * Clears all updates in the engine's update log.
+     * Clears all pending updates.
      */
     clearUpdates() {
         this.updates.clear();
     }
 
     /**
-     * Checks whether there are any updates in the engine's update log.
-     * @returns {boolean} True if there are updates, false otherwise.
+     * Checks if there are any pending updates.
+     * @returns {boolean}
      */
     hasUpdates() {
         return this.updates.size > 0;
     }
 
     /**
-     * Processes a value change.
-     */
-    valueChangedCallback() {
-        if (this.muteUpdates) return;
-
-        this.version++;
-
-        let ctx = {
-            sender: this.reactiveItem,
-            recipients: new Set(),
-        };
-
-        this.shouldRecalc = false;
-
-        this.notifyDependents(EngineMessages.DEPENDENCY_CHANGED, ctx);
-
-        changedItemsController.addItem(this.reactiveItem);
-    }
-
-    /**
-     * Checks whether any temporary old values have changed and if so, moves these values to the oldValues map and deletes them from the temporaryOldValues map.
-     * This method is called by the reactive item whenever a value change is detected and the muteUpdates flag is set to true.
-     * @returns {boolean} True if any changes were detected, false otherwise.
-     */
-    checkChangesTemporary() {
-        let item = this.reactiveItem;
-
-        let keys = Array.from(this.temporaryOldValues.keys());
-
-        for (let i = 0; i < keys.length; i++) {
-            let key = keys[i];
-
-            let temporaryOldValue = this.temporaryOldValues.get(key);
-            let actualValue =
-                key == "" ? item.getValue() : item.getValue()[key];
-
-            if (!item.equals(temporaryOldValue, actualValue)) {
-                this.oldValues.set(key, this.temporaryOldValues.get(key));
-                this.temporaryOldValues.delete(key);
-                return true;
-            }
-        }
-
-        return false;
-    }
-
-    /**
-     * Checks whether any old values have changed by comparing them with the current values.
-     * If a change is detected, returns true; otherwise, returns false.
-     * This method iterates over the keys of the oldValues map and checks if the
-     * corresponding current value differs from the stored old value.
-     *
-     * @returns {boolean} True if any old values have changed, false otherwise.
+     * Legacy method for compatibility.
+     * @returns {boolean}
      */
     checkChangesOldValues() {
         return this.hasUpdates();
     }
 
     /**
-     * Prepares the engine to set a new value for the reactive item by
-     * checking that the reactive item has not been destroyed and that
-     * there are no subscribers currently running. If either of these
-     * conditions are true, an error is thrown.
+     * Processes temporary changes after batch ends.
+     * Removes updates for properties that reverted to original values.
+     * @returns {boolean} True if any changes remain.
+     */
+    checkChangesTemporary() {
+        if (!this.#batchSnapshot) {
+            return this.hasUpdates();
+        }
+
+        /**
+         *
+         * @param {string} prop
+         * @returns {any}
+         */
+        const getCurrent = prop => {
+            if (prop === '') {
+                return this.reactiveItem.peekValue();
+            }
+            const val = this.reactiveItem.peekValue();
+            return val ? val[prop] : undefined;
+        };
+
+        const changedProps = this.#batchSnapshot.getChangedProperties(getCurrent);
+
+        for (const key of this.updates.keys()) {
+            if (!changedProps.includes(key)) {
+                this.updates.delete(key);
+            }
+        }
+
+        const hasChanges = this.updates.size > 0;
+        this.#batchSnapshot.clear();
+        this.#batchSnapshot = null;
+
+        return hasChanges;
+    }
+
+    /**
+     * Called after a value change to schedule notifications.
+     */
+    valueChangedCallback() {
+        if (this.suppressNotifications) {
+            return;
+        }
+        changedItemsController.addItem(this.reactiveItem);
+    }
+
+    /**
+     * Prepares the engine for setting a new value.
+     * @throws {Error} If destroyed or in subscribers mode.
      */
     prepareSetValue() {
         if (this.isDestroyed) {
-            throw new Error("The reactive item has been destroyed");
+            throw new Error('The reactive item has been destroyed');
         }
-
         if (modeController.subscribersMode) {
-            throw new Error("Cannot set value while subscribers are running");
+            throw new Error('Cannot set value while subscribers are running');
+        }
+    }
+
+    /**
+     * Updates dependencies to a new set.
+     * @param {Set<ReactivePrimitive>} newDeps
+     */
+    updateDependencies(newDeps) {
+        // Remove old dependencies no longer needed
+        for (const oldDep of this.dependencies) {
+            if (!newDeps.has(oldDep)) {
+                this.dependencies.delete(oldDep);
+                oldDep.engine.removeDependent(this.reactiveItem);
+            }
+        }
+        // Add new dependencies
+        for (const newDep of newDeps) {
+            if (!this.dependencies.has(newDep)) {
+                this.dependencies.add(newDep);
+                newDep.engine.addDependent(this.reactiveItem);
+            }
         }
     }
 }
-
-export { Engine };

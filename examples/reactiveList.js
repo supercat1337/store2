@@ -1,6 +1,6 @@
 // @ts-check
 
-import { ReactiveList } from "../src/index.js";
+import { ReactiveList } from "@supercat1337/store2";
 
 const list = new ReactiveList();
 const item1 = { name: "item1" };

@@ -1,7 +1,7 @@
 // @ts-check
 
-import { idService } from "../services/idService.js";
-import { ReactivePrimitive } from "../reactives/reactivePrimitive.js";
+import { ReactivePrimitive } from '../reactives/ReactivePrimitive.js';
+import { idService } from '../services/idService.js';
 
 /**
  * Sorts reactive items by their internal id. This is used to
@@ -25,12 +25,12 @@ export function sortReactiveItems(a, b) {
  */
 
 export function getSortedReactiveItems(...items) {
-    let all = new Set();
-    items.forEach((item) => {
+    const all = new Set();
+    items.forEach(item => {
         if (!(item instanceof Set)) {
             all.add(item);
         } else {
-            item.forEach((i) => all.add(i));
+            item.forEach(i => all.add(i));
         }
     });
 
@@ -43,7 +43,7 @@ export function getSortedReactiveItems(...items) {
  * @returns {boolean} true if the value is a plain object, false otherwise.
  */
 export function isPlainObject(obj) {
-    return typeof obj === "object" && obj !== null && !Array.isArray(obj);
+    return typeof obj === 'object' && obj !== null && !Array.isArray(obj);
 }
 
 /**
@@ -70,26 +70,33 @@ function compareArrays(a, b) {
 /**
  * Checks if two plain objects are equal. If the objects do not have the same set of keys, then this function returns false.
  * Otherwise, this function checks if each value of the two objects is equal, using the compareAny function.
- * @param {Object} a - The first object to compare.
- * @param {Object} b - The second object to compare.
+ * @param {object} a - The first object to compare.
+ * @param {object} b - The second object to compare.
  * @returns {boolean} True if the two objects are equal, false otherwise.
  */
 function comparePlainObjects(a, b) {
-    if (a === b) return true;
-    if (!isPlainObject(a) || !isPlainObject(b)) return false;
+    if (a === b) {
+        return true;
+    }
+    if (!isPlainObject(a) || !isPlainObject(b)) {
+        return false;
+    }
 
-    let keysA = Object.keys(a);
-    let keysB = Object.keys(b);
+    const keysA = Object.keys(a);
+    const keysB = Object.keys(b);
 
-    if (keysA.length !== keysB.length) return false;
+    if (keysA.length !== keysB.length) {
+        return false;
+    }
 
     for (let i = 0; i < keysA.length; i++) {
-        let key = keysA[i];
-        let hasProperty = Object.prototype.hasOwnProperty.call(b, key);
+        const key = keysA[i];
+        const hasProperty = Object.prototype.hasOwnProperty.call(b, key);
         if (!hasProperty) {
             return false;
         }
 
+        // @ts-ignore
         if (!compareAny(a[key], b[key])) {
             return false;
         }
@@ -106,11 +113,19 @@ function comparePlainObjects(a, b) {
  * @returns {boolean}
  */
 export function compareAny(a, b) {
-    if (a === b) return true;
-    if (typeof a != typeof b) return false;
+    if (a === b) {
+        return true;
+    }
+    if (typeof a !== typeof b) {
+        return false;
+    }
 
-    if (a === null || b === null) return false;
-    if (a === undefined || b === undefined) return false;
+    if (a === null || b === null) {
+        return false;
+    }
+    if (a === undefined || b === undefined) {
+        return false;
+    }
 
     if (Array.isArray(a) || Array.isArray(b)) {
         if (!(Array.isArray(a) && Array.isArray(b))) {
@@ -133,13 +148,17 @@ export function compareAny(a, b) {
    window.addEventListener('resize', debounce((evt) => console.log(evt), 250));
  */
 export function debounce(func, wait) {
-    var timeout;
-    var f = (...args) => {
-        var context = this;
-        var later = function () {
+    /** @type {ReturnType<typeof setTimeout>|null} */
+    let timeout;
+    // @ts-ignore
+    const f = (...args) => {
+        // @ts-ignore
+        const context = this;
+        const later = function () {
             timeout = null;
             func.apply(context, args);
         };
+        // @ts-ignore
         clearTimeout(timeout);
         timeout = setTimeout(later, wait);
     };
@@ -159,7 +178,7 @@ export function clone(obj) {
     if (Array.isArray(obj)) {
         // @ts-ignore
         return obj.slice();
-    } else if (typeof obj === "object" && obj !== null) {
+    } else if (typeof obj === 'object' && obj !== null) {
         return Object.assign({}, obj);
     } else {
         return obj;
@@ -172,23 +191,104 @@ export function clone(obj) {
  * @returns {Promise<void>}
  */
 export function sleep(ms) {
-    return new Promise((resolve) => setTimeout(resolve, ms));
+    return new Promise(resolve => setTimeout(resolve, ms));
 }
 
 /**
  * Gets all property descriptors of an object, including its prototype and all its ancestors.
  * The descriptors are returned as a plain object.
- * @param {Object} obj - The object to get the property descriptors from.
+ * @param {object} obj - The object to get the property descriptors from.
+ * @param {number} [depth=0]
+ * @param {number} [maxDepth=100]
  * @returns {{[x: string]: TypedPropertyDescriptor<any>;} & { [x: string]: PropertyDescriptor;}} A plain object with all property descriptors of the object.
  */
-export function getAllPropertyDescriptors(obj) {
-    if (!obj) {
+export function getAllPropertyDescriptors(obj, depth = 0, maxDepth = 100) {
+    if (!obj || depth > maxDepth) {
         return Object.create(null);
-    } else {
-        const proto = Object.getPrototypeOf(obj);
-        return {
-            ...getAllPropertyDescriptors(proto),
-            ...Object.getOwnPropertyDescriptors(obj),
-        };
     }
+    const proto = Object.getPrototypeOf(obj);
+    return {
+        ...getAllPropertyDescriptors(proto, depth + 1, maxDepth),
+        ...Object.getOwnPropertyDescriptors(obj),
+    };
+}
+
+/**
+ * Converts any value to an Error object.
+ *
+ * If the given value is already an instance of Error, it is returned unchanged.
+ * Otherwise, a new Error object is created using the string representation of the value.
+ *
+ * @param {unknown} e - The value to convert into an Error.
+ * @returns {Error} An Error object derived from the input value.
+ *
+ * @example
+ * // Returns the original Error
+ * const originalError = new Error('Something went wrong');
+ * getError(originalError) === originalError; // true
+ *
+ * @example
+ * // Converts a string to an Error
+ * const error = getError('Network failure');
+ * error.message; // 'Network failure'
+ * error instanceof Error; // true
+ *
+ * @example
+ * // Converts numbers or other types
+ * getError(42).message; // '42'
+ * getError(null).message; // 'null'
+ * getError(undefined).message; // 'undefined'
+ */
+export function getError(e) {
+    return e instanceof Error ? e : new Error(String(e));
+}
+
+/**
+ * Extracts names (and optionally ids) from a Set of reactive primitives.
+ * Returns an array of strings, one per item.
+ *
+ * @param {Set<ReactivePrimitive>|Iterable<ReactivePrimitive>} items - Collection of reactive items.
+ * @param {{includeId:boolean, fallback:string, sorted:boolean}} [options] - Formatting options.
+ * @returns {string[]} Array of item representations.
+ *
+ * @example
+ * const a = new Atom(0, { name: 'counter' });
+ * const b = new Computed(() => a.value * 2, { name: 'double' });
+ * const set = new Set([a, b]);
+ * getItemNamesFromSet(set);
+ * // ['counter', 'double']
+ *
+ * @example
+ * getItemNamesFromSet(set, { includeId: true });
+ * // ['counter:5', 'double:7']
+ *
+ * @example
+ * getItemNamesFromSet(set, { fallback: '?', sorted: false });
+ */
+export function getItemNamesFromSet(
+    items,
+    options = { includeId: false, fallback: 'unnamed', sorted: true }
+) {
+    const { includeId = false, fallback = 'unnamed', sorted = true } = options;
+
+    const result = [];
+
+    for (const item of items) {
+        if (!(item instanceof ReactivePrimitive)) {
+            continue;
+        }
+
+        const namePart = item.name && item.name.trim() !== '' ? item.name : fallback;
+        if (includeId) {
+            result.push(`${namePart}:${item.engine.id}`);
+        } else {
+            result.push(namePart);
+        }
+    }
+
+    if (sorted) {
+        result.sort((a, b) => a.localeCompare(b));
+    }
+
+    return result;
 }

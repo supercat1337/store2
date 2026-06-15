@@ -1,22 +1,23 @@
 // @ts-check
 
-import { ReactivePrimitive } from "../reactives/reactivePrimitive.js";
-import { sortReactiveItems } from "../helpers/tools.js";
-import { modeController } from "./modeController.js";
+import { getError, sortReactiveItems } from '../helpers/tools.js';
+import { modeController } from './modeController.js';
 
+/**
+ * Controller that manages changed reactive items and coordinates subscriber notifications.
+ * Handles batching, dependency recalculation, and error aggregation.
+ */
 class ChangedItemsController {
     /** @type {Set<ReactivePrimitive>} */
     items = new Set();
 
     /**
-     * Adds an item to the set of changed items. If not in batch mode, it updates
-     * the old values of the items and clears the set.
-     *
-     * @param {ReactivePrimitive} item - The reactive item to add.
+     * Adds a reactive item to the set of changed items.
+     * If not in batch mode, immediately runs subscribers and clears the set.
+     * @param {ReactivePrimitive} item - The reactive item that changed.
      */
     addItem(item) {
         this.items.add(item);
-
         if (!modeController.batchMode) {
             this.runSubscribers();
             this.clear();
@@ -24,40 +25,48 @@ class ChangedItemsController {
     }
 
     /**
-     * Removes all items from the set of changed items.
+     * @param {ReactivePrimitive} item
+     */
+    removeItem(item) {
+        this.items.delete(item);
+    }
+
+    /**
+     * Removes all items from the changed items set.
      */
     clear() {
         this.items.clear();
     }
 
     /**
-     * Runs all subscribers of the items in the set of changed items. If not in batch mode, it clears the set of changed items after running the subscribers.
-     * If in batch mode, it also runs the subscribers of the items that have changed since the last time this method was called.
-     * All subscribers are run in the order of the items' creation IDs. If an error occurs in a subscriber, it is thrown after all subscribers have been run.
+     * Runs all subscribers for the changed items.
+     * Processes dependency trees, recalculates stale computed values,
+     * and invokes subscriber callbacks with update records.
+     * Handles errors and aggregates them if multiple occur.
      */
     runSubscribers() {
         /** @type {Set<ReactivePrimitive>} */
-        let effectedItems = new Set();
+        const changedItemsWithUpdates = new Set();
 
         // get atoms whose value has changed. compare values
-        this.items.forEach((item) => {
-            if (modeController.batchMode == true) {
+        this.items.forEach(item => {
+            if (modeController.batchMode === true) {
                 if (item.engine.checkChangesTemporary()) {
-                    effectedItems.add(item);
+                    changedItemsWithUpdates.add(item);
                 }
             } else {
                 if (item.engine.checkChangesOldValues()) {
-                    effectedItems.add(item);
+                    changedItemsWithUpdates.add(item);
                 }
             }
         });
 
         /** @type {Set<ReactivePrimitive>} */
-        let itemsToRecalc = new Set();
+        const itemsToRecalc = new Set();
 
         // get reactive items whose dependents have subscribers
-        effectedItems.forEach((item) => {
-            item.engine.getDeepDependents().forEach((dep) => {
+        changedItemsWithUpdates.forEach(item => {
+            item.engine.getDeepDependents().forEach(dep => {
                 if (dep.hasSubscribers()) {
                     itemsToRecalc.add(dep);
                 }
@@ -67,46 +76,43 @@ class ChangedItemsController {
         // changed items will be recalculated and added to this.items
         Array.from(itemsToRecalc)
             .sort(sortReactiveItems)
-            .forEach((item) => {
+            .forEach(item => {
                 item.getValue();
             });
 
         itemsToRecalc.clear();
-        effectedItems.clear();
+        changedItemsWithUpdates.clear();
 
-        this.items.forEach((item) => {
-            if (modeController.batchMode == true) {
-                if (item.engine.temporaryOldValues.size > 0) {
-                    if (item.engine.checkChangesTemporary()) {
-                        effectedItems.add(item);
-                    }
-                } else {
-                    effectedItems.add(item);
+        if (modeController.batchMode === true) {
+            this.items.forEach(item => {
+                if (item.engine.checkChangesTemporary()) {
+                    changedItemsWithUpdates.add(item);
                 }
-            } else {
+            });
+        } else {
+            this.items.forEach(item => {
                 if (item.engine.checkChangesOldValues()) {
-                    effectedItems.add(item);
+                    changedItemsWithUpdates.add(item);
                 }
-            }
-        });
+            });
+        }
 
         // create an array of reactive elements, sorted by ID (order of creation)
-        let effectedItemsSorted = Array.from(effectedItems)
-            .filter((item) => item.hasSubscribers())
+        const changedItemsWithUpdatesSorted = Array.from(changedItemsWithUpdates)
+            .filter(item => item.hasSubscribers())
             .sort(sortReactiveItems);
 
         modeController.startSubscribersMode();
 
-        let usedSubscribers = new Set();
-        let errors = [];
+        const usedSubscribers = new Set();
+        const errors = [];
 
-        for (let i = 0; i < effectedItemsSorted.length; i++) {
-            let item = effectedItemsSorted[i];
+        for (let i = 0; i < changedItemsWithUpdatesSorted.length; i++) {
+            const item = changedItemsWithUpdatesSorted[i];
 
-            let itemSubscribers =
-                item.engine.subscribeController.getSubscribers();
+            const itemSubscribers = item.engine.subscribeController.getSubscribers();
 
-            for (let subscriber of itemSubscribers) {
+            for (const subscriber of itemSubscribers) {
                 if (usedSubscribers.has(subscriber)) {
                     continue;
                 }
@@ -115,11 +121,9 @@ class ChangedItemsController {
                 try {
                     subscriber(item.engine.updates);
                 } catch (e) {
-                    let error = new Error(
-                        `Error in ${item.name}: ${e.message}`,
-                        { cause: item }
-                    );
-                    error.stack = e.stack;
+                    const err = getError(e);
+                    const error = new Error(`Error in ${item.name}: ${err.message}`, { cause: item });
+                    error.stack = err.stack;
                     errors.push(error);
                 }
             }
@@ -127,7 +131,7 @@ class ChangedItemsController {
             item.engine.clearUpdates();
         }
 
-        this.items.forEach((item) => {
+        this.items.forEach(item => {
             item.engine.clearUpdates();
         });
 
@@ -138,14 +142,15 @@ class ChangedItemsController {
 
         if (modeController.throwErrorInSubscribers) {
             for (let i = 0; i < errors.length; i++) {
-                let error = errors[i];
+                const error = errors[i];
                 throw error;
             }
         }
     }
 }
 
-modeController.on("beforeBatchModeEnd", () => {
+// Hook into batch mode lifecycle
+modeController.on('beforeBatchModeEnd', () => {
     changedItemsController.runSubscribers();
     changedItemsController.clear();
 });

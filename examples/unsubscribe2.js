@@ -1,6 +1,6 @@
 // @ts-check
 
-import { Atom } from "../src/index.js";
+import { Atom } from "@supercat1337/store2";
 
 const a = new Atom(0, { name: "a" });
 const abortController = new AbortController();

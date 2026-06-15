@@ -1,6 +1,6 @@
 // @ts-check
 
-import { Atom, Computed } from "../src/index.js";
+import { Atom, Computed } from "@supercat1337/store2";
 
 const a = new Atom(0); // same as const a = atom(0);
 const b = new Atom(0);

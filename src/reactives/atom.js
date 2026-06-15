@@ -1,12 +1,12 @@
 // @ts-check
 
-import { ReactivePrimitive } from "./reactivePrimitive.js";
-import { ATOM, Engine } from "../core/Engine.js";
-import { clone } from "../helpers/tools.js";
+import { ATOM } from '../core/Engine.js';
+import { clone } from '../helpers/tools.js';
+import { ReactivePrimitive } from './ReactivePrimitive.js';
 
 /**
  * Atom is a reactive primitive that holds a value. It is the base unit of reactive state.
- * @extends ReactivePrimitive
+ * @augments ReactivePrimitive
  * @template T
  * @example
  * ```js
@@ -54,41 +54,31 @@ class Atom extends ReactivePrimitive {
     /** @type {T} */
     #currentValue;
 
-    options = {
-        name: "",
-        compareFunction: null,
-    };
-
     /**
      * Initializes an Atom instance with a given value.
      * @param {T} value - The initial value of the Atom.
-     * @param {Object} [options] - Options.
+     * @param {object} [options] - Options.
      * @param {string} [options.name] - The name of the Atom.
-     * @param {(a:T, b:T)=>boolean} [options.compareFunction] - A function that compares two values for equality.
+     * @param {((a:T, b:T)=>boolean)|null} [options.compareFunction] - A function that compares two values for equality.
      */
-    constructor(value, options) {
-        super();
+    constructor(
+        value,
+        options = {
+            name: '',
+            compareFunction: null,
+        }
+    ) {
+        super(ATOM);
 
         if (value instanceof ReactivePrimitive) {
             throw new Error(
-                `Atom${
-                    this.name ? ` (${this.name})` : ""
-                }: value must not be a reactive item`
+                `Atom${this.name ? ` (${this.name})` : ''}: value must not be a reactive item`
             );
         }
 
-        this.options = Object.assign({}, this.options, options);
-
-        if (this.options.name) this.name = this.options.name;
-
+        this.name = options.name || '';
+        this.engine.compareFn = options.compareFunction || null;
         this.#currentValue = value;
-
-        this.engine = new Engine(this, ATOM);
-        if (this.options.compareFunction)
-            this.engine.compareFn = this.options.compareFunction;
-
-        //this.engine.addUpdate("", "set", undefined, this.#currentValue);
-        this.engine.oldValues.set("", undefined);
     }
 
     /**
@@ -99,14 +89,11 @@ class Atom extends ReactivePrimitive {
     set value(value) {
         if (value instanceof ReactivePrimitive) {
             throw new Error(
-                `Atom${
-                    this.name ? ` (${this.name})` : ""
-                }: value must not be a reactive item`
+                `Atom${this.name ? ` (${this.name})` : ''}: value must not be a reactive item`
             );
         }
 
-        /** @type {Engine} */
-        let engine = this.engine;
+        const engine = this.engine;
 
         engine.prepareSetValue();
 
@@ -114,18 +101,19 @@ class Atom extends ReactivePrimitive {
             return;
         }
 
-        let oldValue = this.#currentValue;
+        const oldValue = this.#currentValue;
         this.#currentValue = clone(value);
 
-        let newValue = this.#currentValue;
-        engine.addUpdate("", "set", oldValue, newValue);
-        engine.valueChangedCallback();
+        const newValue = this.#currentValue;
+        if (engine.addUpdate('', 'set', oldValue, newValue)) {
+            engine.valueChangedCallback();
+        }
     }
 
     /**
      * Retrieves the current value of the Atom. If the engine is destroyed, an error is thrown.
      * Tracks the Atom for dependency management.
-     * @param {{untracked?: boolean}} [options] - Optional options. If `untracked` is `false`, the Atom value will be added to the getValueTracker.
+     * @param {{untracked?: boolean}} [options] - Optional options. If `untracked` is `false`, the Atom value will be added to the dependencyTracker.
      * @returns {T} The current value of the Atom.
      */
     getValue(options) {

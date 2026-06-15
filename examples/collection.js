@@ -1,6 +1,6 @@
 //@ts-check
 
-import { Collection, computed } from "../src/index.js";
+import { Collection, computed } from "@supercat1337/store2";
 
 let c = new Collection([1, 2, 3]);
 c.subscribe((updates) => {

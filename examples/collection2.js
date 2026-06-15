@@ -1,6 +1,6 @@
 //@ts-check
 
-import { Collection, Computed } from "../src/index.js";
+import { Collection, Computed } from "@supercat1337/store2";
 
 let collection = new Collection([{ foo: 0 }, { foo: 1 }, { foo: 2 }]);
 

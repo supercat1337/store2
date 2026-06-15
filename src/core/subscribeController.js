@@ -1,8 +1,7 @@
 // @ts-check
 
-import { EventEmitterExt } from "@supercat1337/event-emitter-ext";
-import { debounce } from "../helpers/tools.js";
-import { UpdateDataRecord } from "./UpdateDataRecord.js";
+import { EventEmitterExt } from '@supercat1337/event-emitter-ext';
+import { debounce } from '../helpers/tools.js';
 
 /**
  * @typedef {()=>void} Unsubscriber
@@ -16,14 +15,10 @@ class SubscribeController {
     #additionalEvents;
     constructor() {
         this.#eventEmitter = new EventEmitterExt();
-        this.#eventEmitter.registerEvents("change");
+        this.#eventEmitter.registerEvents('change');
 
         this.#additionalEvents = new EventEmitterExt();
-        this.#additionalEvents.registerEvents(
-            "destroy",
-            "#has-listeners",
-            "#no-listeners"
-        );
+        this.#additionalEvents.registerEvents('destroy', '#has-listeners', '#no-listeners');
         // @ts-ignore
         this.#additionalEvents.noLimitsToEmit = true;
     }
@@ -33,56 +28,54 @@ class SubscribeController {
      * @returns {Function[]} The functions that have been subscribed.
      */
     getSubscribers() {
-        return this.#eventEmitter.getListeners("change");
+        return this.#eventEmitter.getListeners('change');
     }
 
     /**
      * Subscribes a function to be called whenever the subscribeController schedules a task.
      * The function is called with no arguments.
-     * @param {(updates: Map<string, UpdateDataRecord>)=>void} fn - The function to be called.
+     * @param {(updates: Map<string, import("./UpdateDataRecord.js").UpdateDataRecord>)=>void} fn - The function to be called.
      * @param {{delay?:number, signal?:AbortSignal}} [options]
      * @returns {Unsubscriber} A function that unsubscribes the given function.
      */
     subscribe(fn, options) {
         /** @type {{delay?:number, signal?:AbortSignal}} */
-        let _options = Object.assign({ delay: 0, signal: undefined }, options);
+        const _options = Object.assign({ delay: 0, signal: undefined }, options);
+
+        const delay = _options.delay || 0;
 
         /** @type {Function} */
-        let _fn;
+        const _fn = delay > 0 ? debounce(fn, delay) : fn;
 
-        let delay = _options.delay || 0;
+        const hasListeners = this.#eventEmitter.hasListeners('change');
 
-        _fn = delay > 0 ? debounce(fn, delay) : fn;
+        const unsubscriberInner = this.#eventEmitter.on('change', _fn);
 
-        let hasListeners = this.#eventEmitter.hasListeners("change");
-
-        let unsubscriberInner = this.#eventEmitter.on("change", _fn);
-
-        let unsubscriber = () => {
-            let hasListeners = this.#eventEmitter.hasListeners("change");
+        const unsubscriber = () => {
+            const hasListeners = this.#eventEmitter.hasListeners('change');
             if (!hasListeners) {
                 return;
             }
 
             if (_options.signal instanceof AbortSignal) {
-                _options.signal.removeEventListener("abort", unsubscriber);
+                _options.signal.removeEventListener('abort', unsubscriber);
             }
 
             unsubscriberInner();
 
-            let hasListeners_2 = this.#eventEmitter.hasListeners("change");
+            const hasListeners_2 = this.#eventEmitter.hasListeners('change');
             if (!hasListeners_2) {
                 /*
                 runInAction(() => {
                     this.#additionalEvents.emit("#no-listeners");
                 });
                 //*/
-                this.#additionalEvents.emit("#no-listeners");
+                this.#additionalEvents.emit('#no-listeners');
             }
         };
 
         if (_options.signal instanceof AbortSignal) {
-            _options.signal.addEventListener("abort", unsubscriber);
+            _options.signal.addEventListener('abort', unsubscriber);
         }
 
         // If there are no listeners, emit the #has-listeners event.
@@ -93,7 +86,7 @@ class SubscribeController {
             });
             //*/
 
-            this.#additionalEvents.emit("#has-listeners");
+            this.#additionalEvents.emit('#has-listeners');
         }
 
         return unsubscriber;
@@ -104,11 +97,11 @@ class SubscribeController {
      * cleaning up all subscribers that are no longer needed.
      */
     clearAllSubscribers() {
-        this.#eventEmitter.removeAllListeners("change");
+        this.#eventEmitter.removeAllListeners('change');
 
-        this.#additionalEvents.removeAllListeners("destroy");
-        this.#additionalEvents.removeAllListeners("#has-listeners");
-        this.#additionalEvents.removeAllListeners("#no-listeners");
+        this.#additionalEvents.removeAllListeners('destroy');
+        this.#additionalEvents.removeAllListeners('#has-listeners');
+        this.#additionalEvents.removeAllListeners('#no-listeners');
     }
 
     /**
@@ -116,7 +109,7 @@ class SubscribeController {
      * "change" subscribers that are no longer needed.
      */
     clearSubscribers() {
-        this.#eventEmitter.removeAllListeners("change");
+        this.#eventEmitter.removeAllListeners('change');
     }
 
     /**
@@ -124,7 +117,7 @@ class SubscribeController {
      * @returns {boolean} Whether there are any subscribers.
      */
     hasSubscribers() {
-        return this.#eventEmitter.hasListeners("change");
+        return this.#eventEmitter.hasListeners('change');
     }
 
     /**
@@ -132,7 +125,7 @@ class SubscribeController {
      * that is no longer needed. It calls clearSubscribers, which removes all subscribers.
      */
     destroy() {
-        this.#additionalEvents.emit("destroy");
+        this.#additionalEvents.emit('destroy');
         this.#eventEmitter.unregisterAllEvents();
         this.#additionalEvents.unregisterAllEvents();
     }
@@ -144,7 +137,7 @@ class SubscribeController {
      * @returns {Unsubscriber} A function that unsubscribes the given function.
      */
     onHasSubscribers(callback) {
-        return this.#additionalEvents.on("#has-listeners", callback);
+        return this.#additionalEvents.on('#has-listeners', callback);
     }
 
     /**
@@ -154,7 +147,7 @@ class SubscribeController {
      * @returns {Unsubscriber} A function that unsubscribes the given function.
      */
     onNoSubscribers(callback) {
-        return this.#additionalEvents.on("#no-listeners", callback);
+        return this.#additionalEvents.on('#no-listeners', callback);
     }
 
     /**
@@ -164,7 +157,7 @@ class SubscribeController {
      * @returns {Unsubscriber} A function that unsubscribes the given function.
      */
     onDestroy(callback) {
-        return this.#additionalEvents.on("destroy", callback);
+        return this.#additionalEvents.on('destroy', callback);
     }
 }
 
