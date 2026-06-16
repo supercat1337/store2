@@ -6,7 +6,7 @@ import { modeController } from '../services/modeController.js';
 import { ReactiveItem } from './ReactiveItem.js';
 
 /**
- * ShallowReactive is a reactive primitive that holds a shallow object. It is the base unit of reactive state.
+ * ShallowReactive is a reactive item that holds a shallow object. It is the base unit of reactive state.
  * It is a shallow reactive object, meaning that it only tracks changes to the properties of the object itself, not its nested properties.
  * @augments ReactiveItem
  * @template {{[key:string]:any}} T

@@ -244,7 +244,7 @@ export function getError(e) {
 }
 
 /**
- * Extracts names (and optionally ids) from a Set of reactive primitives.
+ * Extracts names (and optionally ids) from a Set of reactive items.
  * Returns an array of strings, one per item.
  *
  * @param {Set<ReactiveItem>|Iterable<ReactiveItem>} items - Collection of reactive items.

@@ -21,7 +21,7 @@ function isReactiveWrapper(item) {
 
 /**
  * ReactiveList is a reactive array-like structure that stores values of any type.
- * It automatically chooses the appropriate reactive primitive:
+ * It automatically chooses the appropriate reactive item:
  * - Objects and arrays are wrapped with `ShallowReactive` (shallow property tracking).
  * - Primitives (numbers, strings, booleans, etc.) are wrapped with `Atom`.
  *
@@ -65,7 +65,7 @@ export class ReactiveList {
 
     /**
      * Creates a reactive wrapper for the given value.
-     * Uses ShallowReactive for objects/arrays, Atom for primitives.
+     * Uses ShallowReactive for objects/arrays, Atom for items.
      *
      * @param {any} value - The value to wrap.
      * @param {string} name - The name to assign to the reactive item (used for debugging).

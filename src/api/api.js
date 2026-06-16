@@ -536,7 +536,7 @@ function fromPromise(promise) {
 }
 
 /**
- * Creates a new Atom instance. An Atom is a reactive primitive that holds a value. Same as `atom` but
+ * Creates a new Atom instance. An Atom is a reactive item that holds a value. Same as `atom` but
  * returns a new Atom instance.
  * @template T
  * @param {T} value - The initial value of the Atom.
@@ -560,7 +560,7 @@ function atom(value, options) {
 }
 
 /**
- * Creates a new Computed instance. Computed is a reactive primitive that holds a value that is computed from other reactive values.
+ * Creates a new Computed instance. Computed is a reactive item that holds a value that is computed from other reactive values.
  * @template T
  * @param {()=>T} fn - The function that returns the value of the Computed
  * @param {object} [options] - Options

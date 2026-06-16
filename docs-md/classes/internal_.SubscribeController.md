@@ -39,7 +39,7 @@
 
 #### Defined in
 
-[src/core/subscribeController.js:16](https://github.com/supercat1337/store2/blob/092e7aaba8ac2329715b3d46c6a0217f1d1972eb/src/core/subscribeController.js#L16)
+[src/core/subscribeController.js:16](https://github.com/supercat1337/store2/blob/db27dff8135ce0b18c8545168f48050df8eeffe0/src/core/subscribeController.js#L16)
 
 ## Properties
 
@@ -49,7 +49,7 @@
 
 #### Defined in
 
-[src/core/subscribeController.js:15](https://github.com/supercat1337/store2/blob/092e7aaba8ac2329715b3d46c6a0217f1d1972eb/src/core/subscribeController.js#L15)
+[src/core/subscribeController.js:15](https://github.com/supercat1337/store2/blob/db27dff8135ce0b18c8545168f48050df8eeffe0/src/core/subscribeController.js#L15)
 
 ___
 
@@ -59,7 +59,7 @@ ___
 
 #### Defined in
 
-[src/core/subscribeController.js:12](https://github.com/supercat1337/store2/blob/092e7aaba8ac2329715b3d46c6a0217f1d1972eb/src/core/subscribeController.js#L12)
+[src/core/subscribeController.js:12](https://github.com/supercat1337/store2/blob/db27dff8135ce0b18c8545168f48050df8eeffe0/src/core/subscribeController.js#L12)
 
 ## Methods
 
@@ -76,7 +76,7 @@ cleaning up all subscribers that are no longer needed.
 
 #### Defined in
 
-[src/core/subscribeController.js:99](https://github.com/supercat1337/store2/blob/092e7aaba8ac2329715b3d46c6a0217f1d1972eb/src/core/subscribeController.js#L99)
+[src/core/subscribeController.js:99](https://github.com/supercat1337/store2/blob/db27dff8135ce0b18c8545168f48050df8eeffe0/src/core/subscribeController.js#L99)
 
 ___
 
@@ -93,7 +93,7 @@ Removes all "change" event listeners from the event emitter. This method is usef
 
 #### Defined in
 
-[src/core/subscribeController.js:111](https://github.com/supercat1337/store2/blob/092e7aaba8ac2329715b3d46c6a0217f1d1972eb/src/core/subscribeController.js#L111)
+[src/core/subscribeController.js:111](https://github.com/supercat1337/store2/blob/db27dff8135ce0b18c8545168f48050df8eeffe0/src/core/subscribeController.js#L111)
 
 ___
 
@@ -110,7 +110,7 @@ that is no longer needed. It calls clearSubscribers, which removes all subscribe
 
 #### Defined in
 
-[src/core/subscribeController.js:127](https://github.com/supercat1337/store2/blob/092e7aaba8ac2329715b3d46c6a0217f1d1972eb/src/core/subscribeController.js#L127)
+[src/core/subscribeController.js:127](https://github.com/supercat1337/store2/blob/db27dff8135ce0b18c8545168f48050df8eeffe0/src/core/subscribeController.js#L127)
 
 ___
 
@@ -128,7 +128,7 @@ The functions that have been subscribed.
 
 #### Defined in
 
-[src/core/subscribeController.js:30](https://github.com/supercat1337/store2/blob/092e7aaba8ac2329715b3d46c6a0217f1d1972eb/src/core/subscribeController.js#L30)
+[src/core/subscribeController.js:30](https://github.com/supercat1337/store2/blob/db27dff8135ce0b18c8545168f48050df8eeffe0/src/core/subscribeController.js#L30)
 
 ___
 
@@ -146,7 +146,7 @@ Whether there are any subscribers.
 
 #### Defined in
 
-[src/core/subscribeController.js:119](https://github.com/supercat1337/store2/blob/092e7aaba8ac2329715b3d46c6a0217f1d1972eb/src/core/subscribeController.js#L119)
+[src/core/subscribeController.js:119](https://github.com/supercat1337/store2/blob/db27dff8135ce0b18c8545168f48050df8eeffe0/src/core/subscribeController.js#L119)
 
 ___
 
@@ -171,7 +171,7 @@ A function that unsubscribes the given function.
 
 #### Defined in
 
-[src/core/subscribeController.js:159](https://github.com/supercat1337/store2/blob/092e7aaba8ac2329715b3d46c6a0217f1d1972eb/src/core/subscribeController.js#L159)
+[src/core/subscribeController.js:159](https://github.com/supercat1337/store2/blob/db27dff8135ce0b18c8545168f48050df8eeffe0/src/core/subscribeController.js#L159)
 
 ___
 
@@ -196,7 +196,7 @@ A function that unsubscribes the given function.
 
 #### Defined in
 
-[src/core/subscribeController.js:139](https://github.com/supercat1337/store2/blob/092e7aaba8ac2329715b3d46c6a0217f1d1972eb/src/core/subscribeController.js#L139)
+[src/core/subscribeController.js:139](https://github.com/supercat1337/store2/blob/db27dff8135ce0b18c8545168f48050df8eeffe0/src/core/subscribeController.js#L139)
 
 ___
 
@@ -221,7 +221,7 @@ A function that unsubscribes the given function.
 
 #### Defined in
 
-[src/core/subscribeController.js:149](https://github.com/supercat1337/store2/blob/092e7aaba8ac2329715b3d46c6a0217f1d1972eb/src/core/subscribeController.js#L149)
+[src/core/subscribeController.js:149](https://github.com/supercat1337/store2/blob/db27dff8135ce0b18c8545168f48050df8eeffe0/src/core/subscribeController.js#L149)
 
 ___
 
@@ -249,4 +249,4 @@ A function that unsubscribes the given function.
 
 #### Defined in
 
-[src/core/subscribeController.js:41](https://github.com/supercat1337/store2/blob/092e7aaba8ac2329715b3d46c6a0217f1d1972eb/src/core/subscribeController.js#L41)
+[src/core/subscribeController.js:41](https://github.com/supercat1337/store2/blob/db27dff8135ce0b18c8545168f48050df8eeffe0/src/core/subscribeController.js#L41)

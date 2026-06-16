@@ -3,7 +3,7 @@ type CompareFunction = (a: any, b: any) => boolean;
 
 /* From api\api.d.ts */
 /**
- * Creates a new Atom instance. An Atom is a reactive primitive that holds a value. Same as `atom` but
+ * Creates a new Atom instance. An Atom is a reactive item that holds a value. Same as `atom` but
  * returns a new Atom instance.
  * @template T
  * @param {T} value - The initial value of the Atom.
@@ -27,7 +27,7 @@ export function atom<T>(value: T, options?: {
     compareFunction?: (a: T, b: T) => boolean;
 }): Atom<T>;
 /**
- * Creates a new Computed instance. Computed is a reactive primitive that holds a value that is computed from other reactive values.
+ * Creates a new Computed instance. Computed is a reactive item that holds a value that is computed from other reactive values.
  * @template T
  * @param {()=>T} fn - The function that returns the value of the Computed
  * @param {object} [options] - Options
@@ -603,7 +603,7 @@ export function extendObservable<T, R extends {
 /* From complex\ReactiveList.d.ts */
 /**
  * ReactiveList is a reactive array-like structure that stores values of any type.
- * It automatically chooses the appropriate reactive primitive:
+ * It automatically chooses the appropriate reactive item:
  * - Objects and arrays are wrapped with `ShallowReactive` (shallow property tracking).
  * - Primitives (numbers, strings, booleans, etc.) are wrapped with `Atom`.
  *
@@ -1422,7 +1422,7 @@ export function getAllPropertyDescriptors(obj: object, depth?: number, maxDepth?
  */
 export function getError(e: unknown): Error;
 /**
- * Extracts names (and optionally ids) from a Set of reactive primitives.
+ * Extracts names (and optionally ids) from a Set of reactive items.
  * Returns an array of strings, one per item.
  *
  * @param {Set<ReactiveItem>|Iterable<ReactiveItem>} items - Collection of reactive items.
@@ -1451,7 +1451,7 @@ export function getItemNamesFromSet(items: Set<ReactiveItem> | Iterable<Reactive
 
 /* From reactives\Atom.d.ts */
 /**
- * Atom is a reactive primitive that holds a value. It is the base unit of reactive state.
+ * Atom is a reactive item that holds a value. It is the base unit of reactive state.
  * @augments ReactiveItem
  * @template T
  * @example
@@ -1559,7 +1559,7 @@ export class Atom<T> extends ReactiveItem {
 
 /* From reactives\Collection.d.ts */
 /**
- * Collection is a reactive primitive that holds an array of values.
+ * Collection is a reactive item that holds an array of values.
  * It provides reactivity for array operations (push, pop, splice, etc.)
  * and allows tracking changes to individual elements and the array length.
  *
@@ -1622,7 +1622,7 @@ export class Collection<T> extends ReactiveItem {
 
 /* From reactives\Computed.d.ts */
 /**
- * Computed is a reactive primitive that holds a value that is computed from other reactive values.
+ * Computed is a reactive item that holds a value that is computed from other reactive values.
  * It is the base unit of reactive state.
  * @augments ReactiveItem
  * @template {unknown} T
@@ -1879,7 +1879,7 @@ export class ReactiveItem {
 
 /* From reactives\ShallowReactive.d.ts */
 /**
- * ShallowReactive is a reactive primitive that holds a shallow object. It is the base unit of reactive state.
+ * ShallowReactive is a reactive item that holds a shallow object. It is the base unit of reactive state.
  * It is a shallow reactive object, meaning that it only tracks changes to the properties of the object itself, not its nested properties.
  * @augments ReactiveItem
  * @template {{[key:string]:any}} T

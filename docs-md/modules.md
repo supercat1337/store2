@@ -43,7 +43,7 @@
 
 ▸ **atom**\<`T`\>(`value`, `options?`): [`Atom`](classes/Atom.md)\<`T`\>
 
-Creates a new Atom instance. An Atom is a reactive primitive that holds a value. Same as `atom` but
+Creates a new Atom instance. An Atom is a reactive item that holds a value. Same as `atom` but
 returns a new Atom instance.
 
 #### Type parameters
@@ -81,7 +81,7 @@ count.value = 1;
 
 #### Defined in
 
-[src/api/api.js:558](https://github.com/supercat1337/store2/blob/092e7aaba8ac2329715b3d46c6a0217f1d1972eb/src/api/api.js#L558)
+[src/api/api.js:558](https://github.com/supercat1337/store2/blob/db27dff8135ce0b18c8545168f48050df8eeffe0/src/api/api.js#L558)
 
 ___
 
@@ -147,7 +147,7 @@ console.log(a.value, b.value, foo); // 2 2 4
 
 #### Defined in
 
-[src/api/api.js:51](https://github.com/supercat1337/store2/blob/092e7aaba8ac2329715b3d46c6a0217f1d1972eb/src/api/api.js#L51)
+[src/api/api.js:51](https://github.com/supercat1337/store2/blob/db27dff8135ce0b18c8545168f48050df8eeffe0/src/api/api.js#L51)
 
 ___
 
@@ -196,7 +196,7 @@ console.log(a.value, b.value, foo); // 1 1 2
 
 #### Defined in
 
-[src/api/api.js:342](https://github.com/supercat1337/store2/blob/092e7aaba8ac2329715b3d46c6a0217f1d1972eb/src/api/api.js#L342)
+[src/api/api.js:342](https://github.com/supercat1337/store2/blob/db27dff8135ce0b18c8545168f48050df8eeffe0/src/api/api.js#L342)
 
 ___
 
@@ -251,7 +251,7 @@ coll.value[0] = 10; // triggers subscriber
 
 #### Defined in
 
-[src/api/api.js:619](https://github.com/supercat1337/store2/blob/092e7aaba8ac2329715b3d46c6a0217f1d1972eb/src/api/api.js#L619)
+[src/api/api.js:619](https://github.com/supercat1337/store2/blob/db27dff8135ce0b18c8545168f48050df8eeffe0/src/api/api.js#L619)
 
 ___
 
@@ -259,7 +259,7 @@ ___
 
 ▸ **computed**\<`T`\>(`fn`, `options?`): [`Computed`](classes/Computed.md)\<`T`\>
 
-Creates a new Computed instance. Computed is a reactive primitive that holds a value that is computed from other reactive values.
+Creates a new Computed instance. Computed is a reactive item that holds a value that is computed from other reactive values.
 
 #### Type parameters
 
@@ -299,7 +299,7 @@ a.value = 1;
 
 #### Defined in
 
-[src/api/api.js:584](https://github.com/supercat1337/store2/blob/092e7aaba8ac2329715b3d46c6a0217f1d1972eb/src/api/api.js#L584)
+[src/api/api.js:584](https://github.com/supercat1337/store2/blob/db27dff8135ce0b18c8545168f48050df8eeffe0/src/api/api.js#L584)
 
 ___
 
@@ -362,7 +362,7 @@ console.log(foo); // 2
 
 #### Defined in
 
-[src/api/api.js:863](https://github.com/supercat1337/store2/blob/092e7aaba8ac2329715b3d46c6a0217f1d1972eb/src/api/api.js#L863)
+[src/api/api.js:863](https://github.com/supercat1337/store2/blob/db27dff8135ce0b18c8545168f48050df8eeffe0/src/api/api.js#L863)
 
 ___
 
@@ -423,7 +423,7 @@ await fromPromiseResult.case({
 
 #### Defined in
 
-[src/api/api.js:471](https://github.com/supercat1337/store2/blob/092e7aaba8ac2329715b3d46c6a0217f1d1972eb/src/api/api.js#L471)
+[src/api/api.js:471](https://github.com/supercat1337/store2/blob/db27dff8135ce0b18c8545168f48050df8eeffe0/src/api/api.js#L471)
 
 ___
 
@@ -462,7 +462,7 @@ const unsubscribe = now.subscribe(() => {
 
 #### Defined in
 
-[src/api/api.js:413](https://github.com/supercat1337/store2/blob/092e7aaba8ac2329715b3d46c6a0217f1d1972eb/src/api/api.js#L413)
+[src/api/api.js:413](https://github.com/supercat1337/store2/blob/db27dff8135ce0b18c8545168f48050df8eeffe0/src/api/api.js#L413)
 
 ___
 
@@ -524,7 +524,7 @@ console.log(foo); // 3
 
 #### Defined in
 
-[src/api/api.js:907](https://github.com/supercat1337/store2/blob/092e7aaba8ac2329715b3d46c6a0217f1d1972eb/src/api/api.js#L907)
+[src/api/api.js:907](https://github.com/supercat1337/store2/blob/db27dff8135ce0b18c8545168f48050df8eeffe0/src/api/api.js#L907)
 
 ___
 
@@ -632,7 +632,7 @@ console.log(foo); // 3
 
 #### Defined in
 
-[src/api/api.js:742](https://github.com/supercat1337/store2/blob/092e7aaba8ac2329715b3d46c6a0217f1d1972eb/src/api/api.js#L742)
+[src/api/api.js:742](https://github.com/supercat1337/store2/blob/db27dff8135ce0b18c8545168f48050df8eeffe0/src/api/api.js#L742)
 
 ___
 
@@ -704,7 +704,7 @@ console.log(a.value, b.value, foo); // 2 2 3
 
 #### Defined in
 
-[src/api/api.js:120](https://github.com/supercat1337/store2/blob/092e7aaba8ac2329715b3d46c6a0217f1d1972eb/src/api/api.js#L120)
+[src/api/api.js:120](https://github.com/supercat1337/store2/blob/db27dff8135ce0b18c8545168f48050df8eeffe0/src/api/api.js#L120)
 
 ___
 
@@ -747,7 +747,7 @@ console.log(a.value, b.value, count); // 1 1 1
 
 #### Defined in
 
-[src/api/api.js:303](https://github.com/supercat1337/store2/blob/092e7aaba8ac2329715b3d46c6a0217f1d1972eb/src/api/api.js#L303)
+[src/api/api.js:303](https://github.com/supercat1337/store2/blob/db27dff8135ce0b18c8545168f48050df8eeffe0/src/api/api.js#L303)
 
 ___
 
@@ -800,7 +800,7 @@ reactive.value.b = 5; // triggers subscriber
 
 #### Defined in
 
-[src/api/api.js:652](https://github.com/supercat1337/store2/blob/092e7aaba8ac2329715b3d46c6a0217f1d1972eb/src/api/api.js#L652)
+[src/api/api.js:652](https://github.com/supercat1337/store2/blob/db27dff8135ce0b18c8545168f48050df8eeffe0/src/api/api.js#L652)
 
 ___
 
@@ -855,7 +855,7 @@ console.log(a.value, b.value, foo); // 1 1 2
 
 #### Defined in
 
-[src/api/api.js:380](https://github.com/supercat1337/store2/blob/092e7aaba8ac2329715b3d46c6a0217f1d1972eb/src/api/api.js#L380)
+[src/api/api.js:380](https://github.com/supercat1337/store2/blob/db27dff8135ce0b18c8545168f48050df8eeffe0/src/api/api.js#L380)
 
 ___
 
@@ -896,7 +896,7 @@ a.value = 4; // foo = 1
 
 #### Defined in
 
-[src/api/api.js:247](https://github.com/supercat1337/store2/blob/092e7aaba8ac2329715b3d46c6a0217f1d1972eb/src/api/api.js#L247)
+[src/api/api.js:247](https://github.com/supercat1337/store2/blob/db27dff8135ce0b18c8545168f48050df8eeffe0/src/api/api.js#L247)
 
 ___
 
@@ -953,4 +953,4 @@ a.value = 5; // foo = 2
 
 #### Defined in
 
-[src/api/api.js:195](https://github.com/supercat1337/store2/blob/092e7aaba8ac2329715b3d46c6a0217f1d1972eb/src/api/api.js#L195)
+[src/api/api.js:195](https://github.com/supercat1337/store2/blob/db27dff8135ce0b18c8545168f48050df8eeffe0/src/api/api.js#L195)

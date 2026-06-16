@@ -1,228 +1,323 @@
 @supercat1337/store2 / [Modules](modules.md)
 
-# Supercat Store2
+# @supercat1337/store2
 
-A lightweight, efficient, and easy-to-use reactive state management system for JavaScript applications.
+A lightweight, efficient, and fully reactive state management library for JavaScript.
 
-## Install
+[![npm version](https://badge.fury.io/js/%40supercat1337%2Fstore2.svg)](https://www.npmjs.com/package/@supercat1337/store2)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
+---
+
+## Features
+
+- **MobX-inspired mental model** – predictable transparent reactive graph, but lightweight and dependency‑free
+- **Reactive primitives** – `Atom`, `Computed`, `Collection`, `ShallowReactive`
+- **Reactive containers** – `Store` (key‑value store) and `ReactiveList` (array‑like list)
+- **Declarative APIs** – `autorun`, `reaction`, `when`, `waitUntil`
+- **Batched updates** – group changes with `batch()` to reduce notifications
+- **Observable objects** – `makeObservable`, `makeAutoObservable`, `extendObservable`
+- **Promise integration** – `fromPromise` to observe pending/resolved/rejected states
+- **Tiny and fast** – no external runtime dependencies (except tiny event‑emitter helpers)
+- **Fully typed** – via JSDoc and generated `.d.ts` files
+
+---
+
+## Installation
 
 ```bash
-npm i @supercat1337/store2
+npm install @supercat1337/store2
 ```
 
-## Overview
+---
 
-Supercat Store2 is a reactive state management system for JavaScript applications. It provides a simple and intuitive way to manage and update state in a reactive way, allowing components to automatically re‑render when the state changes. It's designed to be flexible and scalable, making it suitable for a wide range of applications, from small web apps to large‑scale enterprise systems.
-
-Store2 is based on the concept of **reactive items** – atoms, computed values, collections, and shallow reactive objects. These items can be observed and updated, triggering notifications to dependent components.
-
-Store2 takes inspiration from other reactive state management systems, such as signals and MobX, and refines them to provide a more efficient and intuitive way to manage state in JavaScript applications.
-
-The full documentation is available at [https://supercat1337.github.io/store2/docs/index.html](https://supercat1337.github.io/store2/docs/index.html).
-
-## Important Notes / Known Limitations
-
-- **Static dependency collection in `autorun` and `reaction`**  
-  Dependencies are collected **only once** – during the first execution of the tracked function.  
-  If your function contains conditional branches that use different reactive items, changes in dependencies that were not used during the first run **will not** trigger the effect.  
-  **Workaround**: Use `computed` or restructure your code to always touch all possible dependencies.
-
-- **`Atom` clones objects shallowly**  
-  When you assign an object or array to an `Atom`, the value is shallow‑cloned (`Object.assign` or `slice`).  
-  Mutating nested properties of the stored value **will not** trigger reactivity. Treat `Atom` as a container for immutable data or primitives.
-
-- **`Store` removal notifications**  
-  Currently, when an item is removed from a `Store` via `removeItem` or `destroyItem`, **subscribers of the Store are not notified** about the deletion.  
-  This is a known limitation that will be addressed in a future version.
-
-- **`Collection` returns a Proxy**  
-  The array returned by `collection()` or `new Collection().value` is a reactive Proxy.  
-  Mutations via index assignment or array methods (push, pop, splice, etc.) are reactive.  
-  Accessing the raw array via `.getRawValue()` is **not reactive**.
-
-- **`shallowReactive` returns a Proxy**  
-  The function `shallowReactive(obj)` returns a reactive Proxy of the original object.  
-  Only direct property changes are tracked; nested objects are not made reactive.
-
-## Atoms and Computeds
-
-Atoms store individual values. Computed values derive from other reactive sources and update automatically when those sources change.
+## Quick Start
 
 ```js
-import { atom, computed } from '@supercat1337/store2';
+import { atom, computed, autorun, batch } from '@supercat1337/store2';
 
-const a = atom(0);
-const b = atom(0);
+// Create reactive atoms
+const price = atom(10);
+const quantity = atom(2);
 
-const c = computed(() => a.value + b.value);
+// Compute total reactively
+const total = computed(() => price.value * quantity.value);
 
-c.subscribe(() => {
-    console.log('c', c.value);
+// Autorun – runs whenever its dependencies change
+autorun(() => {
+    console.log(`Total: ${total.value}`);
+});
+// Logs: Total: 20
+
+// Update state – autorun fires automatically
+price.value = 15; // Logs: Total: 30
+quantity.value = 3; // Logs: Total: 45
+
+// Batch multiple updates – only one notification
+batch(() => {
+    price.value = 20;
+    quantity.value = 4;
+});
+// Logs: Total: 80 (only once)
+```
+
+### Simple DOM Binding Example
+
+```js
+const count = atom(0);
+const btn = document.getElementById('counter-btn');
+
+autorun(() => {
+    btn.textContent = `Clicks: ${count.value}`;
 });
 
-a.value = 1;
-// Output: c 1
-
-b.value = 2;
-// Output: c 3
+btn.addEventListener('click', () => count.value++);
 ```
 
-## Collections
+---
 
-A `Collection` holds an array reactively. You can use the `collection()` function for convenience.
+## Core Concepts
+
+### Atoms
+
+An `Atom` holds a single value. It is the most basic reactive unit.
 
 ```js
-import { collection, computed } from '@supercat1337/store2';
+const count = atom(0);
+count.subscribe(() => console.log('count changed:', count.value));
+count.value++; // triggers the subscriber
+```
+
+### Computed
+
+A `Computed` derives its value from other reactive sources. It caches the result and updates only when dependencies change.
+
+```js
+const a = atom(2);
+const b = atom(3);
+const sum = computed(() => a.value + b.value);
+console.log(sum.value); // 5
+a.value = 5; // sum is automatically recalculated
+console.log(sum.value); // 8
+```
+
+### Collection
+
+A `Collection` wraps an array and makes its mutations (push, pop, splice, index assignment) reactive.
+
+```js
+import { collection } from '@supercat1337/store2';
 
 const items = collection([1, 2, 3]);
-
-items.subscribe(updates => {
-    console.log('Collection changed:', Array.from(updates.keys()));
-});
-
-const len = computed(() => items.length);
-
-items.push(4);
-// Output: Collection changed: ["length", "3"]
-
-console.log(len.value); // 4
+items.subscribe(() => console.log('array changed'));
+items.value.push(4); // triggers notification
+console.log(items.value); // [1, 2, 3, 4]
 ```
 
-## Shallow Reactive Objects
+### ShallowReactive
 
-`shallowReactive` makes an object’s direct properties reactive.
+`shallowReactive` turns a plain object into a reactive proxy. Only direct property changes are tracked (nested objects are not made reactive).
 
 ```js
 import { shallowReactive } from '@supercat1337/store2';
 
-const state = shallowReactive({ count: 0 });
-
-state.subscribe(() => {
-    console.log('state changed:', state.count);
-});
-
-state.count = 1; // triggers the subscriber
+const state = shallowReactive({ name: 'Alice', age: 30 });
+state.subscribe(() => console.log('state updated'));
+state.age = 31; // triggers notification
 ```
+
+---
 
 ## Reactive Containers
 
 ### Store
 
-`Store` is a container for multiple reactive items (atoms, computeds, other stores). It batches updates and notifies subscribers.
+`Store` is a key‑value container that can hold any reactive items (atoms, computeds, collections, other stores). It batches updates and notifies subscribers about changes.
 
 ```js
-import { Store, atom, computed, batch } from '@supercat1337/store2';
+import { Store, atom, computed } from '@supercat1337/store2';
 
 const store = new Store();
-const a = atom(0);
-const b = atom(0);
-const sum = computed(() => a.value + b.value);
+const x = atom(1);
+const y = atom(2);
+const z = computed(() => x.value + y.value);
 
-store.addItems({ a, b, sum });
+store.addItems({ x, y, z });
 
 store.subscribe(updates => {
     console.log('Changed:', Array.from(updates.keys()));
 });
 
-// Suppress temporary notifications
-store.suppressNotifications();
-a.value = 3;
-b.value = 4;
-store.unmuteUpdates();
-// Output: Changed: ["a", "sum", "b"]
+x.value = 10; // triggers subscriber with updates: ['x', 'z']
+```
 
-// Batch multiple changes into one notification
-batch(() => {
-    a.value = 1;
-    b.value = 2;
-});
-// Output: Changed: ["a", "sum", "b"]
+You can also mute/unmute notifications temporarily:
+
+```js
+store.muteUpdates();
+x.value = 100;
+y.value = 200;
+store.unmuteUpdates(); // only one notification with both changes
 ```
 
 ### ReactiveList
 
-`ReactiveList` manages a list of items, automatically wrapping primitives in `Atom` and objects in `ShallowReactive`.
+`ReactiveList` is a reactive array‑like list. It automatically wraps primitives in `Atom` and objects in `ShallowReactive`. It provides methods to add, remove, update, and clear items.
 
 ```js
 import { ReactiveList } from '@supercat1337/store2';
 
 const list = new ReactiveList();
+list.subscribe(() => console.log('list changed'));
 
-list.subscribe(() => {
-    console.log('List updated:', list.getItems());
-});
-
-list.add({ name: 'item1' }, { name: 'item2' });
-list.setItem(0, { name: 'updated' });
-list.splice(1, 1); // remove second item
+list.add(1, 2, 3); // primitives → Atoms
+list.setItem(1, 42); // update value at index 1
+list.removeItem(0); // remove first element
+console.log(list.toArray()); // [42, 3]
 ```
+
+---
 
 ## Advanced APIs
 
-The library also provides functions for more complex reactive patterns:
+### `autorun(fn, options)`
 
-- `autorun` – run a function whenever its dependencies change (static dependencies).
-- `batch` – group multiple updates into one notification.
-- `reaction` – track specific data and run an effect when it changes.
-- `when` / `waitUntil` – wait for a condition to become true.
-- `fromPromise` – observe a promise's pending/resolved/rejected state.
-- `getNow` – a reactive timestamp that updates periodically.
-- `makeObservable` / `makeAutoObservable` / `extendObservable` – add reactivity to existing objects.
-- `runInAction` – defer mutations until after subscribers are done.
-- `untrack` – read reactive values without creating a dependency.
-
-### Example: `autorun` and `batch`
+Runs `fn` immediately and re‑runs it whenever any reactive value used inside changes. Dependencies are collected **only during the first run**.
 
 ```js
-const a = atom(0);
-const b = atom(0);
-
-let count = 0;
+const a = atom(1);
+const b = atom(2);
 autorun(() => {
-    a.value; // dependency
-    b.value; // dependency
-    count++;
+    console.log(a.value + b.value);
 });
-
-console.log(count); // 1
-
-batch(() => {
-    a.value = 1;
-    b.value = 2;
-});
-console.log(count); // 2 (only one notification)
+// Output: 3
+a.value = 5; // Output: 7
 ```
 
-### Example: `makeAutoObservable`
+### `reaction(dataFn, effectFn, options)`
+
+Tracks dependencies inside `dataFn` and runs `effectFn` whenever those dependencies change. Useful when you need to react to a subset of state.
 
 ```js
-import { makeAutoObservable, autorun } from '@supercat1337/store2';
+reaction(
+    () => [a.value, b.value],
+    () => console.log('a or b changed')
+);
+```
 
-let obj = {
-    value: 0,
+### `batch(fn)`
+
+Groups multiple updates into a single notification. Nested batches are supported.
+
+```js
+batch(() => {
+    a.value = 10;
+    b.value = 20;
+});
+// only one notification (if any subscriber exists)
+```
+
+### `when(predicate, effect, options)`
+
+Waits for `predicate` to become true, then runs `effect` once and automatically unsubscribes.
+
+```js
+const ready = atom(false);
+when(
+    () => ready.value === true,
+    () => {
+        console.log('Ready!');
+    }
+);
+ready.value = true; // logs "Ready!"
+```
+
+### `waitUntil(predicate, options)`
+
+Returns a promise that resolves when `predicate` becomes true.
+
+```js
+await waitUntil(() => dataLoaded.value === true);
+console.log('Data loaded');
+```
+
+### `fromPromise(promise)`
+
+Observes a promise’s state (pending, resolved, rejected) and lets you react to each phase.
+
+```js
+const promise = fetch('/api/data');
+const observable = fromPromise(promise);
+
+observable.case({
+    pending: () => console.log('Loading...'),
+    resolved: data => console.log('Data:', data),
+    rejected: err => console.error('Error:', err),
+});
+```
+
+### `makeObservable`, `makeAutoObservable`, `extendObservable`
+
+These functions add reactivity to existing objects or classes. `makeAutoObservable` automatically infers which properties should be reactive.
+
+```js
+class Counter {
+    value = 0;
     get double() {
         return this.value * 2;
-    },
+    }
     increment() {
         this.value++;
-    },
-};
+    }
+}
 
-makeAutoObservable(obj);
+const counter = new Counter();
+makeAutoObservable(counter);
 
-let runs = 0;
 autorun(() => {
-    obj.double; // tracks both `value` and `double`
-    runs++;
+    console.log('Double:', counter.double);
 });
-
-console.log(runs); // 1
-obj.increment();
-console.log(runs); // 2
+counter.increment(); // logs "Double: 2"
 ```
+
+---
+
+## Important Notes / Known Limitations
+
+- **Static dependency collection in `autorun` and `reaction`**  
+  Dependencies are captured **only once** – during the first execution of the tracked function. If your function conditionally uses different reactive items, changes to items not used in the first run **will not** trigger the effect. Use `computed` or restructure to ensure all possible dependencies are touched.
+
+- **`Atom` clones objects shallowly**  
+  When you assign an object/array to an `Atom`, it is shallow‑cloned (`Object.assign` or `slice`). Mutating nested properties **will not** trigger reactivity. Use `Collection` or `ShallowReactive` for nested structures.
+
+- **`Collection` and `ShallowReactive` return Proxies**  
+  The `.value` property of a `Collection` and the result of `shallowReactive()` are reactive Proxies. Direct mutations via the proxy are tracked; using the raw underlying value (via `.getRawValue()`) breaks reactivity.
+
+- **Destructuring breaks reactivity**  
+  When using `shallowReactive` or accessing properties of a `Collection`, destructuring fields (e.g., `const { name, age } = state`) breaks reactivity for those variables. Always access properties directly through the reactive object (e.g., `state.age`) to ensure dependencies are tracked correctly.
+
+- **Error handling in Computed**  
+  If a `Computed` function throws an error, the error is caught and stored. The computed will re‑throw the same error until its dependencies change, at which point it will try to recompute.
+
+- **Destroyed items**  
+  Calling `destroy()` on a reactive item cleans up all subscriptions and dependencies. Further operations (except checking `isDestroyed`) will throw an error.
+
+---
+
+## TypeScript Support
+
+This library is written in plain JavaScript with JSDoc annotations. Type definitions are generated automatically and shipped with the package. You get full IntelliSense and type checking in supporting editors.
+
+---
 
 ## License
 
-MIT
+MIT © 2025 Albert Bazaleev
 
-Copyright (c) 2025 Albert Bazaleev
+---
+
+## Links
+
+- [Full Documentation](https://supercat1337.github.io/store2/docs/index.html)
+- [GitHub Repository](https://github.com/supercat1337/store2)
+- [NPM Package](https://www.npmjs.com/package/@supercat1337/store2)

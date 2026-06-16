@@ -3,7 +3,7 @@
 # Class: ReactiveList\<T\>
 
 ReactiveList is a reactive array-like structure that stores values of any type.
-It automatically chooses the appropriate reactive primitive:
+It automatically chooses the appropriate reactive item:
 - Objects and arrays are wrapped with `ShallowReactive` (shallow property tracking).
 - Primitives (numbers, strings, booleans, etc.) are wrapped with `Atom`.
 
@@ -145,7 +145,7 @@ src/complex/ReactiveList.js:176
 ▸ **#createReactiveItem**(`value`, `name`): [`ShallowReactive`](ShallowReactive.md)\<`any`\>
 
 Creates a reactive wrapper for the given value.
-Uses ShallowReactive for objects/arrays, Atom for primitives.
+Uses ShallowReactive for objects/arrays, Atom for items.
 
 #### Parameters
 

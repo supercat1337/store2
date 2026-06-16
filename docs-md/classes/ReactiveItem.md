@@ -66,7 +66,7 @@ getting the current value, and checking for errors.
 
 #### Defined in
 
-src/reactives/ReactiveItem.js:21
+[src/reactives/ReactiveItem.js:21](https://github.com/supercat1337/store2/blob/db27dff8135ce0b18c8545168f48050df8eeffe0/src/reactives/ReactiveItem.js#L21)
 
 ## Properties
 
@@ -76,7 +76,7 @@ src/reactives/ReactiveItem.js:21
 
 #### Defined in
 
-src/reactives/ReactiveItem.js:13
+[src/reactives/ReactiveItem.js:13](https://github.com/supercat1337/store2/blob/db27dff8135ce0b18c8545168f48050df8eeffe0/src/reactives/ReactiveItem.js#L13)
 
 ___
 
@@ -86,7 +86,7 @@ ___
 
 #### Defined in
 
-src/reactives/ReactiveItem.js:15
+[src/reactives/ReactiveItem.js:15](https://github.com/supercat1337/store2/blob/db27dff8135ce0b18c8545168f48050df8eeffe0/src/reactives/ReactiveItem.js#L15)
 
 ## Accessors
 
@@ -102,7 +102,7 @@ True if the reactive item has been destroyed, false otherwise.
 
 #### Defined in
 
-src/reactives/ReactiveItem.js:180
+[src/reactives/ReactiveItem.js:180](https://github.com/supercat1337/store2/blob/db27dff8135ce0b18c8545168f48050df8eeffe0/src/reactives/ReactiveItem.js#L180)
 
 ## Methods
 
@@ -118,7 +118,7 @@ Removes all subscribers, including listeners for "#has-subscribers" and "#no-sub
 
 #### Defined in
 
-src/reactives/ReactiveItem.js:47
+[src/reactives/ReactiveItem.js:47](https://github.com/supercat1337/store2/blob/db27dff8135ce0b18c8545168f48050df8eeffe0/src/reactives/ReactiveItem.js#L47)
 
 ___
 
@@ -134,7 +134,7 @@ Removes all "change" subscribers. Listeners for "#has-subscribers" and "#no-subs
 
 #### Defined in
 
-src/reactives/ReactiveItem.js:40
+[src/reactives/ReactiveItem.js:40](https://github.com/supercat1337/store2/blob/db27dff8135ce0b18c8545168f48050df8eeffe0/src/reactives/ReactiveItem.js#L40)
 
 ___
 
@@ -152,7 +152,7 @@ removes all dependencies, dependents and subscribers, and marks the engine as de
 
 #### Defined in
 
-src/reactives/ReactiveItem.js:153
+[src/reactives/ReactiveItem.js:153](https://github.com/supercat1337/store2/blob/db27dff8135ce0b18c8545168f48050df8eeffe0/src/reactives/ReactiveItem.js#L153)
 
 ___
 
@@ -179,7 +179,7 @@ True if the two values are equal, false otherwise.
 
 #### Defined in
 
-src/reactives/ReactiveItem.js:165
+[src/reactives/ReactiveItem.js:165](https://github.com/supercat1337/store2/blob/db27dff8135ce0b18c8545168f48050df8eeffe0/src/reactives/ReactiveItem.js#L165)
 
 ___
 
@@ -198,7 +198,7 @@ The last error that occurred, or null if there is no error.
 
 #### Defined in
 
-src/reactives/ReactiveItem.js:90
+[src/reactives/ReactiveItem.js:90](https://github.com/supercat1337/store2/blob/db27dff8135ce0b18c8545168f48050df8eeffe0/src/reactives/ReactiveItem.js#L90)
 
 ___
 
@@ -223,7 +223,7 @@ The current value of the reactive item.
 
 #### Defined in
 
-src/reactives/ReactiveItem.js:65
+[src/reactives/ReactiveItem.js:65](https://github.com/supercat1337/store2/blob/db27dff8135ce0b18c8545168f48050df8eeffe0/src/reactives/ReactiveItem.js#L65)
 
 ___
 
@@ -245,7 +245,7 @@ reactive item.
 
 #### Defined in
 
-src/reactives/ReactiveItem.js:102
+[src/reactives/ReactiveItem.js:102](https://github.com/supercat1337/store2/blob/db27dff8135ce0b18c8545168f48050df8eeffe0/src/reactives/ReactiveItem.js#L102)
 
 ___
 
@@ -263,7 +263,7 @@ Whether there are any subscribers.
 
 #### Defined in
 
-src/reactives/ReactiveItem.js:55
+[src/reactives/ReactiveItem.js:55](https://github.com/supercat1337/store2/blob/db27dff8135ce0b18c8545168f48050df8eeffe0/src/reactives/ReactiveItem.js#L55)
 
 ___
 
@@ -294,7 +294,7 @@ A function that unsubscribes the given function.
 
 #### Defined in
 
-src/reactives/ReactiveItem.js:138
+[src/reactives/ReactiveItem.js:138](https://github.com/supercat1337/store2/blob/db27dff8135ce0b18c8545168f48050df8eeffe0/src/reactives/ReactiveItem.js#L138)
 
 ___
 
@@ -325,7 +325,7 @@ A function that unsubscribes the given function.
 
 #### Defined in
 
-src/reactives/ReactiveItem.js:118
+[src/reactives/ReactiveItem.js:118](https://github.com/supercat1337/store2/blob/db27dff8135ce0b18c8545168f48050df8eeffe0/src/reactives/ReactiveItem.js#L118)
 
 ___
 
@@ -356,7 +356,7 @@ A function that unsubscribes the given function.
 
 #### Defined in
 
-src/reactives/ReactiveItem.js:128
+[src/reactives/ReactiveItem.js:128](https://github.com/supercat1337/store2/blob/db27dff8135ce0b18c8545168f48050df8eeffe0/src/reactives/ReactiveItem.js#L128)
 
 ___
 
@@ -374,7 +374,7 @@ The current value of the reactive item.
 
 #### Defined in
 
-src/reactives/ReactiveItem.js:81
+[src/reactives/ReactiveItem.js:81](https://github.com/supercat1337/store2/blob/db27dff8135ce0b18c8545168f48050df8eeffe0/src/reactives/ReactiveItem.js#L81)
 
 ___
 
@@ -405,4 +405,4 @@ Subscribes a function to be called whenever the value of this reactive item chan
 
 #### Defined in
 
-src/reactives/ReactiveItem.js:33
+[src/reactives/ReactiveItem.js:33](https://github.com/supercat1337/store2/blob/db27dff8135ce0b18c8545168f48050df8eeffe0/src/reactives/ReactiveItem.js#L33)

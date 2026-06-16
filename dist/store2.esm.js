@@ -1644,7 +1644,7 @@ class ReactiveItem {
 
 
 /**
- * Atom is a reactive primitive that holds a value. It is the base unit of reactive state.
+ * Atom is a reactive item that holds a value. It is the base unit of reactive state.
  * @augments ReactiveItem
  * @template T
  * @example
@@ -1802,7 +1802,7 @@ class Atom extends ReactiveItem {
 
 
 /**
- * Computed is a reactive primitive that holds a value that is computed from other reactive values.
+ * Computed is a reactive item that holds a value that is computed from other reactive values.
  * It is the base unit of reactive state.
  * @augments ReactiveItem
  * @template {unknown} T
@@ -2149,7 +2149,7 @@ class Computed extends ReactiveItem {
 
 
 /**
- * Collection is a reactive primitive that holds an array of values.
+ * Collection is a reactive item that holds an array of values.
  * It provides reactivity for array operations (push, pop, splice, etc.)
  * and allows tracking changes to individual elements and the array length.
  *
@@ -2359,7 +2359,7 @@ class Collection extends ReactiveItem {
 
 
 /**
- * ShallowReactive is a reactive primitive that holds a shallow object. It is the base unit of reactive state.
+ * ShallowReactive is a reactive item that holds a shallow object. It is the base unit of reactive state.
  * It is a shallow reactive object, meaning that it only tracks changes to the properties of the object itself, not its nested properties.
  * @augments ReactiveItem
  * @template {{[key:string]:any}} T
@@ -3279,7 +3279,7 @@ function isReactiveWrapper(item) {
 
 /**
  * ReactiveList is a reactive array-like structure that stores values of any type.
- * It automatically chooses the appropriate reactive primitive:
+ * It automatically chooses the appropriate reactive item:
  * - Objects and arrays are wrapped with `ShallowReactive` (shallow property tracking).
  * - Primitives (numbers, strings, booleans, etc.) are wrapped with `Atom`.
  *
@@ -3323,7 +3323,7 @@ class ReactiveList {
 
     /**
      * Creates a reactive wrapper for the given value.
-     * Uses ShallowReactive for objects/arrays, Atom for primitives.
+     * Uses ShallowReactive for objects/arrays, Atom for items.
      *
      * @param {any} value - The value to wrap.
      * @param {string} name - The name to assign to the reactive item (used for debugging).
@@ -4122,7 +4122,7 @@ function fromPromise(promise) {
 }
 
 /**
- * Creates a new Atom instance. An Atom is a reactive primitive that holds a value. Same as `atom` but
+ * Creates a new Atom instance. An Atom is a reactive item that holds a value. Same as `atom` but
  * returns a new Atom instance.
  * @template T
  * @param {T} value - The initial value of the Atom.
@@ -4146,7 +4146,7 @@ function atom(value, options) {
 }
 
 /**
- * Creates a new Computed instance. Computed is a reactive primitive that holds a value that is computed from other reactive values.
+ * Creates a new Computed instance. Computed is a reactive item that holds a value that is computed from other reactive values.
  * @template T
  * @param {()=>T} fn - The function that returns the value of the Computed
  * @param {object} [options] - Options

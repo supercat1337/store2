@@ -5,7 +5,7 @@ import { clone } from '../helpers/tools.js';
 import { ReactiveItem } from './ReactiveItem.js';
 
 /**
- * Atom is a reactive primitive that holds a value. It is the base unit of reactive state.
+ * Atom is a reactive item that holds a value. It is the base unit of reactive state.
  * @augments ReactiveItem
  * @template T
  * @example

@@ -7,7 +7,7 @@ import { modeController } from '../services/modeController.js';
 import { ReactiveItem } from './ReactiveItem.js';
 
 /**
- * Computed is a reactive primitive that holds a value that is computed from other reactive values.
+ * Computed is a reactive item that holds a value that is computed from other reactive values.
  * It is the base unit of reactive state.
  * @augments ReactiveItem
  * @template {unknown} T

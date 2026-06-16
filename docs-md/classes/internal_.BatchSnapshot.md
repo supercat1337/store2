@@ -51,7 +51,7 @@ Creates a new BatchSnapshot instance.
 
 #### Defined in
 
-[src/core/BatchSnapshot.js:26](https://github.com/supercat1337/store2/blob/092e7aaba8ac2329715b3d46c6a0217f1d1972eb/src/core/BatchSnapshot.js#L26)
+[src/core/BatchSnapshot.js:26](https://github.com/supercat1337/store2/blob/db27dff8135ce0b18c8545168f48050df8eeffe0/src/core/BatchSnapshot.js#L26)
 
 ## Properties
 
@@ -63,7 +63,7 @@ Map storing original values for each property key.
 
 #### Defined in
 
-[src/core/BatchSnapshot.js:13](https://github.com/supercat1337/store2/blob/092e7aaba8ac2329715b3d46c6a0217f1d1972eb/src/core/BatchSnapshot.js#L13)
+[src/core/BatchSnapshot.js:13](https://github.com/supercat1337/store2/blob/db27dff8135ce0b18c8545168f48050df8eeffe0/src/core/BatchSnapshot.js#L13)
 
 ___
 
@@ -76,7 +76,7 @@ Used to access the equality comparison function.
 
 #### Defined in
 
-[src/core/BatchSnapshot.js:20](https://github.com/supercat1337/store2/blob/092e7aaba8ac2329715b3d46c6a0217f1d1972eb/src/core/BatchSnapshot.js#L20)
+[src/core/BatchSnapshot.js:20](https://github.com/supercat1337/store2/blob/db27dff8135ce0b18c8545168f48050df8eeffe0/src/core/BatchSnapshot.js#L20)
 
 ## Accessors
 
@@ -92,7 +92,7 @@ Returns the number of recorded properties.
 
 #### Defined in
 
-[src/core/BatchSnapshot.js:87](https://github.com/supercat1337/store2/blob/092e7aaba8ac2329715b3d46c6a0217f1d1972eb/src/core/BatchSnapshot.js#L87)
+[src/core/BatchSnapshot.js:87](https://github.com/supercat1337/store2/blob/db27dff8135ce0b18c8545168f48050df8eeffe0/src/core/BatchSnapshot.js#L87)
 
 ## Methods
 
@@ -108,7 +108,7 @@ Clears all recorded initial values.
 
 #### Defined in
 
-[src/core/BatchSnapshot.js:79](https://github.com/supercat1337/store2/blob/092e7aaba8ac2329715b3d46c6a0217f1d1972eb/src/core/BatchSnapshot.js#L79)
+[src/core/BatchSnapshot.js:79](https://github.com/supercat1337/store2/blob/db27dff8135ce0b18c8545168f48050df8eeffe0/src/core/BatchSnapshot.js#L79)
 
 ___
 
@@ -133,7 +133,7 @@ Array of property keys that actually changed.
 
 #### Defined in
 
-[src/core/BatchSnapshot.js:65](https://github.com/supercat1337/store2/blob/092e7aaba8ac2329715b3d46c6a0217f1d1972eb/src/core/BatchSnapshot.js#L65)
+[src/core/BatchSnapshot.js:65](https://github.com/supercat1337/store2/blob/db27dff8135ce0b18c8545168f48050df8eeffe0/src/core/BatchSnapshot.js#L65)
 
 ___
 
@@ -157,7 +157,7 @@ The original value, or undefined if not recorded.
 
 #### Defined in
 
-[src/core/BatchSnapshot.js:46](https://github.com/supercat1337/store2/blob/092e7aaba8ac2329715b3d46c6a0217f1d1972eb/src/core/BatchSnapshot.js#L46)
+[src/core/BatchSnapshot.js:46](https://github.com/supercat1337/store2/blob/db27dff8135ce0b18c8545168f48050df8eeffe0/src/core/BatchSnapshot.js#L46)
 
 ___
 
@@ -181,7 +181,7 @@ True if the property was recorded.
 
 #### Defined in
 
-[src/core/BatchSnapshot.js:55](https://github.com/supercat1337/store2/blob/092e7aaba8ac2329715b3d46c6a0217f1d1972eb/src/core/BatchSnapshot.js#L55)
+[src/core/BatchSnapshot.js:55](https://github.com/supercat1337/store2/blob/db27dff8135ce0b18c8545168f48050df8eeffe0/src/core/BatchSnapshot.js#L55)
 
 ___
 
@@ -204,4 +204,4 @@ Records the original value for a property if not already recorded in this batch.
 
 #### Defined in
 
-[src/core/BatchSnapshot.js:35](https://github.com/supercat1337/store2/blob/092e7aaba8ac2329715b3d46c6a0217f1d1972eb/src/core/BatchSnapshot.js#L35)
+[src/core/BatchSnapshot.js:35](https://github.com/supercat1337/store2/blob/db27dff8135ce0b18c8545168f48050df8eeffe0/src/core/BatchSnapshot.js#L35)

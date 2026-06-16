@@ -5,7 +5,7 @@ import { COLLECTION } from '../core/Engine.js';
 import { modeController } from '../services/modeController.js';
 
 /**
- * Collection is a reactive primitive that holds an array of values.
+ * Collection is a reactive item that holds an array of values.
  * It provides reactivity for array operations (push, pop, splice, etc.)
  * and allows tracking changes to individual elements and the array length.
  *
