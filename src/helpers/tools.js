@@ -1,14 +1,14 @@
 // @ts-check
 
-import { ReactivePrimitive } from '../reactives/ReactivePrimitive.js';
+import { ReactiveItem } from '../reactives/ReactiveItem.js';
 import { idService } from '../services/idService.js';
 
 /**
  * Sorts reactive items by their internal id. This is used to
  * ensure that reactive items are processed in a consistent order
  * when they are notified of changes.
- * @param {ReactivePrimitive} a - The first item to compare
- * @param {ReactivePrimitive} b - The second item to compare
+ * @param {ReactiveItem} a - The first item to compare
+ * @param {ReactiveItem} b - The second item to compare
  * @returns {number} -1 if a should come before b, 0 if a and b are equal, 1 if a should come after b
  */
 export function sortReactiveItems(a, b) {
@@ -20,8 +20,8 @@ export function sortReactiveItems(a, b) {
  * ensuring that each item appears only once. The combined set is then converted
  * to an array and sorted by the internal id of the reactive items.
  *
- * @param {...(ReactivePrimitive|Set<ReactivePrimitive>)} items - Reactive items or sets of reactive items to combine and sort.
- * @returns {Array<ReactivePrimitive>} A sorted array of unique reactive items.
+ * @param {...(ReactiveItem|Set<ReactiveItem>)} items - Reactive items or sets of reactive items to combine and sort.
+ * @returns {Array<ReactiveItem>} A sorted array of unique reactive items.
  */
 
 export function getSortedReactiveItems(...items) {
@@ -247,7 +247,7 @@ export function getError(e) {
  * Extracts names (and optionally ids) from a Set of reactive primitives.
  * Returns an array of strings, one per item.
  *
- * @param {Set<ReactivePrimitive>|Iterable<ReactivePrimitive>} items - Collection of reactive items.
+ * @param {Set<ReactiveItem>|Iterable<ReactiveItem>} items - Collection of reactive items.
  * @param {{includeId:boolean, fallback:string, sorted:boolean}} [options] - Formatting options.
  * @returns {string[]} Array of item representations.
  *
@@ -274,7 +274,7 @@ export function getItemNamesFromSet(
     const result = [];
 
     for (const item of items) {
-        if (!(item instanceof ReactivePrimitive)) {
+        if (!(item instanceof ReactiveItem)) {
             continue;
         }
 

@@ -103,14 +103,6 @@ test('Collection: set new value in subscriber', t => {
     b.value++;
 });
 
-test('Collection: value == data', t => {
-    const a = new Collection([0, 1, 2], { name: 'a' });
-    a.data = [3, 4, 5, 6, 7];
-
-    t.deepEqual(a.value, [3, 4, 5, 6, 7]);
-    t.deepEqual(a.value, a.data);
-});
-
 test('Collection: set new value 2', t => {
     const a = new Collection([0, 1, 2], { name: 'a' });
     a.value = [3, 4];
@@ -154,9 +146,9 @@ test("Collection: delete collection's item value in subscriber", t => {
 test("Collection: delete collection's item value in subscriber 2", t => {
     const a = new Collection([0, 1, 2], { name: 'a' });
     a.subscribe(() => {
-        t.throws(() => a.data.pop());
+        t.throws(() => a.value.pop());
     });
-    t.notThrows(() => a.data.pop());
+    t.notThrows(() => a.value.pop());
 });
 
 test('Collection: value in computed', t => {
@@ -307,7 +299,7 @@ test('Collection: check updates data when value is not changed', t => {
             'updates entries:',
             Array.from(updates.entries()).map(([k, v]) => ({
                 k,
-                verb: v.verb,
+                type: v.type,
                 old: v.oldValue,
                 new: v.value,
             }))
@@ -325,7 +317,7 @@ test('Collection: check updates data when value is not changed', t => {
         'After batch: a.engine.updates =',
         Array.from(a.engine.updates.entries()).map(([k, v]) => ({
             k,
-            verb: v.verb,
+            type: v.type,
             old: v.oldValue,
             new: v.value,
         }))

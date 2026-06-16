@@ -2,7 +2,7 @@
 
 export class UpdateDataRecord {
     /** @type {"set"|"delete"} */
-    verb;
+    type;
 
     /** @type {any} */
     value;
@@ -10,18 +10,18 @@ export class UpdateDataRecord {
     /** @type {any} */
     oldValue;
 
-    /** @type {ReactivePrimitive|undefined} */
+    /** @type {ReactiveItem|undefined} */
     reactiveItem;
 
     /**
-     * Initializes an instance of UpdateDataRecord with the provided verb, old value, and new value.
-     * @param {"set"|"delete"} verb - The action performed, either "set" or "delete".
+     * Initializes an instance of UpdateDataRecord with the provided type, old value, and new value.
+     * @param {"set"|"delete"} type - The action performed, either "set" or "delete".
      * @param {any} oldValue - The previous value before the update.
      * @param {any} value - The new value after the update.
-     * @param {ReactivePrimitive} [reactiveItem] - The reactive item that triggered the update.
+     * @param {ReactiveItem} [reactiveItem] - The reactive item that triggered the update.
      */
-    constructor(verb, oldValue, value, reactiveItem) {
-        this.verb = verb;
+    constructor(type, oldValue, value, reactiveItem) {
+        this.type = type;
         this.oldValue = oldValue;
         this.value = value;
         this.reactiveItem = reactiveItem;

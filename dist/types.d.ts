@@ -1,4 +1,4 @@
-type ReactivePrimitive = import('./reactives/ReactivePrimitive.js').ReactivePrimitive;
+type ReactiveItem = import('./reactives/ReactiveItem.js').ReactiveItem;
 type CompareFunction = (a: any, b: any) => boolean;
 
 /* From api\api.d.ts */
@@ -54,53 +54,72 @@ export function computed<T>(fn: () => T, options?: {
     smartRecompute?: boolean;
 }): Computed<T>;
 /**
- * Creates a new Collection instance. A Collection is a reactive primitive that holds an array of values. Same as `collection` but
- * returns a new Collection instance.
+ * Creates a new reactive Collection instance that holds an array.
+ * The Collection provides reactivity for array mutations (push, pop, splice, etc.)
+ * and allows subscribing to changes.
+ *
+ * Unlike the `Atom` and `Computed` factories, this function returns the actual
+ * `Collection` instance, not just the proxied array. To access the reactive array,
+ * use the `.value` property.
+ *
  * @template T
- * @param {T[]} value - The array to observe.
- * @param {object} [options] - Options
- * @param {string} [options.name] - The name of Collection object.
- * @param {(a:T, b:T)=>boolean} [options.compareFunction] - A function that compares two values to determine if they are equal.
- * @returns {T[]} The observed array
+ * @param {T[]} value - The initial array to observe.
+ * @param {object} [options] - Configuration options.
+ * @param {string} [options.name] - The name of the Collection (used for debugging).
+ * @param {(a:T, b:T)=>boolean} [options.compareFunction] - Custom equality function.
+ * @returns {Collection<T>} The Collection instance.
+ *
  * @example
  * ```js
- * const items = collection([1, 2, 3]);
+ * const coll = collection([1, 2, 3]);
  *
- * items.subscribe(() => {
- *     console.log(items.value);
- });
+ * // Subscribe to changes
+ * coll.subscribe(() => console.log('changed'));
  *
- * items.value.push(4);
- * // output: [1, 2, 3, 4]
+ * // Mutate the array via .value
+ * coll.value.push(4); // triggers subscriber
+ * console.log(coll.value); // [1, 2, 3, 4]
+ *
+ * // Direct property access also works (proxied)
+ * coll.value[0] = 10; // triggers subscriber
  * ```
  */
 export function collection<T>(value: T[], options?: {
     name?: string;
     compareFunction?: (a: T, b: T) => boolean;
-}): T[];
+}): Collection<T>;
 /**
- * Creates a new ShallowReactive instance. An ShallowReactive is a reactive primitive that holds a value. Same as `shallowReactive` but
- * returns a new ShallowReactive instance.
+ * Creates a new reactive ShallowReactive instance that wraps an object.
+ * The ShallowReactive provides reactivity for property assignments and deletions
+ * on the top level of the object (shallow reactivity).
+ *
+ * This function returns the actual `ShallowReactive` instance, not just the proxy.
+ * To access the reactive object, use the `.value` property.
+ *
  * @template T
- * @param {T} value - The object to observe.
- * @param {object} [options] - Options to configure the observable behavior.
- * @param {string} [options.name] - The name of ShallowReactive object.
- * @returns {T} The observed object
+ * @param {T} value - The object to observe (must be a plain object or an instance).
+ * @param {object} [options] - Configuration options.
+ * @param {string} [options.name] - The name of the ShallowReactive (used for debugging).
+ * @returns {ShallowReactive<T>} The ShallowReactive instance.
+ *
  * @example
  * ```js
- * const obj = shallowReactive({ a: 1, b: 2 });
+ * const reactive = shallowReactive({ a: 1, b: 2 });
  *
- * obj.subscribe(() => {
- *     console.log(obj.value);
- * });
+ * // Subscribe to changes
+ * reactive.subscribe(() => console.log('changed'));
  *
- * obj.value.a = 3;
- * // output: { a: 3, b: 2 }
+ * // Modify the object via .value
+ * reactive.value.a = 3; // triggers subscriber
+ * console.log(reactive.value); // { a: 3, b: 2 }
+ *
+ * // Direct property access also works (proxied)
+ * reactive.value.b = 5; // triggers subscriber
  * ```
  */
 export function shallowReactive<T>(value: T, options?: {
     name?: string;
-}): T;
+}): ShallowReactive<T>;
 /**
  * Automatically tracks and subscribes to changes in reactive items used by the specified function.
  * This allows the function to be re-executed whenever any of its dependencies change, maintaining
@@ -277,7 +296,7 @@ export function when(predicate: () => boolean, fn: () => void, options?: {
  * const a = atom(0, { name: "a" });
  * let foo = 0;
  *
- * waitTrue(() => a.value > 3).then(() => {
+ * waitUntil(() => a.value > 3).then(() => {
  *     foo++;
  * });
  *
@@ -286,7 +305,7 @@ export function when(predicate: () => boolean, fn: () => void, options?: {
  * a.value = 4; // foo = 1
  * ```
  */
-export function waitTrue(predicate: () => boolean, options?: {
+export function waitUntil(predicate: () => boolean, options?: {
     timeout?: number;
 }): Promise<void>;
 /**
@@ -581,7 +600,7 @@ export function extendObservable<T, R extends {
     name?: string;
 }): T & R;
 
-/* From complex\reactiveList.d.ts */
+/* From complex\ReactiveList.d.ts */
 /**
  * ReactiveList is a reactive array-like structure that stores values of any type.
  * It automatically chooses the appropriate reactive primitive:
@@ -598,12 +617,12 @@ export function extendObservable<T, R extends {
  * const list = new ReactiveList();
  *
  * list.subscribe(() => {
- *     console.log('List changed:', list.getItems());
+ *     console.log('List changed:', list.toArray());
  * });
  *
  * list.add(1, 2, 3);                // numbers -> stored as Atom
  * list.setItem(1, 42);
- * list.splice(0, 1);
+ * list.removeRange(0, 1);
  * list.setItems([{ a: 1 }, { b: 2 }]); // objects -> stored as ShallowReactive
  * ```
  */
@@ -628,7 +647,7 @@ export class ReactiveList<T extends {
      *
      * @returns {T[]} An array containing all values.
      */
-    getItems(): T[];
+    toArray(): T[];
     /**
      * Updates the value at the specified index.
      *
@@ -655,7 +674,7 @@ export class ReactiveList<T extends {
      * @param {number} startIndex - The index at which to start removal.
      * @param {number} count - The number of elements to remove.
      */
-    splice(startIndex: number, count: number): void;
+    removeRange(startIndex: number, count: number): void;
     /**
      * Removes the item at the given index.
      *
@@ -697,7 +716,7 @@ export class ReactiveList<T extends {
 }
 export type ReactiveWrapper<T> = T extends object ? ShallowReactive<T> : Atom<T>;
 
-/* From complex\store.d.ts */
+/* From complex\Store.d.ts */
 /**
  * Store is a reactive container that holds a collection of reactive items.
  * You can add, remove and access items via methods of this class.
@@ -720,7 +739,7 @@ export type ReactiveWrapper<T> = T extends object ? ShallowReactive<T> : Atom<T>
  * });
  *
  * // mute updates
- * store.suppressNotifications();
+ * store.muteUpdates();
  * childStore.removeItem("childStore");
  * a.value = 3;
  * b.value = 4;
@@ -778,7 +797,7 @@ export class Store {
     get isDestroyed(): boolean;
     /**
      * Adds one or more reactive items to the store. If an item is a child store, it will be added to the store.
-     * @param {{[key: string]: ReactivePrimitive|Store}} items - An object where the keys are the keys to use when adding the items to the store and the values are the reactive items to add.
+     * @param {{[key: string]: ReactiveItem|Store}} items - An object where the keys are the keys to use when adding the items to the store and the values are the reactive items to add.
      * @throws {Error} If an item with the given key already exists in the store.
      * @throws {Error} If the store is destroyed.
      * @example
@@ -790,7 +809,7 @@ export class Store {
      * ```
      */
     addItems(items: {
-        [key: string]: ReactivePrimitive | Store;
+        [key: string]: ReactiveItem | Store;
     }): void;
     /**
      * Destroys the item with the given key, whether it's a reactive item or a child store.
@@ -816,14 +835,14 @@ export class Store {
      * Clears all reactive items from the store. This method is useful for resetting a Store to an empty state.
      * It removes all reactive items from the store and clears all child stores. It does not destroy the reactive items.
      */
-    clear(): void;
+    detachAll(): void;
     /**
      * Retrieves the item with the given key from the store. This method first looks for a reactive item with the given key,
      * and if no such item exists, looks for a child store with the same key.
      * @param {string} key - The key of the item to retrieve.
-     * @returns {ReactivePrimitive|Store|null} The item with the given key, or null if no such item exists in the store.
+     * @returns {ReactiveItem|Store|null} The item with the given key, or null if no such item exists in the store.
      */
-    getItem(key: string): ReactivePrimitive | Store | null;
+    getItem(key: string): ReactiveItem | Store | null;
     /**
      * Checks if an item with the given key exists in the store.
      * @param {string} key - The key of the item to check.
@@ -843,9 +862,9 @@ export class Store {
      *
      * @param {"all"|"reactives"|"stores"} [filter="all"] - The filter to apply when retrieving items. Default is "all".
      * Possible values can be "all", "reactives", or "stores" (if applicable).
-     * @returns {Map<string, ReactivePrimitive|Store>} A Map containing the items that match the filter.
+     * @returns {Map<string, ReactiveItem|Store>} A Map containing the items that match the filter.
      */
-    getItems(filter?: "all" | "reactives" | "stores"): Map<string, ReactivePrimitive | Store>;
+    toMap(filter?: "all" | "reactives" | "stores"): Map<string, ReactiveItem | Store>;
     /**
      * Retrieves the value of this Store as a plain object, optionally filtered by a specified filter.
      *
@@ -864,25 +883,25 @@ export class Store {
      * store.addItems({ a, b, c });
      * c.addItems({ d, e });
      *
-     * console.log(store.asPlainObject());
+     * console.log(store.toJSON());
      * // output: { a: 1, b: 2, c: { d: 3, e: [1, 2, 3] } }
      *
-     * console.log(store.asPlainObject("all"));
+     * console.log(store.toJSON("all"));
      * // output: { a: 1, b: 2, c: { d: 3, e: [1, 2, 3] } }
      *
-     * console.log(store.asPlainObject("reactives"));
+     * console.log(store.toJSON("reactives"));
      * // output: { a: 1, b: 2 }
      *
-     * console.log(store.asPlainObject("stores"));
+     * console.log(store.toJSON("stores"));
      * // output: { c: { d: 3, e: [1, 2, 3] } }
      *
      * store.destroy();
      *
-     * console.log(store.asPlainObject());
+     * console.log(store.toJSON());
      * // output: {}
      * ```
      */
-    asPlainObject(filter?: "all" | "reactives" | "stores"): object;
+    toJSON(filter?: "all" | "reactives" | "stores"): object;
     /**
      * Subscribes a function to be called whenever the value of this Store changes.
      * The function is called with a Map of updates, where the keys are the names of the items that changed, and the values are UpdateDataRecord objects.
@@ -929,7 +948,7 @@ export class Store {
      * Mutes the event emitter, preventing any updates from being triggered.
      * Any updates that are scheduled while muted will be queued and executed when unmuteUpdates is called.
      */
-    suppressNotifications(): void;
+    muteUpdates(): void;
     /**
      * Unmutes the event emitter, allowing updates to be triggered.
      * Any updates that were scheduled while muted will be executed.
@@ -952,9 +971,9 @@ export class Store {
 export class BatchSnapshot {
     /**
      * Creates a new BatchSnapshot instance.
-     * @param {ReactivePrimitive} reactiveItem - The reactive item to snapshot.
+     * @param {ReactiveItem} reactiveItem - The reactive item to snapshot.
      */
-    constructor(reactiveItem: ReactivePrimitive);
+    constructor(reactiveItem: ReactiveItem);
     /**
      * Records the original value for a property if not already recorded in this batch.
      * @param {string} property - The property key.
@@ -1007,20 +1026,20 @@ export const SHALLOW_REACTIVE: 4;
 export class Engine {
     /**
      * Creates an Engine instance.
-     * @param {ReactivePrimitive} reactiveItem - The reactive item.
+     * @param {ReactiveItem} reactiveItem - The reactive item.
      * @param {ATOM|COMPUTED|COLLECTION|SHALLOW_REACTIVE} type - The type.
      */
-    constructor(reactiveItem: ReactivePrimitive, type: 1 | 2 | 3 | 4);
+    constructor(reactiveItem: ReactiveItem, type: 1 | 2 | 3 | 4);
     /**
      * The set of dependencies of the engine.
-     * @type {Set<ReactivePrimitive>}
+     * @type {Set<ReactiveItem>}
      */
-    dependencies: Set<ReactivePrimitive>;
+    dependencies: Set<ReactiveItem>;
     /**
      * The set of dependents of the engine.
-     * @type {Set<ReactivePrimitive>}
+     * @type {Set<ReactiveItem>}
      */
-    dependents: Set<ReactivePrimitive>;
+    dependents: Set<ReactiveItem>;
     /**
      * Unique identifier for ordering.
      * @type {number}
@@ -1033,9 +1052,9 @@ export class Engine {
     version: number;
     /**
      * Reference to the reactive item.
-     * @type {ReactivePrimitive}
+     * @type {ReactiveItem}
      */
-    reactiveItem: ReactivePrimitive;
+    reactiveItem: ReactiveItem;
     /**
      * Flag indicating that the value should be recalculated.
      * @type {boolean}
@@ -1087,78 +1106,78 @@ export class Engine {
     /**
      * Legacy method for backward compatibility. Delegates to recordChange + #commitChange.
      * @param {string} property - The property key.
-     * @param {"set"|"delete"} verb - The operation.
+     * @param {"set"|"delete"} type - The operation.
      * @param {any} oldValue - The previous value.
      * @param {any} value - The new value.
      * @returns {boolean} True if an update was added.
      */
-    addUpdate(property: string, verb: "set" | "delete", oldValue: any, value: any): boolean;
+    addUpdate(property: string, type: "set" | "delete", oldValue: any, value: any): boolean;
     /**
      * Adds dependencies to this engine.
-     * @param {Set<ReactivePrimitive>} dependencies
+     * @param {Set<ReactiveItem>} dependencies
      */
-    addDependencies(dependencies: Set<ReactivePrimitive>): void;
+    addDependencies(dependencies: Set<ReactiveItem>): void;
     /**
      * Adds a single dependency.
-     * @param {ReactivePrimitive} dependency
+     * @param {ReactiveItem} dependency
      */
-    addDependency(dependency: ReactivePrimitive): void;
+    addDependency(dependency: ReactiveItem): void;
     /**
      * Adds a dependent.
-     * @param {ReactivePrimitive} dependent
+     * @param {ReactiveItem} dependent
      * @returns {boolean}
      */
-    addDependent(dependent: ReactivePrimitive): boolean;
+    addDependent(dependent: ReactiveItem): boolean;
     /**
      * Removes a dependent.
-     * @param {ReactivePrimitive} dependent
+     * @param {ReactiveItem} dependent
      */
-    removeDependent(dependent: ReactivePrimitive): void;
+    removeDependent(dependent: ReactiveItem): void;
     /**
      * Returns all dependents recursively.
-     * @returns {Set<ReactivePrimitive>}
+     * @returns {Set<ReactiveItem>}
      */
-    getDeepDependents(): Set<ReactivePrimitive>;
+    getDeepDependents(): Set<ReactiveItem>;
     /**
      * Returns sorted array of deep dependents.
-     * @returns {Array<ReactivePrimitive>}
+     * @returns {Array<ReactiveItem>}
      */
-    getDeepDependentsArray(): Array<ReactivePrimitive>;
+    getDeepDependentsArray(): Array<ReactiveItem>;
     /**
      * Notifies dependents of a message.
      * @param {EngineMessages} message
-     * @param {{sender: ReactivePrimitive, recipients: Set<ReactivePrimitive>}} [ctx]
+     * @param {{sender: ReactiveItem, recipients: Set<ReactiveItem>}} [ctx]
      */
     notifyDependents(message: EngineMessages, ctx?: {
-        sender: ReactivePrimitive;
-        recipients: Set<ReactivePrimitive>;
+        sender: ReactiveItem;
+        recipients: Set<ReactiveItem>;
     }): void;
     /**
      * Notifies dependencies (reverse direction).
      * @param {EngineMessages} message
-     * @param {{sender: ReactivePrimitive, recipients: Set<ReactivePrimitive>}} ctx
+     * @param {{sender: ReactiveItem, recipients: Set<ReactiveItem>}} ctx
      */
     notifyDependencies(message: EngineMessages, ctx: {
-        sender: ReactivePrimitive;
-        recipients: Set<ReactivePrimitive>;
+        sender: ReactiveItem;
+        recipients: Set<ReactiveItem>;
     }): void;
     /**
      * Handles incoming messages.
      * @param {EngineMessages} message
-     * @param {{sender: ReactivePrimitive, recipients: Set<ReactivePrimitive>}} ctx
+     * @param {{sender: ReactiveItem, recipients: Set<ReactiveItem>}} ctx
      */
     getMessage(message: EngineMessages, ctx: {
-        sender: ReactivePrimitive;
-        recipients: Set<ReactivePrimitive>;
+        sender: ReactiveItem;
+        recipients: Set<ReactiveItem>;
     }): void;
     /**
      * Sets an error and notifies dependents.
      * @param {Error|null} error
-     * @param {{sender: ReactivePrimitive, recipients: Set<ReactivePrimitive>}} [ctx]
+     * @param {{sender: ReactiveItem, recipients: Set<ReactiveItem>}} [ctx]
      */
     setError(error: Error | null, ctx?: {
-        sender: ReactivePrimitive;
-        recipients: Set<ReactivePrimitive>;
+        sender: ReactiveItem;
+        recipients: Set<ReactiveItem>;
     }): void;
     /**
      * Clears the current error.
@@ -1166,11 +1185,11 @@ export class Engine {
     clearError(): void;
     /**
      * Destroys the engine.
-     * @param {{sender: ReactivePrimitive, recipients: Set<ReactivePrimitive>}} [ctx]
+     * @param {{sender: ReactiveItem, recipients: Set<ReactiveItem>}} [ctx]
      */
     destroy(ctx?: {
-        sender: ReactivePrimitive;
-        recipients: Set<ReactivePrimitive>;
+        sender: ReactiveItem;
+        recipients: Set<ReactiveItem>;
     }): void;
     /**
      * Clears all pending updates.
@@ -1181,11 +1200,6 @@ export class Engine {
      * @returns {boolean}
      */
     hasUpdates(): boolean;
-    /**
-     * Legacy method for compatibility.
-     * @returns {boolean}
-     */
-    checkChangesOldValues(): boolean;
     /**
      * Processes temporary changes after batch ends.
      * Removes updates for properties that reverted to original values.
@@ -1203,9 +1217,9 @@ export class Engine {
     prepareSetValue(): void;
     /**
      * Updates dependencies to a new set.
-     * @param {Set<ReactivePrimitive>} newDeps
+     * @param {Set<ReactiveItem>} newDeps
      */
-    updateDependencies(newDeps: Set<ReactivePrimitive>): void;
+    updateDependencies(newDeps: Set<ReactiveItem>): void;
     #private;
 }
 
@@ -1278,21 +1292,21 @@ export class SubscribeController {
 /* From core\UpdateDataRecord.d.ts */
 export class UpdateDataRecord {
     /**
-     * Initializes an instance of UpdateDataRecord with the provided verb, old value, and new value.
-     * @param {"set"|"delete"} verb - The action performed, either "set" or "delete".
+     * Initializes an instance of UpdateDataRecord with the provided type, old value, and new value.
+     * @param {"set"|"delete"} type - The action performed, either "set" or "delete".
      * @param {any} oldValue - The previous value before the update.
      * @param {any} value - The new value after the update.
-     * @param {ReactivePrimitive} [reactiveItem] - The reactive item that triggered the update.
+     * @param {ReactiveItem} [reactiveItem] - The reactive item that triggered the update.
      */
-    constructor(verb: "set" | "delete", oldValue: any, value: any, reactiveItem?: ReactivePrimitive);
+    constructor(type: "set" | "delete", oldValue: any, value: any, reactiveItem?: ReactiveItem);
     /** @type {"set"|"delete"} */
-    verb: "set" | "delete";
+    type: "set" | "delete";
     /** @type {any} */
     value: any;
     /** @type {any} */
     oldValue: any;
-    /** @type {ReactivePrimitive|undefined} */
-    reactiveItem: ReactivePrimitive | undefined;
+    /** @type {ReactiveItem|undefined} */
+    reactiveItem: ReactiveItem | undefined;
 }
 export class UpdateDataRecordManager {
     /**
@@ -1314,20 +1328,20 @@ export class UpdateDataRecordManager {
  * Sorts reactive items by their internal id. This is used to
  * ensure that reactive items are processed in a consistent order
  * when they are notified of changes.
- * @param {ReactivePrimitive} a - The first item to compare
- * @param {ReactivePrimitive} b - The second item to compare
+ * @param {ReactiveItem} a - The first item to compare
+ * @param {ReactiveItem} b - The second item to compare
  * @returns {number} -1 if a should come before b, 0 if a and b are equal, 1 if a should come after b
  */
-export function sortReactiveItems(a: ReactivePrimitive, b: ReactivePrimitive): number;
+export function sortReactiveItems(a: ReactiveItem, b: ReactiveItem): number;
 /**
  * Combines multiple reactive items or sets of reactive items into a single set,
  * ensuring that each item appears only once. The combined set is then converted
  * to an array and sorted by the internal id of the reactive items.
  *
- * @param {...(ReactivePrimitive|Set<ReactivePrimitive>)} items - Reactive items or sets of reactive items to combine and sort.
- * @returns {Array<ReactivePrimitive>} A sorted array of unique reactive items.
+ * @param {...(ReactiveItem|Set<ReactiveItem>)} items - Reactive items or sets of reactive items to combine and sort.
+ * @returns {Array<ReactiveItem>} A sorted array of unique reactive items.
  */
-export function getSortedReactiveItems(...items: (ReactivePrimitive | Set<ReactivePrimitive>)[]): Array<ReactivePrimitive>;
+export function getSortedReactiveItems(...items: (ReactiveItem | Set<ReactiveItem>)[]): Array<ReactiveItem>;
 /**
  * Checks if a given value is a plain object.
  * @param {*} obj - The value to check.
@@ -1411,7 +1425,7 @@ export function getError(e: unknown): Error;
  * Extracts names (and optionally ids) from a Set of reactive primitives.
  * Returns an array of strings, one per item.
  *
- * @param {Set<ReactivePrimitive>|Iterable<ReactivePrimitive>} items - Collection of reactive items.
+ * @param {Set<ReactiveItem>|Iterable<ReactiveItem>} items - Collection of reactive items.
  * @param {{includeId:boolean, fallback:string, sorted:boolean}} [options] - Formatting options.
  * @returns {string[]} Array of item representations.
  *
@@ -1429,7 +1443,7 @@ export function getError(e: unknown): Error;
  * @example
  * getItemNamesFromSet(set, { fallback: '?', sorted: false });
  */
-export function getItemNamesFromSet(items: Set<ReactivePrimitive> | Iterable<ReactivePrimitive>, options?: {
+export function getItemNamesFromSet(items: Set<ReactiveItem> | Iterable<ReactiveItem>, options?: {
     includeId: boolean;
     fallback: string;
     sorted: boolean;
@@ -1438,7 +1452,7 @@ export function getItemNamesFromSet(items: Set<ReactivePrimitive> | Iterable<Rea
 /* From reactives\Atom.d.ts */
 /**
  * Atom is a reactive primitive that holds a value. It is the base unit of reactive state.
- * @augments ReactivePrimitive
+ * @augments ReactiveItem
  * @template T
  * @example
  * ```js
@@ -1482,7 +1496,7 @@ export function getItemNamesFromSet(items: Set<ReactivePrimitive> | Iterable<Rea
  * // Output: nothing
  * ```
  */
-export class Atom<T> extends ReactivePrimitive {
+export class Atom<T> extends ReactiveItem {
     /**
      * Initializes an Atom instance with a given value.
      * @param {T} value - The initial value of the Atom.
@@ -1550,7 +1564,7 @@ export class Atom<T> extends ReactivePrimitive {
  * and allows tracking changes to individual elements and the array length.
  *
  * @template T
- * @augments ReactivePrimitive
+ * @augments ReactiveItem
  * @example
  * ```js
  * const coll = new Collection([1, 2, 3]);
@@ -1560,7 +1574,7 @@ export class Atom<T> extends ReactivePrimitive {
  * coll.value.push(4); // triggers reactivity
  * ```
  */
-export class Collection<T> extends ReactivePrimitive {
+export class Collection<T> extends ReactiveItem {
     /**
      * Initializes a Collection instance with an initial array.
      *
@@ -1597,18 +1611,6 @@ export class Collection<T> extends ReactivePrimitive {
         untracked?: boolean;
     }): T[];
     /**
-     * Alias for `value` setter.
-     *
-     * @param {T[]} value - The new array value.
-     */
-    set data(value: T[]);
-    /**
-     * Alias for `value` getter.
-     *
-     * @returns {T[]} The reactive array proxy.
-     */
-    get data(): T[];
-    /**
      * Returns the raw, unproxied target array.
      * Warning: Mutating the raw array directly does NOT trigger reactivity.
      *
@@ -1622,7 +1624,7 @@ export class Collection<T> extends ReactivePrimitive {
 /**
  * Computed is a reactive primitive that holds a value that is computed from other reactive values.
  * It is the base unit of reactive state.
- * @augments ReactivePrimitive
+ * @augments ReactiveItem
  * @template {unknown} T
  * @example
  * ```js
@@ -1666,7 +1668,7 @@ export class Collection<T> extends ReactivePrimitive {
  * // Output: nothing
  * ```
  */
-export class Computed<T extends unknown> extends ReactivePrimitive {
+export class Computed<T extends unknown> extends ReactiveItem {
     /**
      * Initializes an Atom instance with a given value.
      * @param {function():T} fn - function that returns the value of the Computed
@@ -1708,10 +1710,32 @@ export class Computed<T extends unknown> extends ReactivePrimitive {
      */
     get value(): T;
     /**
+     * Returns the current cached value of the computed without triggering a recalculation
+     * and without tracking dependencies.
      *
-     * @returns {T}
+     * Unlike the `value` getter, this method does not check if dependencies have changed
+     * and does not recompute the value if it's stale. It simply returns the last
+     * computed value. This is useful for debugging or for accessing the value
+     * without causing side effects (e.g., inside an untracked context).
+     *
+     * If the computed has an error, this method will still return the last cached
+     * value (which may be undefined or a previous value) without rethrowing the error.
+     *
+     * @override
+     * @returns {T} The cached value.
+     *
+     * @example
+     * ```js
+     * const a = atom(1);
+     * const b = computed(() => a.value * 2);
+     *
+     * console.log(b.peekValue()); // 2 (without tracking dependencies)
+     * a.value = 2;
+     * console.log(b.peekValue()); // still 2 (stale, not recomputed)
+     * console.log(b.value);       // 4 (recomputed now)
+     * ```
      */
-    peekValue(): T;
+    override peekValue(): T;
     /**
      * Returns the current value of the Computed value without tracking it for dependency management.
      * This is useful when you want to access the value without affecting its reactive state.
@@ -1743,13 +1767,13 @@ export class Computed<T extends unknown> extends ReactivePrimitive {
     #private;
 }
 
-/* From reactives\ReactivePrimitive.d.ts */
+/* From reactives\ReactiveItem.d.ts */
 /**
- * ReactivePrimitive is the base class for all reactive items. It provides methods for subscribing to changes,
+ * ReactiveItem is the base class for all reactive items. It provides methods for subscribing to changes,
  * getting the current value, and checking for errors.
  * @private
  */
-export class ReactivePrimitive {
+export class ReactiveItem {
     /**
      *
      * @param {1|2|3|4} type
@@ -1828,10 +1852,10 @@ export class ReactivePrimitive {
     /**
      * Subscribes a function to be called when the reactive item is destroyed.
      * The function is called with no arguments.
-     * @param {(reactiveItem:ReactivePrimitive)=>void} fn - The function to be called.
+     * @param {(reactiveItem:ReactiveItem)=>void} fn - The function to be called.
      * @returns {()=>void} A function that unsubscribes the given function.
      */
-    onDestroy(fn: (reactiveItem: ReactivePrimitive) => void): () => void;
+    onDestroy(fn: (reactiveItem: ReactiveItem) => void): () => void;
     /**
      * Destroys the reactive item. This method is useful for cleaning up after a reactive item
      * that is no longer needed. It calls destroy on the engine of the reactive item, which
@@ -1857,7 +1881,7 @@ export class ReactivePrimitive {
 /**
  * ShallowReactive is a reactive primitive that holds a shallow object. It is the base unit of reactive state.
  * It is a shallow reactive object, meaning that it only tracks changes to the properties of the object itself, not its nested properties.
- * @augments ReactivePrimitive
+ * @augments ReactiveItem
  * @template {{[key:string]:any}} T
  *  * @example
  * ```js
@@ -1869,7 +1893,7 @@ export class ReactivePrimitive {
  *     bar += 1;
  * });
  *
- * const props = b.data;
+ * const props = b.value;
  * props.foo = 2;
  *
  * console.log(bar);
@@ -1893,18 +1917,18 @@ export class ReactivePrimitive {
  *     bar++;
  * });
  *
- * console.log(b.data.foo);
+ * console.log(b.value.foo);
  * // Outputs: 1
  *
- * b.data.foo = 2;
- * console.log(b.data.foo);
+ * b.value.foo = 2;
+ * console.log(b.value.foo);
  * // Outputs: 2
  *
  * console.log(bar);
  * // Outputs: 1
  *
- * b.data.inc();
- * console.log(b.data.foo);
+ * b.value.inc();
+ * console.log(b.value.foo);
  * // Outputs: 3
  * console.log(bar);
  * // Outputs: 2
@@ -1912,7 +1936,7 @@ export class ReactivePrimitive {
  */
 export class ShallowReactive<T extends {
     [key: string]: any;
-}> extends ReactivePrimitive {
+}> extends ReactiveItem {
     /**
      * Initializes a ShallowReactive instance with a given value.
      * @param {T} value - The initial value of the ShallowReactive.
@@ -1948,18 +1972,6 @@ export class ShallowReactive<T extends {
      */
     get value(): T;
     /**
-     * Sets the value of the ShallowReactive. If the value is an object, it will be proxied and reactive.
-     * This is a synonym for `set value(value)`.
-     * @param {T} value - The new value of the ShallowReactive.
-     */
-    set data(value: T);
-    /**
-     * Retrieves the proxied value of the ShallowReactive. If the engine is destroyed, an error is thrown.
-     * Tracks the ShallowReactive for dependency management.
-     * @returns {T} The proxied value of the ShallowReactive.
-     */
-    get data(): T;
-    /**
      * Returns the raw, unproxied value of the ShallowReactive. This is generally not recommended as it breaks reactivity.
      * @returns {T} The raw, unproxied value of the ShallowReactive.
      */
@@ -1974,18 +1986,18 @@ export const changedItemsController: ChangedItemsController;
  * Handles batching, dependency recalculation, and error aggregation.
  */
 declare class ChangedItemsController {
-    /** @type {Set<ReactivePrimitive>} */
-    items: Set<ReactivePrimitive>;
+    /** @type {Set<ReactiveItem>} */
+    items: Set<ReactiveItem>;
     /**
      * Adds a reactive item to the set of changed items.
      * If not in batch mode, immediately runs subscribers and clears the set.
-     * @param {ReactivePrimitive} item - The reactive item that changed.
+     * @param {ReactiveItem} item - The reactive item that changed.
      */
-    addItem(item: ReactivePrimitive): void;
+    addItem(item: ReactiveItem): void;
     /**
-     * @param {ReactivePrimitive} item
+     * @param {ReactiveItem} item
      */
-    removeItem(item: ReactivePrimitive): void;
+    removeItem(item: ReactiveItem): void;
     /**
      * Removes all items from the changed items set.
      */
@@ -2006,17 +2018,17 @@ export {};
  * Returns a sorted array of used reactive items.
  * @param {Function} fn - The function to execute and track.
  * @param {...any} args - Arguments to pass to the function.
- * @returns {Array<ReactivePrimitive>} Sorted array of reactive items accessed.
+ * @returns {Array<ReactiveItem>} Sorted array of reactive items accessed.
  */
-export function getArrayOfUsedReactiveItems(fn: Function, ...args: any[]): Array<ReactivePrimitive>;
+export function getArrayOfUsedReactiveItems(fn: Function, ...args: any[]): Array<ReactiveItem>;
 /**
  * Executes the specified function and tracks reactive items.
  * Returns a Set of used reactive items.
  * @param {Function} fn - The function to execute and track.
  * @param {...any} args - Arguments to pass to the function.
- * @returns {Set<ReactivePrimitive>} Set of reactive items accessed.
+ * @returns {Set<ReactiveItem>} Set of reactive items accessed.
  */
-export function getSetOfUsedReactiveItems(fn: Function, ...args: any[]): Set<ReactivePrimitive>;
+export function getSetOfUsedReactiveItems(fn: Function, ...args: any[]): Set<ReactiveItem>;
 /**
  * The dependencyTracker is a utility instance that monitors reactive items that are used when a computed item is created. It is used
  * to track the dependencies of a computed item, so that it can be recalculated when any of the dependencies change.
@@ -2028,28 +2040,28 @@ declare class Tracker {
     /**
      * Returns the current contents of the tracker's store, which is a set of all reactive items that have been
      * accessed since the tracker was last turned on. This is useful for debugging and testing purposes.
-     * @returns {Set<ReactivePrimitive>} The current contents of the tracker's store.
+     * @returns {Set<ReactiveItem>} The current contents of the tracker's store.
      */
-    get data(): Set<ReactivePrimitive>;
+    get data(): Set<ReactiveItem>;
     /**
      * Returns a sorted array of all reactive items in the tracker's store. The items are sorted by their internal id,
      * ensuring consistent processing order when notified of changes.
-     * @returns {Array<ReactivePrimitive>} A sorted array of reactive items.
+     * @returns {Array<ReactiveItem>} A sorted array of reactive items.
      */
-    getAsSortedArray(): Array<ReactivePrimitive>;
+    getAsSortedArray(): Array<ReactiveItem>;
     /**
      * Adds a reactive item to the tracker's store if the tracker is turned on. If the tracker is not turned on, this
      * method does nothing.
-     * @param {ReactivePrimitive} item - The reactive item to add to the tracker's store.
+     * @param {ReactiveItem} item - The reactive item to add to the tracker's store.
      * @param {string} [_key=""]
      */
-    add(item: ReactivePrimitive, _key?: string): void;
+    add(item: ReactiveItem, _key?: string): void;
     /**
      *
-     * @param {(reactiveItem:ReactivePrimitive)=>void} callback
+     * @param {(reactiveItem:ReactiveItem)=>void} callback
      * @returns {()=>void}
      */
-    onAdd(callback: (reactiveItem: ReactivePrimitive) => void): () => void;
+    onAdd(callback: (reactiveItem: ReactiveItem) => void): () => void;
     /**
      * Returns whether the tracker is currently turned on or not.
      * @returns {boolean} true if the tracker is on, false if it is off.
@@ -2061,12 +2073,12 @@ declare class Tracker {
      * are tracked. If filter is a function, it is called with each reactive item as its argument, and if it returns false, the
      * reactive item is not tracked.
      */
-    turnOn(ctx?: object): void;
+    enable(ctx?: object): void;
     /**
      * Disables the tracker. When the tracker is disabled, it will not watch any set operations and will not report
      * anything to any registered listeners. The tracker is off by default.
      */
-    turnOff(): void;
+    disable(): void;
     #private;
 }
 export {};
@@ -2101,7 +2113,7 @@ export {};
 /* From services\modeController.d.ts */
 export const modeController: ModeControllerService;
 declare class ModeControllerService {
-    computedMode: boolean;
+    isComputing: boolean;
     untrackMode: boolean;
     throwErrorInSubscribers: boolean;
     /** @type {EventEmitterExt<"batchModeStart"|"batchModeEnd"|"beforeBatchModeEnd">} */

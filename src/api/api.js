@@ -235,7 +235,7 @@ function when(predicate, fn, options) {
  * const a = atom(0, { name: "a" });
  * let foo = 0;
  *
- * waitTrue(() => a.value > 3).then(() => {
+ * waitUntil(() => a.value > 3).then(() => {
  *     foo++;
  * });
  *
@@ -244,7 +244,7 @@ function when(predicate, fn, options) {
  * a.value = 4; // foo = 1
  * ```
  */
-function waitTrue(predicate, options) {
+function waitUntil(predicate, options) {
     return new Promise(resolve => {
         const computed = new Computed(predicate);
         const timeout = options?.timeout || 0;
@@ -586,55 +586,72 @@ function computed(fn, options) {
 }
 
 /**
- * Creates a new Collection instance. A Collection is a reactive primitive that holds an array of values. Same as `collection` but
- * returns a new Collection instance.
+ * Creates a new reactive Collection instance that holds an array.
+ * The Collection provides reactivity for array mutations (push, pop, splice, etc.)
+ * and allows subscribing to changes.
+ *
+ * Unlike the `Atom` and `Computed` factories, this function returns the actual
+ * `Collection` instance, not just the proxied array. To access the reactive array,
+ * use the `.value` property.
+ *
  * @template T
- * @param {T[]} value - The array to observe.
- * @param {object} [options] - Options
- * @param {string} [options.name] - The name of Collection object.
- * @param {(a:T, b:T)=>boolean} [options.compareFunction] - A function that compares two values to determine if they are equal.
- * @returns {T[]} The observed array
+ * @param {T[]} value - The initial array to observe.
+ * @param {object} [options] - Configuration options.
+ * @param {string} [options.name] - The name of the Collection (used for debugging).
+ * @param {(a:T, b:T)=>boolean} [options.compareFunction] - Custom equality function.
+ * @returns {Collection<T>} The Collection instance.
+ *
  * @example
  * ```js
- * const items = collection([1, 2, 3]);
- * 
- * items.subscribe(() => {
- *     console.log(items.value);
- });
+ * const coll = collection([1, 2, 3]);
  *
- * items.value.push(4);
- * // output: [1, 2, 3, 4]
+ * // Subscribe to changes
+ * coll.subscribe(() => console.log('changed'));
+ *
+ * // Mutate the array via .value
+ * coll.value.push(4); // triggers subscriber
+ * console.log(coll.value); // [1, 2, 3, 4]
+ *
+ * // Direct property access also works (proxied)
+ * coll.value[0] = 10; // triggers subscriber
  * ```
  */
 function collection(value, options) {
-    const item = new Collection(value, options);
-    return item.value;
+    return new Collection(value, options);
 }
 
 /**
- * Creates a new ShallowReactive instance. An ShallowReactive is a reactive primitive that holds a value. Same as `shallowReactive` but
- * returns a new ShallowReactive instance.
+ * Creates a new reactive ShallowReactive instance that wraps an object.
+ * The ShallowReactive provides reactivity for property assignments and deletions
+ * on the top level of the object (shallow reactivity).
+ *
+ * This function returns the actual `ShallowReactive` instance, not just the proxy.
+ * To access the reactive object, use the `.value` property.
+ *
  * @template T
- * @param {T} value - The object to observe.
- * @param {object} [options] - Options to configure the observable behavior.
- * @param {string} [options.name] - The name of ShallowReactive object.
- * @returns {T} The observed object
+ * @param {T} value - The object to observe (must be a plain object or an instance).
+ * @param {object} [options] - Configuration options.
+ * @param {string} [options.name] - The name of the ShallowReactive (used for debugging).
+ * @returns {ShallowReactive<T>} The ShallowReactive instance.
+ *
  * @example
  * ```js
- * const obj = shallowReactive({ a: 1, b: 2 });
+ * const reactive = shallowReactive({ a: 1, b: 2 });
  *
- * obj.subscribe(() => {
- *     console.log(obj.value);
- * });
+ * // Subscribe to changes
+ * reactive.subscribe(() => console.log('changed'));
  *
- * obj.value.a = 3;
- * // output: { a: 3, b: 2 }
+ * // Modify the object via .value
+ * reactive.value.a = 3; // triggers subscriber
+ * console.log(reactive.value); // { a: 3, b: 2 }
+ *
+ * // Direct property access also works (proxied)
+ * reactive.value.b = 5; // triggers subscriber
  * ```
  */
 function shallowReactive(value, options) {
     // @ts-ignore
-    const item = new ShallowReactive(value, options);
-    return /** @type {T} */ (item.value);
+    return new ShallowReactive(value, options);
 }
 
 /**
@@ -723,7 +740,7 @@ function shallowReactive(value, options) {
  * ```
  */
 function makeObservable(obj, annotations, options) {
-    /** @type {{[key:string]:ReactivePrimitive}} */
+    /** @type {{[key:string]:ReactiveItem}} */
     const reactiveStore = {};
     const _options = Object.assign({ name: '' }, options);
 
@@ -976,7 +993,7 @@ export {
     batch,
     reaction,
     when,
-    waitTrue,
+    waitUntil,
     getNow,
     fromPromise,
     untrack,

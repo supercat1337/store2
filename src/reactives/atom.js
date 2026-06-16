@@ -2,11 +2,11 @@
 
 import { ATOM } from '../core/Engine.js';
 import { clone } from '../helpers/tools.js';
-import { ReactivePrimitive } from './ReactivePrimitive.js';
+import { ReactiveItem } from './ReactiveItem.js';
 
 /**
  * Atom is a reactive primitive that holds a value. It is the base unit of reactive state.
- * @augments ReactivePrimitive
+ * @augments ReactiveItem
  * @template T
  * @example
  * ```js
@@ -50,7 +50,7 @@ import { ReactivePrimitive } from './ReactivePrimitive.js';
  * // Output: nothing
  * ```
  */
-class Atom extends ReactivePrimitive {
+class Atom extends ReactiveItem {
     /** @type {T} */
     #currentValue;
 
@@ -70,7 +70,7 @@ class Atom extends ReactivePrimitive {
     ) {
         super(ATOM);
 
-        if (value instanceof ReactivePrimitive) {
+        if (value instanceof ReactiveItem) {
             throw new Error(
                 `Atom${this.name ? ` (${this.name})` : ''}: value must not be a reactive item`
             );
@@ -87,7 +87,7 @@ class Atom extends ReactivePrimitive {
      * @param {T} value - The new value to set for the Atom.
      */
     set value(value) {
-        if (value instanceof ReactivePrimitive) {
+        if (value instanceof ReactiveItem) {
             throw new Error(
                 `Atom${this.name ? ` (${this.name})` : ''}: value must not be a reactive item`
             );

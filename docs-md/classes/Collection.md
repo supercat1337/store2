@@ -24,7 +24,7 @@ coll.value.push(4); // triggers reactivity
 
 ## Hierarchy
 
-- [`ReactivePrimitive`](ReactivePrimitive.md)
+- [`ReactiveItem`](ReactiveItem.md)
 
   ↳ **`Collection`**
 
@@ -45,7 +45,6 @@ coll.value.push(4); // triggers reactivity
 
 ### Accessors
 
-- [data](Collection.md#data)
 - [isDestroyed](Collection.md#isdestroyed)
 - [value](Collection.md#value)
 
@@ -96,7 +95,7 @@ Initializes a Collection instance with an initial array.
 
 #### Overrides
 
-[ReactivePrimitive](ReactivePrimitive.md).[constructor](ReactivePrimitive.md#constructor)
+[ReactiveItem](ReactiveItem.md).[constructor](ReactiveItem.md#constructor)
 
 #### Defined in
 
@@ -150,11 +149,11 @@ ___
 
 #### Inherited from
 
-[ReactivePrimitive](ReactivePrimitive.md).[engine](ReactivePrimitive.md#engine)
+[ReactiveItem](ReactiveItem.md).[engine](ReactiveItem.md#engine)
 
 #### Defined in
 
-src/reactives/ReactivePrimitive.js:13
+src/reactives/ReactiveItem.js:13
 
 ___
 
@@ -164,49 +163,13 @@ ___
 
 #### Inherited from
 
-[ReactivePrimitive](ReactivePrimitive.md).[name](ReactivePrimitive.md#name)
+[ReactiveItem](ReactiveItem.md).[name](ReactiveItem.md#name)
 
 #### Defined in
 
 src/reactives/Collection.js:43
 
 ## Accessors
-
-### data
-
-• `get` **data**(): `T`[]
-
-Alias for `value` getter.
-
-#### Returns
-
-`T`[]
-
-The reactive array proxy.
-
-#### Defined in
-
-src/reactives/Collection.js:217
-
-• `set` **data**(`value`): `void`
-
-Alias for `value` setter.
-
-#### Parameters
-
-| Name | Type | Description |
-| :------ | :------ | :------ |
-| `value` | `T`[] | The new array value. |
-
-#### Returns
-
-`void`
-
-#### Defined in
-
-src/reactives/Collection.js:208
-
-___
 
 ### isDestroyed
 
@@ -220,11 +183,11 @@ True if the reactive item has been destroyed, false otherwise.
 
 #### Inherited from
 
-ReactivePrimitive.isDestroyed
+ReactiveItem.isDestroyed
 
 #### Defined in
 
-src/reactives/ReactivePrimitive.js:180
+src/reactives/ReactiveItem.js:180
 
 ___
 
@@ -295,11 +258,11 @@ Removes all subscribers, including listeners for "#has-subscribers" and "#no-sub
 
 #### Inherited from
 
-[ReactivePrimitive](ReactivePrimitive.md).[clearAllSubscribers](ReactivePrimitive.md#clearallsubscribers)
+[ReactiveItem](ReactiveItem.md).[clearAllSubscribers](ReactiveItem.md#clearallsubscribers)
 
 #### Defined in
 
-src/reactives/ReactivePrimitive.js:47
+src/reactives/ReactiveItem.js:47
 
 ___
 
@@ -315,11 +278,11 @@ Removes all "change" subscribers. Listeners for "#has-subscribers" and "#no-subs
 
 #### Inherited from
 
-[ReactivePrimitive](ReactivePrimitive.md).[clearSubscribers](ReactivePrimitive.md#clearsubscribers)
+[ReactiveItem](ReactiveItem.md).[clearSubscribers](ReactiveItem.md#clearsubscribers)
 
 #### Defined in
 
-src/reactives/ReactivePrimitive.js:40
+src/reactives/ReactiveItem.js:40
 
 ___
 
@@ -337,11 +300,11 @@ removes all dependencies, dependents and subscribers, and marks the engine as de
 
 #### Inherited from
 
-[ReactivePrimitive](ReactivePrimitive.md).[destroy](ReactivePrimitive.md#destroy)
+[ReactiveItem](ReactiveItem.md).[destroy](ReactiveItem.md#destroy)
 
 #### Defined in
 
-src/reactives/ReactivePrimitive.js:153
+src/reactives/ReactiveItem.js:153
 
 ___
 
@@ -368,11 +331,11 @@ True if the two values are equal, false otherwise.
 
 #### Inherited from
 
-[ReactivePrimitive](ReactivePrimitive.md).[equals](ReactivePrimitive.md#equals)
+[ReactiveItem](ReactiveItem.md).[equals](ReactiveItem.md#equals)
 
 #### Defined in
 
-src/reactives/ReactivePrimitive.js:165
+src/reactives/ReactiveItem.js:165
 
 ___
 
@@ -391,11 +354,11 @@ The last error that occurred, or null if there is no error.
 
 #### Inherited from
 
-[ReactivePrimitive](ReactivePrimitive.md).[getLastError](ReactivePrimitive.md#getlasterror)
+[ReactiveItem](ReactiveItem.md).[getLastError](ReactiveItem.md#getlasterror)
 
 #### Defined in
 
-src/reactives/ReactivePrimitive.js:90
+src/reactives/ReactiveItem.js:90
 
 ___
 
@@ -414,7 +377,7 @@ The raw array.
 
 #### Defined in
 
-src/reactives/Collection.js:227
+src/reactives/Collection.js:209
 
 ___
 
@@ -440,7 +403,7 @@ The reactive array proxy.
 
 #### Overrides
 
-[ReactivePrimitive](ReactivePrimitive.md).[getValue](ReactivePrimitive.md#getvalue)
+[ReactiveItem](ReactiveItem.md).[getValue](ReactiveItem.md#getvalue)
 
 #### Defined in
 
@@ -466,11 +429,11 @@ reactive item.
 
 #### Inherited from
 
-[ReactivePrimitive](ReactivePrimitive.md).[hasError](ReactivePrimitive.md#haserror)
+[ReactiveItem](ReactiveItem.md).[hasError](ReactiveItem.md#haserror)
 
 #### Defined in
 
-src/reactives/ReactivePrimitive.js:102
+src/reactives/ReactiveItem.js:102
 
 ___
 
@@ -488,11 +451,11 @@ Whether there are any subscribers.
 
 #### Inherited from
 
-[ReactivePrimitive](ReactivePrimitive.md).[hasSubscribers](ReactivePrimitive.md#hassubscribers)
+[ReactiveItem](ReactiveItem.md).[hasSubscribers](ReactiveItem.md#hassubscribers)
 
 #### Defined in
 
-src/reactives/ReactivePrimitive.js:55
+src/reactives/ReactiveItem.js:55
 
 ___
 
@@ -507,7 +470,7 @@ The function is called with no arguments.
 
 | Name | Type | Description |
 | :------ | :------ | :------ |
-| `fn` | (`reactiveItem`: [`ReactivePrimitive`](ReactivePrimitive.md)) => `void` | The function to be called. |
+| `fn` | (`reactiveItem`: [`ReactiveItem`](ReactiveItem.md)) => `void` | The function to be called. |
 
 #### Returns
 
@@ -523,11 +486,11 @@ A function that unsubscribes the given function.
 
 #### Inherited from
 
-[ReactivePrimitive](ReactivePrimitive.md).[onDestroy](ReactivePrimitive.md#ondestroy)
+[ReactiveItem](ReactiveItem.md).[onDestroy](ReactiveItem.md#ondestroy)
 
 #### Defined in
 
-src/reactives/ReactivePrimitive.js:138
+src/reactives/ReactiveItem.js:138
 
 ___
 
@@ -558,11 +521,11 @@ A function that unsubscribes the given function.
 
 #### Inherited from
 
-[ReactivePrimitive](ReactivePrimitive.md).[onHasSubscribers](ReactivePrimitive.md#onhassubscribers)
+[ReactiveItem](ReactiveItem.md).[onHasSubscribers](ReactiveItem.md#onhassubscribers)
 
 #### Defined in
 
-src/reactives/ReactivePrimitive.js:118
+src/reactives/ReactiveItem.js:118
 
 ___
 
@@ -593,11 +556,11 @@ A function that unsubscribes the given function.
 
 #### Inherited from
 
-[ReactivePrimitive](ReactivePrimitive.md).[onNoSubscribers](ReactivePrimitive.md#onnosubscribers)
+[ReactiveItem](ReactiveItem.md).[onNoSubscribers](ReactiveItem.md#onnosubscribers)
 
 #### Defined in
 
-src/reactives/ReactivePrimitive.js:128
+src/reactives/ReactiveItem.js:128
 
 ___
 
@@ -615,11 +578,11 @@ The current value of the reactive item.
 
 #### Inherited from
 
-[ReactivePrimitive](ReactivePrimitive.md).[peekValue](ReactivePrimitive.md#peekvalue)
+[ReactiveItem](ReactiveItem.md).[peekValue](ReactiveItem.md#peekvalue)
 
 #### Defined in
 
-src/reactives/ReactivePrimitive.js:81
+src/reactives/ReactiveItem.js:81
 
 ___
 
@@ -650,8 +613,8 @@ Subscribes a function to be called whenever the value of this reactive item chan
 
 #### Inherited from
 
-[ReactivePrimitive](ReactivePrimitive.md).[subscribe](ReactivePrimitive.md#subscribe)
+[ReactiveItem](ReactiveItem.md).[subscribe](ReactiveItem.md#subscribe)
 
 #### Defined in
 
-src/reactives/ReactivePrimitive.js:33
+src/reactives/ReactiveItem.js:33

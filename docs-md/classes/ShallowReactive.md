@@ -16,7 +16,7 @@ b.subscribe(() => {
     bar += 1;
 });
 
-const props = b.data;
+const props = b.value;
 props.foo = 2;
 
 console.log(bar);
@@ -41,18 +41,18 @@ b.subscribe(() => {
     bar++;
 });
 
-console.log(b.data.foo);
+console.log(b.value.foo);
 // Outputs: 1
 
-b.data.foo = 2;
-console.log(b.data.foo);
+b.value.foo = 2;
+console.log(b.value.foo);
 // Outputs: 2
 
 console.log(bar);
 // Outputs: 1
 
-b.data.inc();
-console.log(b.data.foo);
+b.value.inc();
+console.log(b.value.foo);
 // Outputs: 3
 console.log(bar);
 // Outputs: 2
@@ -66,7 +66,7 @@ console.log(bar);
 
 ## Hierarchy
 
-- [`ReactivePrimitive`](ReactivePrimitive.md)
+- [`ReactiveItem`](ReactiveItem.md)
 
   ↳ **`ShallowReactive`**
 
@@ -86,7 +86,6 @@ console.log(bar);
 
 ### Accessors
 
-- [data](ShallowReactive.md#data)
 - [isDestroyed](ShallowReactive.md#isdestroyed)
 - [value](ShallowReactive.md#value)
 
@@ -137,11 +136,11 @@ Initializes a ShallowReactive instance with a given value.
 
 #### Overrides
 
-[ReactivePrimitive](ReactivePrimitive.md).[constructor](ReactivePrimitive.md#constructor)
+[ReactiveItem](ReactiveItem.md).[constructor](ReactiveItem.md#constructor)
 
 #### Defined in
 
-src/reactives/ShallowReactive.js:80
+[src/reactives/ShallowReactive.js:80](https://github.com/supercat1337/store2/blob/092e7aaba8ac2329715b3d46c6a0217f1d1972eb/src/reactives/ShallowReactive.js#L80)
 
 ## Properties
 
@@ -151,7 +150,7 @@ src/reactives/ShallowReactive.js:80
 
 #### Defined in
 
-src/reactives/ShallowReactive.js:72
+[src/reactives/ShallowReactive.js:72](https://github.com/supercat1337/store2/blob/092e7aaba8ac2329715b3d46c6a0217f1d1972eb/src/reactives/ShallowReactive.js#L72)
 
 ___
 
@@ -161,7 +160,7 @@ ___
 
 #### Defined in
 
-src/reactives/ShallowReactive.js:69
+[src/reactives/ShallowReactive.js:69](https://github.com/supercat1337/store2/blob/092e7aaba8ac2329715b3d46c6a0217f1d1972eb/src/reactives/ShallowReactive.js#L69)
 
 ___
 
@@ -171,7 +170,7 @@ ___
 
 #### Defined in
 
-src/reactives/ShallowReactive.js:66
+[src/reactives/ShallowReactive.js:66](https://github.com/supercat1337/store2/blob/092e7aaba8ac2329715b3d46c6a0217f1d1972eb/src/reactives/ShallowReactive.js#L66)
 
 ___
 
@@ -181,11 +180,11 @@ ___
 
 #### Inherited from
 
-[ReactivePrimitive](ReactivePrimitive.md).[engine](ReactivePrimitive.md#engine)
+[ReactiveItem](ReactiveItem.md).[engine](ReactiveItem.md#engine)
 
 #### Defined in
 
-src/reactives/ReactivePrimitive.js:13
+src/reactives/ReactiveItem.js:13
 
 ___
 
@@ -195,51 +194,13 @@ ___
 
 #### Inherited from
 
-[ReactivePrimitive](ReactivePrimitive.md).[name](ReactivePrimitive.md#name)
+[ReactiveItem](ReactiveItem.md).[name](ReactiveItem.md#name)
 
 #### Defined in
 
-src/reactives/ShallowReactive.js:88
+[src/reactives/ShallowReactive.js:88](https://github.com/supercat1337/store2/blob/092e7aaba8ac2329715b3d46c6a0217f1d1972eb/src/reactives/ShallowReactive.js#L88)
 
 ## Accessors
-
-### data
-
-• `get` **data**(): `T`
-
-Retrieves the proxied value of the ShallowReactive. If the engine is destroyed, an error is thrown.
-Tracks the ShallowReactive for dependency management.
-
-#### Returns
-
-`T`
-
-The proxied value of the ShallowReactive.
-
-#### Defined in
-
-src/reactives/ShallowReactive.js:237
-
-• `set` **data**(`value`): `void`
-
-Sets the value of the ShallowReactive. If the value is an object, it will be proxied and reactive.
-This is a synonym for `set value(value)`.
-
-#### Parameters
-
-| Name | Type | Description |
-| :------ | :------ | :------ |
-| `value` | `T` | The new value of the ShallowReactive. |
-
-#### Returns
-
-`void`
-
-#### Defined in
-
-src/reactives/ShallowReactive.js:219
-
-___
 
 ### isDestroyed
 
@@ -253,11 +214,11 @@ True if the reactive item has been destroyed, false otherwise.
 
 #### Inherited from
 
-ReactivePrimitive.isDestroyed
+ReactiveItem.isDestroyed
 
 #### Defined in
 
-src/reactives/ReactivePrimitive.js:180
+src/reactives/ReactiveItem.js:180
 
 ___
 
@@ -276,7 +237,7 @@ The proxied value of the ShallowReactive.
 
 #### Defined in
 
-src/reactives/ShallowReactive.js:228
+[src/reactives/ShallowReactive.js:219](https://github.com/supercat1337/store2/blob/092e7aaba8ac2329715b3d46c6a0217f1d1972eb/src/reactives/ShallowReactive.js#L219)
 
 • `set` **value**(`value`): `void`
 
@@ -294,7 +255,7 @@ Sets the value of the ShallowReactive. If the value is an object, it will be pro
 
 #### Defined in
 
-src/reactives/ShallowReactive.js:210
+[src/reactives/ShallowReactive.js:210](https://github.com/supercat1337/store2/blob/092e7aaba8ac2329715b3d46c6a0217f1d1972eb/src/reactives/ShallowReactive.js#L210)
 
 ## Methods
 
@@ -314,7 +275,7 @@ src/reactives/ShallowReactive.js:210
 
 #### Defined in
 
-src/reactives/ShallowReactive.js:101
+[src/reactives/ShallowReactive.js:101](https://github.com/supercat1337/store2/blob/092e7aaba8ac2329715b3d46c6a0217f1d1972eb/src/reactives/ShallowReactive.js#L101)
 
 ___
 
@@ -330,11 +291,11 @@ Removes all subscribers, including listeners for "#has-subscribers" and "#no-sub
 
 #### Inherited from
 
-[ReactivePrimitive](ReactivePrimitive.md).[clearAllSubscribers](ReactivePrimitive.md#clearallsubscribers)
+[ReactiveItem](ReactiveItem.md).[clearAllSubscribers](ReactiveItem.md#clearallsubscribers)
 
 #### Defined in
 
-src/reactives/ReactivePrimitive.js:47
+src/reactives/ReactiveItem.js:47
 
 ___
 
@@ -350,11 +311,11 @@ Removes all "change" subscribers. Listeners for "#has-subscribers" and "#no-subs
 
 #### Inherited from
 
-[ReactivePrimitive](ReactivePrimitive.md).[clearSubscribers](ReactivePrimitive.md#clearsubscribers)
+[ReactiveItem](ReactiveItem.md).[clearSubscribers](ReactiveItem.md#clearsubscribers)
 
 #### Defined in
 
-src/reactives/ReactivePrimitive.js:40
+src/reactives/ReactiveItem.js:40
 
 ___
 
@@ -372,11 +333,11 @@ removes all dependencies, dependents and subscribers, and marks the engine as de
 
 #### Inherited from
 
-[ReactivePrimitive](ReactivePrimitive.md).[destroy](ReactivePrimitive.md#destroy)
+[ReactiveItem](ReactiveItem.md).[destroy](ReactiveItem.md#destroy)
 
 #### Defined in
 
-src/reactives/ReactivePrimitive.js:153
+src/reactives/ReactiveItem.js:153
 
 ___
 
@@ -403,11 +364,11 @@ True if the two values are equal, false otherwise.
 
 #### Inherited from
 
-[ReactivePrimitive](ReactivePrimitive.md).[equals](ReactivePrimitive.md#equals)
+[ReactiveItem](ReactiveItem.md).[equals](ReactiveItem.md#equals)
 
 #### Defined in
 
-src/reactives/ReactivePrimitive.js:165
+src/reactives/ReactiveItem.js:165
 
 ___
 
@@ -426,11 +387,11 @@ The last error that occurred, or null if there is no error.
 
 #### Inherited from
 
-[ReactivePrimitive](ReactivePrimitive.md).[getLastError](ReactivePrimitive.md#getlasterror)
+[ReactiveItem](ReactiveItem.md).[getLastError](ReactiveItem.md#getlasterror)
 
 #### Defined in
 
-src/reactives/ReactivePrimitive.js:90
+src/reactives/ReactiveItem.js:90
 
 ___
 
@@ -448,7 +409,7 @@ The raw, unproxied value of the ShallowReactive.
 
 #### Defined in
 
-src/reactives/ShallowReactive.js:245
+[src/reactives/ShallowReactive.js:227](https://github.com/supercat1337/store2/blob/092e7aaba8ac2329715b3d46c6a0217f1d1972eb/src/reactives/ShallowReactive.js#L227)
 
 ___
 
@@ -474,11 +435,11 @@ The proxied value of the ShallowReactive.
 
 #### Overrides
 
-[ReactivePrimitive](ReactivePrimitive.md).[getValue](ReactivePrimitive.md#getvalue)
+[ReactiveItem](ReactiveItem.md).[getValue](ReactiveItem.md#getvalue)
 
 #### Defined in
 
-src/reactives/ShallowReactive.js:177
+[src/reactives/ShallowReactive.js:177](https://github.com/supercat1337/store2/blob/092e7aaba8ac2329715b3d46c6a0217f1d1972eb/src/reactives/ShallowReactive.js#L177)
 
 ___
 
@@ -500,11 +461,11 @@ reactive item.
 
 #### Inherited from
 
-[ReactivePrimitive](ReactivePrimitive.md).[hasError](ReactivePrimitive.md#haserror)
+[ReactiveItem](ReactiveItem.md).[hasError](ReactiveItem.md#haserror)
 
 #### Defined in
 
-src/reactives/ReactivePrimitive.js:102
+src/reactives/ReactiveItem.js:102
 
 ___
 
@@ -522,11 +483,11 @@ Whether there are any subscribers.
 
 #### Inherited from
 
-[ReactivePrimitive](ReactivePrimitive.md).[hasSubscribers](ReactivePrimitive.md#hassubscribers)
+[ReactiveItem](ReactiveItem.md).[hasSubscribers](ReactiveItem.md#hassubscribers)
 
 #### Defined in
 
-src/reactives/ReactivePrimitive.js:55
+src/reactives/ReactiveItem.js:55
 
 ___
 
@@ -541,7 +502,7 @@ The function is called with no arguments.
 
 | Name | Type | Description |
 | :------ | :------ | :------ |
-| `fn` | (`reactiveItem`: [`ReactivePrimitive`](ReactivePrimitive.md)) => `void` | The function to be called. |
+| `fn` | (`reactiveItem`: [`ReactiveItem`](ReactiveItem.md)) => `void` | The function to be called. |
 
 #### Returns
 
@@ -557,11 +518,11 @@ A function that unsubscribes the given function.
 
 #### Inherited from
 
-[ReactivePrimitive](ReactivePrimitive.md).[onDestroy](ReactivePrimitive.md#ondestroy)
+[ReactiveItem](ReactiveItem.md).[onDestroy](ReactiveItem.md#ondestroy)
 
 #### Defined in
 
-src/reactives/ReactivePrimitive.js:138
+src/reactives/ReactiveItem.js:138
 
 ___
 
@@ -592,11 +553,11 @@ A function that unsubscribes the given function.
 
 #### Inherited from
 
-[ReactivePrimitive](ReactivePrimitive.md).[onHasSubscribers](ReactivePrimitive.md#onhassubscribers)
+[ReactiveItem](ReactiveItem.md).[onHasSubscribers](ReactiveItem.md#onhassubscribers)
 
 #### Defined in
 
-src/reactives/ReactivePrimitive.js:118
+src/reactives/ReactiveItem.js:118
 
 ___
 
@@ -627,11 +588,11 @@ A function that unsubscribes the given function.
 
 #### Inherited from
 
-[ReactivePrimitive](ReactivePrimitive.md).[onNoSubscribers](ReactivePrimitive.md#onnosubscribers)
+[ReactiveItem](ReactiveItem.md).[onNoSubscribers](ReactiveItem.md#onnosubscribers)
 
 #### Defined in
 
-src/reactives/ReactivePrimitive.js:128
+src/reactives/ReactiveItem.js:128
 
 ___
 
@@ -649,11 +610,11 @@ The current value of the reactive item.
 
 #### Inherited from
 
-[ReactivePrimitive](ReactivePrimitive.md).[peekValue](ReactivePrimitive.md#peekvalue)
+[ReactiveItem](ReactiveItem.md).[peekValue](ReactiveItem.md#peekvalue)
 
 #### Defined in
 
-src/reactives/ReactivePrimitive.js:81
+src/reactives/ReactiveItem.js:81
 
 ___
 
@@ -675,7 +636,7 @@ Sets the value of the ShallowReactive. If the value is an object, it will be pro
 
 #### Defined in
 
-src/reactives/ShallowReactive.js:186
+[src/reactives/ShallowReactive.js:186](https://github.com/supercat1337/store2/blob/092e7aaba8ac2329715b3d46c6a0217f1d1972eb/src/reactives/ShallowReactive.js#L186)
 
 ___
 
@@ -706,8 +667,8 @@ Subscribes a function to be called whenever the value of this reactive item chan
 
 #### Inherited from
 
-[ReactivePrimitive](ReactivePrimitive.md).[subscribe](ReactivePrimitive.md#subscribe)
+[ReactiveItem](ReactiveItem.md).[subscribe](ReactiveItem.md#subscribe)
 
 #### Defined in
 
-src/reactives/ReactivePrimitive.js:33
+src/reactives/ReactiveItem.js:33

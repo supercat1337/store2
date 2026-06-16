@@ -3,7 +3,7 @@
 import { EventEmitterExt } from '@supercat1337/event-emitter-ext';
 
 class ModeControllerService {
-    computedMode = false;
+    isComputing = false;
     untrackMode = false;
     throwErrorInSubscribers = true;
 

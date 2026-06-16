@@ -1,13 +1,13 @@
-[@supercat1337/store2](../README.md) / [Modules](../modules.md) / ReactivePrimitive
+[@supercat1337/store2](../README.md) / [Modules](../modules.md) / ReactiveItem
 
-# Class: ReactivePrimitive
+# Class: ReactiveItem
 
-ReactivePrimitive is the base class for all reactive items. It provides methods for subscribing to changes,
+ReactiveItem is the base class for all reactive items. It provides methods for subscribing to changes,
 getting the current value, and checking for errors.
 
 ## Hierarchy
 
-- **`ReactivePrimitive`**
+- **`ReactiveItem`**
 
   ↳ [`Atom`](Atom.md)
 
@@ -21,38 +21,38 @@ getting the current value, and checking for errors.
 
 ### Constructors
 
-- [constructor](ReactivePrimitive.md#constructor)
+- [constructor](ReactiveItem.md#constructor)
 
 ### Properties
 
-- [engine](ReactivePrimitive.md#engine)
-- [name](ReactivePrimitive.md#name)
+- [engine](ReactiveItem.md#engine)
+- [name](ReactiveItem.md#name)
 
 ### Accessors
 
-- [isDestroyed](ReactivePrimitive.md#isdestroyed)
+- [isDestroyed](ReactiveItem.md#isdestroyed)
 
 ### Methods
 
-- [clearAllSubscribers](ReactivePrimitive.md#clearallsubscribers)
-- [clearSubscribers](ReactivePrimitive.md#clearsubscribers)
-- [destroy](ReactivePrimitive.md#destroy)
-- [equals](ReactivePrimitive.md#equals)
-- [getLastError](ReactivePrimitive.md#getlasterror)
-- [getValue](ReactivePrimitive.md#getvalue)
-- [hasError](ReactivePrimitive.md#haserror)
-- [hasSubscribers](ReactivePrimitive.md#hassubscribers)
-- [onDestroy](ReactivePrimitive.md#ondestroy)
-- [onHasSubscribers](ReactivePrimitive.md#onhassubscribers)
-- [onNoSubscribers](ReactivePrimitive.md#onnosubscribers)
-- [peekValue](ReactivePrimitive.md#peekvalue)
-- [subscribe](ReactivePrimitive.md#subscribe)
+- [clearAllSubscribers](ReactiveItem.md#clearallsubscribers)
+- [clearSubscribers](ReactiveItem.md#clearsubscribers)
+- [destroy](ReactiveItem.md#destroy)
+- [equals](ReactiveItem.md#equals)
+- [getLastError](ReactiveItem.md#getlasterror)
+- [getValue](ReactiveItem.md#getvalue)
+- [hasError](ReactiveItem.md#haserror)
+- [hasSubscribers](ReactiveItem.md#hassubscribers)
+- [onDestroy](ReactiveItem.md#ondestroy)
+- [onHasSubscribers](ReactiveItem.md#onhassubscribers)
+- [onNoSubscribers](ReactiveItem.md#onnosubscribers)
+- [peekValue](ReactiveItem.md#peekvalue)
+- [subscribe](ReactiveItem.md#subscribe)
 
 ## Constructors
 
 ### constructor
 
-• **new ReactivePrimitive**(`type`): [`ReactivePrimitive`](ReactivePrimitive.md)
+• **new ReactiveItem**(`type`): [`ReactiveItem`](ReactiveItem.md)
 
 #### Parameters
 
@@ -62,11 +62,11 @@ getting the current value, and checking for errors.
 
 #### Returns
 
-[`ReactivePrimitive`](ReactivePrimitive.md)
+[`ReactiveItem`](ReactiveItem.md)
 
 #### Defined in
 
-src/reactives/ReactivePrimitive.js:21
+src/reactives/ReactiveItem.js:21
 
 ## Properties
 
@@ -76,7 +76,7 @@ src/reactives/ReactivePrimitive.js:21
 
 #### Defined in
 
-src/reactives/ReactivePrimitive.js:13
+src/reactives/ReactiveItem.js:13
 
 ___
 
@@ -86,7 +86,7 @@ ___
 
 #### Defined in
 
-src/reactives/ReactivePrimitive.js:15
+src/reactives/ReactiveItem.js:15
 
 ## Accessors
 
@@ -102,7 +102,7 @@ True if the reactive item has been destroyed, false otherwise.
 
 #### Defined in
 
-src/reactives/ReactivePrimitive.js:180
+src/reactives/ReactiveItem.js:180
 
 ## Methods
 
@@ -118,7 +118,7 @@ Removes all subscribers, including listeners for "#has-subscribers" and "#no-sub
 
 #### Defined in
 
-src/reactives/ReactivePrimitive.js:47
+src/reactives/ReactiveItem.js:47
 
 ___
 
@@ -134,7 +134,7 @@ Removes all "change" subscribers. Listeners for "#has-subscribers" and "#no-subs
 
 #### Defined in
 
-src/reactives/ReactivePrimitive.js:40
+src/reactives/ReactiveItem.js:40
 
 ___
 
@@ -152,7 +152,7 @@ removes all dependencies, dependents and subscribers, and marks the engine as de
 
 #### Defined in
 
-src/reactives/ReactivePrimitive.js:153
+src/reactives/ReactiveItem.js:153
 
 ___
 
@@ -179,7 +179,7 @@ True if the two values are equal, false otherwise.
 
 #### Defined in
 
-src/reactives/ReactivePrimitive.js:165
+src/reactives/ReactiveItem.js:165
 
 ___
 
@@ -198,7 +198,7 @@ The last error that occurred, or null if there is no error.
 
 #### Defined in
 
-src/reactives/ReactivePrimitive.js:90
+src/reactives/ReactiveItem.js:90
 
 ___
 
@@ -223,7 +223,7 @@ The current value of the reactive item.
 
 #### Defined in
 
-src/reactives/ReactivePrimitive.js:65
+src/reactives/ReactiveItem.js:65
 
 ___
 
@@ -245,7 +245,7 @@ reactive item.
 
 #### Defined in
 
-src/reactives/ReactivePrimitive.js:102
+src/reactives/ReactiveItem.js:102
 
 ___
 
@@ -263,7 +263,7 @@ Whether there are any subscribers.
 
 #### Defined in
 
-src/reactives/ReactivePrimitive.js:55
+src/reactives/ReactiveItem.js:55
 
 ___
 
@@ -278,7 +278,7 @@ The function is called with no arguments.
 
 | Name | Type | Description |
 | :------ | :------ | :------ |
-| `fn` | (`reactiveItem`: [`ReactivePrimitive`](ReactivePrimitive.md)) => `void` | The function to be called. |
+| `fn` | (`reactiveItem`: [`ReactiveItem`](ReactiveItem.md)) => `void` | The function to be called. |
 
 #### Returns
 
@@ -294,7 +294,7 @@ A function that unsubscribes the given function.
 
 #### Defined in
 
-src/reactives/ReactivePrimitive.js:138
+src/reactives/ReactiveItem.js:138
 
 ___
 
@@ -325,7 +325,7 @@ A function that unsubscribes the given function.
 
 #### Defined in
 
-src/reactives/ReactivePrimitive.js:118
+src/reactives/ReactiveItem.js:118
 
 ___
 
@@ -356,7 +356,7 @@ A function that unsubscribes the given function.
 
 #### Defined in
 
-src/reactives/ReactivePrimitive.js:128
+src/reactives/ReactiveItem.js:128
 
 ___
 
@@ -374,7 +374,7 @@ The current value of the reactive item.
 
 #### Defined in
 
-src/reactives/ReactivePrimitive.js:81
+src/reactives/ReactiveItem.js:81
 
 ___
 
@@ -405,4 +405,4 @@ Subscribes a function to be called whenever the value of this reactive item chan
 
 #### Defined in
 
-src/reactives/ReactivePrimitive.js:33
+src/reactives/ReactiveItem.js:33

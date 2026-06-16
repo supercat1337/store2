@@ -49,8 +49,8 @@ const idService = new IdService();
  * Sorts reactive items by their internal id. This is used to
  * ensure that reactive items are processed in a consistent order
  * when they are notified of changes.
- * @param {ReactivePrimitive} a - The first item to compare
- * @param {ReactivePrimitive} b - The second item to compare
+ * @param {ReactiveItem} a - The first item to compare
+ * @param {ReactiveItem} b - The second item to compare
  * @returns {number} -1 if a should come before b, 0 if a and b are equal, 1 if a should come after b
  */
 function sortReactiveItems(a, b) {
@@ -419,7 +419,7 @@ class SubscribeController {
 
 
 class ModeControllerService {
-    computedMode = false;
+    isComputing = false;
     untrackMode = false;
     throwErrorInSubscribers = true;
 
@@ -531,13 +531,13 @@ const modeController = new ModeControllerService();
  * Handles batching, dependency recalculation, and error aggregation.
  */
 class ChangedItemsController {
-    /** @type {Set<ReactivePrimitive>} */
+    /** @type {Set<ReactiveItem>} */
     items = new Set();
 
     /**
      * Adds a reactive item to the set of changed items.
      * If not in batch mode, immediately runs subscribers and clears the set.
-     * @param {ReactivePrimitive} item - The reactive item that changed.
+     * @param {ReactiveItem} item - The reactive item that changed.
      */
     addItem(item) {
         this.items.add(item);
@@ -548,7 +548,7 @@ class ChangedItemsController {
     }
 
     /**
-     * @param {ReactivePrimitive} item
+     * @param {ReactiveItem} item
      */
     removeItem(item) {
         this.items.delete(item);
@@ -568,7 +568,7 @@ class ChangedItemsController {
      * Handles errors and aggregates them if multiple occur.
      */
     runSubscribers() {
-        /** @type {Set<ReactivePrimitive>} */
+        /** @type {Set<ReactiveItem>} */
         const changedItemsWithUpdates = new Set();
 
         // get atoms whose value has changed. compare values
@@ -578,13 +578,13 @@ class ChangedItemsController {
                     changedItemsWithUpdates.add(item);
                 }
             } else {
-                if (item.engine.checkChangesOldValues()) {
+                if (item.engine.hasUpdates()) {
                     changedItemsWithUpdates.add(item);
                 }
             }
         });
 
-        /** @type {Set<ReactivePrimitive>} */
+        /** @type {Set<ReactiveItem>} */
         const itemsToRecalc = new Set();
 
         // get reactive items whose dependents have subscribers
@@ -614,7 +614,7 @@ class ChangedItemsController {
             });
         } else {
             this.items.forEach(item => {
-                if (item.engine.checkChangesOldValues()) {
+                if (item.engine.hasUpdates()) {
                     changedItemsWithUpdates.add(item);
                 }
             });
@@ -684,7 +684,7 @@ const changedItemsController = new ChangedItemsController();
 
 class UpdateDataRecord {
     /** @type {"set"|"delete"} */
-    verb;
+    type;
 
     /** @type {any} */
     value;
@@ -692,18 +692,18 @@ class UpdateDataRecord {
     /** @type {any} */
     oldValue;
 
-    /** @type {ReactivePrimitive|undefined} */
+    /** @type {ReactiveItem|undefined} */
     reactiveItem;
 
     /**
-     * Initializes an instance of UpdateDataRecord with the provided verb, old value, and new value.
-     * @param {"set"|"delete"} verb - The action performed, either "set" or "delete".
+     * Initializes an instance of UpdateDataRecord with the provided type, old value, and new value.
+     * @param {"set"|"delete"} type - The action performed, either "set" or "delete".
      * @param {any} oldValue - The previous value before the update.
      * @param {any} value - The new value after the update.
-     * @param {ReactivePrimitive} [reactiveItem] - The reactive item that triggered the update.
+     * @param {ReactiveItem} [reactiveItem] - The reactive item that triggered the update.
      */
-    constructor(verb, oldValue, value, reactiveItem) {
-        this.verb = verb;
+    constructor(type, oldValue, value, reactiveItem) {
+        this.type = type;
         this.oldValue = oldValue;
         this.value = value;
         this.reactiveItem = reactiveItem;
@@ -763,13 +763,13 @@ class BatchSnapshot {
     /**
      * Reference to the reactive item this snapshot belongs to.
      * Used to access the equality comparison function.
-     * @type {ReactivePrimitive}
+     * @type {ReactiveItem}
      */
     #reactiveItem;
 
     /**
      * Creates a new BatchSnapshot instance.
-     * @param {ReactivePrimitive} reactiveItem - The reactive item to snapshot.
+     * @param {ReactiveItem} reactiveItem - The reactive item to snapshot.
      */
     constructor(reactiveItem) {
         this.#reactiveItem = reactiveItem;
@@ -856,13 +856,13 @@ const SHALLOW_REACTIVE = 4;
 class Engine {
     /**
      * The set of dependencies of the engine.
-     * @type {Set<ReactivePrimitive>}
+     * @type {Set<ReactiveItem>}
      */
     dependencies = new Set();
 
     /**
      * The set of dependents of the engine.
-     * @type {Set<ReactivePrimitive>}
+     * @type {Set<ReactiveItem>}
      */
     dependents = new Set();
 
@@ -880,7 +880,7 @@ class Engine {
 
     /**
      * Reference to the reactive item.
-     * @type {ReactivePrimitive}
+     * @type {ReactiveItem}
      */
     reactiveItem;
 
@@ -935,7 +935,7 @@ class Engine {
 
     /**
      * Creates an Engine instance.
-     * @param {ReactivePrimitive} reactiveItem - The reactive item.
+     * @param {ReactiveItem} reactiveItem - The reactive item.
      * @param {ATOM|COMPUTED|COLLECTION|SHALLOW_REACTIVE} type - The type.
      */
     constructor(reactiveItem, type) {
@@ -1002,12 +1002,12 @@ class Engine {
     /**
      * Commits a change: creates an UpdateDataRecord, adds to updates, and schedules notification.
      * @param {string} property - The property key.
-     * @param {"set"|"delete"} verb - The operation.
+     * @param {"set"|"delete"} type - The operation.
      * @param {any} oldValue - The previous value (immediate before this change).
      * @param {any} newValue - The new value.
      * @returns {boolean} True if committed (i.e., value actually changed).
      */
-    #commitChange(property, verb, oldValue, newValue) {
+    #commitChange(property, type, oldValue, newValue) {
         let reportedOld = oldValue;
         let compareOld = oldValue;
         if (modeController.batchMode && this.#batchSnapshot?.has(property)) {
@@ -1042,7 +1042,7 @@ class Engine {
         }
 
         // 4. Создаём или обновляем запись в updates
-        const record = new UpdateDataRecord(verb, reportedOld, newValue, this.reactiveItem);
+        const record = new UpdateDataRecord(type, reportedOld, newValue, this.reactiveItem);
         this.updates.set(property, record);
         this.version++;
         return true;
@@ -1051,19 +1051,19 @@ class Engine {
     /**
      * Legacy method for backward compatibility. Delegates to recordChange + #commitChange.
      * @param {string} property - The property key.
-     * @param {"set"|"delete"} verb - The operation.
+     * @param {"set"|"delete"} type - The operation.
      * @param {any} oldValue - The previous value.
      * @param {any} value - The new value.
      * @returns {boolean} True if an update was added.
      */
-    addUpdate(property, verb, oldValue, value) {
+    addUpdate(property, type, oldValue, value) {
         this.#recordChange(property, oldValue);
-        return this.#commitChange(property, verb, oldValue, value);
+        return this.#commitChange(property, type, oldValue, value);
     }
 
     /**
      * Adds dependencies to this engine.
-     * @param {Set<ReactivePrimitive>} dependencies
+     * @param {Set<ReactiveItem>} dependencies
      */
     addDependencies(dependencies) {
         const array = [];
@@ -1081,7 +1081,7 @@ class Engine {
 
     /**
      * Adds a single dependency.
-     * @param {ReactivePrimitive} dependency
+     * @param {ReactiveItem} dependency
      */
     addDependency(dependency) {
         if (!this.dependencies.has(dependency)) {
@@ -1091,7 +1091,7 @@ class Engine {
 
     /**
      * Adds a dependent.
-     * @param {ReactivePrimitive} dependent
+     * @param {ReactiveItem} dependent
      * @returns {boolean}
      */
     addDependent(dependent) {
@@ -1106,7 +1106,7 @@ class Engine {
 
     /**
      * Removes a dependent.
-     * @param {ReactivePrimitive} dependent
+     * @param {ReactiveItem} dependent
      */
     removeDependent(dependent) {
         this.dependents.delete(dependent);
@@ -1114,7 +1114,7 @@ class Engine {
 
     /**
      * Returns all dependents recursively.
-     * @returns {Set<ReactivePrimitive>}
+     * @returns {Set<ReactiveItem>}
      */
     getDeepDependents() {
         const result = new Set();
@@ -1138,7 +1138,7 @@ class Engine {
 
     /**
      * Returns sorted array of deep dependents.
-     * @returns {Array<ReactivePrimitive>}
+     * @returns {Array<ReactiveItem>}
      */
     getDeepDependentsArray() {
         const array = Array.from(this.getDeepDependents());
@@ -1149,7 +1149,7 @@ class Engine {
     /**
      * Notifies dependents of a message.
      * @param {EngineMessages} message
-     * @param {{sender: ReactivePrimitive, recipients: Set<ReactivePrimitive>}} [ctx]
+     * @param {{sender: ReactiveItem, recipients: Set<ReactiveItem>}} [ctx]
      */
     notifyDependents(message, ctx) {
         if (ctx === undefined) {
@@ -1164,7 +1164,7 @@ class Engine {
     /**
      * Notifies dependencies (reverse direction).
      * @param {EngineMessages} message
-     * @param {{sender: ReactivePrimitive, recipients: Set<ReactivePrimitive>}} ctx
+     * @param {{sender: ReactiveItem, recipients: Set<ReactiveItem>}} ctx
      */
     notifyDependencies(message, ctx) {
         for (const dependency of this.dependencies) {
@@ -1176,7 +1176,7 @@ class Engine {
     /**
      * Handles incoming messages.
      * @param {EngineMessages} message
-     * @param {{sender: ReactivePrimitive, recipients: Set<ReactivePrimitive>}} ctx
+     * @param {{sender: ReactiveItem, recipients: Set<ReactiveItem>}} ctx
      */
     getMessage(message, ctx) {
         switch (message) {
@@ -1201,7 +1201,7 @@ class Engine {
     /**
      * Sets an error and notifies dependents.
      * @param {Error|null} error
-     * @param {{sender: ReactivePrimitive, recipients: Set<ReactivePrimitive>}} [ctx]
+     * @param {{sender: ReactiveItem, recipients: Set<ReactiveItem>}} [ctx]
      */
     setError(error, ctx) {
         if (error === null) {
@@ -1225,7 +1225,7 @@ class Engine {
 
     /**
      * Destroys the engine.
-     * @param {{sender: ReactivePrimitive, recipients: Set<ReactivePrimitive>}} [ctx]
+     * @param {{sender: ReactiveItem, recipients: Set<ReactiveItem>}} [ctx]
      */
     destroy(ctx) {
         if (this.isDestroyed) {
@@ -1261,14 +1261,6 @@ class Engine {
      */
     hasUpdates() {
         return this.updates.size > 0;
-    }
-
-    /**
-     * Legacy method for compatibility.
-     * @returns {boolean}
-     */
-    checkChangesOldValues() {
-        return this.hasUpdates();
     }
 
     /**
@@ -1334,7 +1326,7 @@ class Engine {
 
     /**
      * Updates dependencies to a new set.
-     * @param {Set<ReactivePrimitive>} newDeps
+     * @param {Set<ReactiveItem>} newDeps
      */
     updateDependencies(newDeps) {
         // Remove old dependencies no longer needed
@@ -1359,7 +1351,7 @@ class Engine {
 
 class Tracker {
     #isActive = false;
-    /** @type {Set<ReactivePrimitive>} */
+    /** @type {Set<ReactiveItem>} */
     #store = new Set();
     #eventEmitter = new EventEmitterLite();
 
@@ -1369,7 +1361,7 @@ class Tracker {
     /**
      * Returns the current contents of the tracker's store, which is a set of all reactive items that have been
      * accessed since the tracker was last turned on. This is useful for debugging and testing purposes.
-     * @returns {Set<ReactivePrimitive>} The current contents of the tracker's store.
+     * @returns {Set<ReactiveItem>} The current contents of the tracker's store.
      */
     get data() {
         return new Set([...this.#store]);
@@ -1379,7 +1371,7 @@ class Tracker {
     /**
      * Returns a sorted array of all reactive items in the tracker's store. The items are sorted by their internal id,
      * ensuring consistent processing order when notified of changes.
-     * @returns {Array<ReactivePrimitive>} A sorted array of reactive items.
+     * @returns {Array<ReactiveItem>} A sorted array of reactive items.
      */
     getAsSortedArray() {
         return Array.from(this.#store).sort(sortReactiveItems);
@@ -1388,7 +1380,7 @@ class Tracker {
     /**
      * Adds a reactive item to the tracker's store if the tracker is turned on. If the tracker is not turned on, this
      * method does nothing.
-     * @param {ReactivePrimitive} item - The reactive item to add to the tracker's store.
+     * @param {ReactiveItem} item - The reactive item to add to the tracker's store.
      * @param {string} [_key=""]
      */
     add(item, _key = '') {
@@ -1404,7 +1396,7 @@ class Tracker {
 
     /**
      *
-     * @param {(reactiveItem:ReactivePrimitive)=>void} callback
+     * @param {(reactiveItem:ReactiveItem)=>void} callback
      * @returns {()=>void}
      */
     onAdd(callback) {
@@ -1425,7 +1417,7 @@ class Tracker {
      * are tracked. If filter is a function, it is called with each reactive item as its argument, and if it returns false, the
      * reactive item is not tracked.
      */
-    turnOn(ctx = {}) {
+    enable(ctx = {}) {
         if (this.#isActive) {
             throw new Error('The tracker is already turned on');
         }
@@ -1439,7 +1431,7 @@ class Tracker {
      * Disables the tracker. When the tracker is disabled, it will not watch any set operations and will not report
      * anything to any registered listeners. The tracker is off by default.
      */
-    turnOff() {
+    disable() {
         this.#isActive = false;
     }
 }
@@ -1455,14 +1447,14 @@ const dependencyTracker = new Tracker();
  * Returns a Set of used reactive items.
  * @param {Function} fn - The function to execute and track.
  * @param {...any} args - Arguments to pass to the function.
- * @returns {Set<ReactivePrimitive>} Set of reactive items accessed.
+ * @returns {Set<ReactiveItem>} Set of reactive items accessed.
  */
 function getSetOfUsedReactiveItems(fn, ...args) {
-    dependencyTracker.turnOn();
+    dependencyTracker.enable();
     try {
         fn(...args);
     } finally {
-        dependencyTracker.turnOff();
+        dependencyTracker.disable();
     }
     return dependencyTracker.data;
 }
@@ -1471,11 +1463,11 @@ function getSetOfUsedReactiveItems(fn, ...args) {
 
 
 /**
- * ReactivePrimitive is the base class for all reactive items. It provides methods for subscribing to changes,
+ * ReactiveItem is the base class for all reactive items. It provides methods for subscribing to changes,
  * getting the current value, and checking for errors.
  * @private
  */
-class ReactivePrimitive {
+class ReactiveItem {
     engine;
 
     name = '';
@@ -1490,7 +1482,7 @@ class ReactivePrimitive {
 
     /**
      * Subscribes a function to be called whenever the value of this reactive item changes.
-     * @param {(updates: Map<string, import("./../core/UpdateDataRecord.js").UpdateDataRecord>)=>void} fn - The function to be called whenever the value of this reactive item changes.
+     * @param {(updates: Map<string, import("../core/UpdateDataRecord.js").UpdateDataRecord>)=>void} fn - The function to be called whenever the value of this reactive item changes.
      * @param {object} [options] - Optional options.
      * @param {number} [options.delay] - The delay in milliseconds before the function is called.
      * @param {AbortSignal} [options.signal] - The signal to abort the subscription.
@@ -1598,7 +1590,7 @@ class ReactivePrimitive {
     /**
      * Subscribes a function to be called when the reactive item is destroyed.
      * The function is called with no arguments.
-     * @param {(reactiveItem:ReactivePrimitive)=>void} fn - The function to be called.
+     * @param {(reactiveItem:ReactiveItem)=>void} fn - The function to be called.
      * @returns {()=>void} A function that unsubscribes the given function.
      */
     onDestroy(fn) {
@@ -1653,7 +1645,7 @@ class ReactivePrimitive {
 
 /**
  * Atom is a reactive primitive that holds a value. It is the base unit of reactive state.
- * @augments ReactivePrimitive
+ * @augments ReactiveItem
  * @template T
  * @example
  * ```js
@@ -1697,7 +1689,7 @@ class ReactivePrimitive {
  * // Output: nothing
  * ```
  */
-class Atom extends ReactivePrimitive {
+class Atom extends ReactiveItem {
     /** @type {T} */
     #currentValue;
 
@@ -1717,7 +1709,7 @@ class Atom extends ReactivePrimitive {
     ) {
         super(ATOM);
 
-        if (value instanceof ReactivePrimitive) {
+        if (value instanceof ReactiveItem) {
             throw new Error(
                 `Atom${this.name ? ` (${this.name})` : ''}: value must not be a reactive item`
             );
@@ -1734,7 +1726,7 @@ class Atom extends ReactivePrimitive {
      * @param {T} value - The new value to set for the Atom.
      */
     set value(value) {
-        if (value instanceof ReactivePrimitive) {
+        if (value instanceof ReactiveItem) {
             throw new Error(
                 `Atom${this.name ? ` (${this.name})` : ''}: value must not be a reactive item`
             );
@@ -1812,7 +1804,7 @@ class Atom extends ReactivePrimitive {
 /**
  * Computed is a reactive primitive that holds a value that is computed from other reactive values.
  * It is the base unit of reactive state.
- * @augments ReactivePrimitive
+ * @augments ReactiveItem
  * @template {unknown} T
  * @example
  * ```js
@@ -1856,7 +1848,7 @@ class Atom extends ReactivePrimitive {
  * // Output: nothing
  * ```
  */
-class Computed extends ReactivePrimitive {
+class Computed extends ReactiveItem {
     /** @type {T} */
     #currentValue;
 
@@ -1931,13 +1923,13 @@ class Computed extends ReactivePrimitive {
     }
 
     #collectDependenciesAndInitValue() {
-        dependencyTracker.turnOn();
-        modeController.computedMode = true;
+        dependencyTracker.enable();
+        modeController.isComputing = true;
         /** @type {T} */
         let value;
         try {
             value = this.#fn();
-            if (value instanceof ReactivePrimitive) {
+            if (value instanceof ReactiveItem) {
                 throw new Error(
                     `Computed${
                         this.name ? ` (${this.name})` : ''
@@ -1948,8 +1940,8 @@ class Computed extends ReactivePrimitive {
             this.engine.setError(getError(e));
         }
 
-        modeController.computedMode = false;
-        dependencyTracker.turnOff();
+        modeController.isComputing = false;
+        dependencyTracker.disable();
 
         if (this.engine.error) {
             throw this.engine.error;
@@ -2011,7 +2003,7 @@ class Computed extends ReactivePrimitive {
             throw engine.error;
         }
 
-        if (modeController.computedMode) {
+        if (modeController.isComputing) {
             if (this.isStale()) {
                 throw new Error(
                     `Computed${this.name ? ` (${this.name})` : ''}: Dependencies cannot be stale`,
@@ -2044,8 +2036,30 @@ class Computed extends ReactivePrimitive {
     }
 
     /**
+     * Returns the current cached value of the computed without triggering a recalculation
+     * and without tracking dependencies.
      *
-     * @returns {T}
+     * Unlike the `value` getter, this method does not check if dependencies have changed
+     * and does not recompute the value if it's stale. It simply returns the last
+     * computed value. This is useful for debugging or for accessing the value
+     * without causing side effects (e.g., inside an untracked context).
+     *
+     * If the computed has an error, this method will still return the last cached
+     * value (which may be undefined or a previous value) without rethrowing the error.
+     *
+     * @override
+     * @returns {T} The cached value.
+     *
+     * @example
+     * ```js
+     * const a = atom(1);
+     * const b = computed(() => a.value * 2);
+     *
+     * console.log(b.peekValue()); // 2 (without tracking dependencies)
+     * a.value = 2;
+     * console.log(b.peekValue()); // still 2 (stale, not recomputed)
+     * console.log(b.value);       // 4 (recomputed now)
+     * ```
      */
     peekValue() {
         return this.#currentValue;
@@ -2089,7 +2103,7 @@ class Computed extends ReactivePrimitive {
         engine.clearError();
 
         // Collect new dependencies if dynamic mode is enabled
-        /** @type {Set<ReactivePrimitive>} */
+        /** @type {Set<ReactiveItem>} */
         const newDeps = new Set();
         const unsubscribe = dependencyTracker.onAdd(item => {
             newDeps.add(item);
@@ -2140,7 +2154,7 @@ class Computed extends ReactivePrimitive {
  * and allows tracking changes to individual elements and the array length.
  *
  * @template T
- * @augments ReactivePrimitive
+ * @augments ReactiveItem
  * @example
  * ```js
  * const coll = new Collection([1, 2, 3]);
@@ -2150,7 +2164,7 @@ class Computed extends ReactivePrimitive {
  * coll.value.push(4); // triggers reactivity
  * ```
  */
-class Collection extends ReactivePrimitive {
+class Collection extends ReactiveItem {
     /** @type {T[]} */
     #target;
     /** @type {T[]} */
@@ -2331,24 +2345,6 @@ class Collection extends ReactivePrimitive {
     }
 
     /**
-     * Alias for `value` setter.
-     *
-     * @param {T[]} value - The new array value.
-     */
-    set data(value) {
-        this.value = value;
-    }
-
-    /**
-     * Alias for `value` getter.
-     *
-     * @returns {T[]} The reactive array proxy.
-     */
-    get data() {
-        return this.getValue();
-    }
-
-    /**
      * Returns the raw, unproxied target array.
      * Warning: Mutating the raw array directly does NOT trigger reactivity.
      *
@@ -2365,7 +2361,7 @@ class Collection extends ReactivePrimitive {
 /**
  * ShallowReactive is a reactive primitive that holds a shallow object. It is the base unit of reactive state.
  * It is a shallow reactive object, meaning that it only tracks changes to the properties of the object itself, not its nested properties.
- * @augments ReactivePrimitive
+ * @augments ReactiveItem
  * @template {{[key:string]:any}} T
  *  * @example
  * ```js
@@ -2377,7 +2373,7 @@ class Collection extends ReactivePrimitive {
  *     bar += 1;
  * });
  *
- * const props = b.data;
+ * const props = b.value;
  * props.foo = 2;
  *
  * console.log(bar);
@@ -2401,24 +2397,24 @@ class Collection extends ReactivePrimitive {
  *     bar++;
  * });
  *
- * console.log(b.data.foo);
+ * console.log(b.value.foo);
  * // Outputs: 1
  *
- * b.data.foo = 2;
- * console.log(b.data.foo);
+ * b.value.foo = 2;
+ * console.log(b.value.foo);
  * // Outputs: 2
  *
  * console.log(bar);
  * // Outputs: 1
  *
- * b.data.inc();
- * console.log(b.data.foo);
+ * b.value.inc();
+ * console.log(b.value.foo);
  * // Outputs: 3
  * console.log(bar);
  * // Outputs: 2
  * ```
  */
-class ShallowReactive extends ReactivePrimitive {
+class ShallowReactive extends ReactiveItem {
     /** @type {T} */
     #target;
 
@@ -2569,29 +2565,11 @@ class ShallowReactive extends ReactivePrimitive {
     }
 
     /**
-     * Sets the value of the ShallowReactive. If the value is an object, it will be proxied and reactive.
-     * This is a synonym for `set value(value)`.
-     * @param {T} value - The new value of the ShallowReactive.
-     */
-    set data(value) {
-        this.setValue(value);
-    }
-
-    /**
      * Retrieves the proxied value of the ShallowReactive. If the engine is destroyed, an error is thrown.
      * Tracks the ShallowReactive for dependency management.
      * @returns {T} The proxied value of the ShallowReactive.
      */
     get value() {
-        return this.getValue();
-    }
-
-    /**
-     * Retrieves the proxied value of the ShallowReactive. If the engine is destroyed, an error is thrown.
-     * Tracks the ShallowReactive for dependency management.
-     * @returns {T} The proxied value of the ShallowReactive.
-     */
-    get data() {
         return this.getValue();
     }
 
@@ -2629,7 +2607,7 @@ class ShallowReactive extends ReactivePrimitive {
  * });
  *
  * // mute updates
- * store.suppressNotifications();
+ * store.muteUpdates();
  * childStore.removeItem("childStore");
  * a.value = 3;
  * b.value = 4;
@@ -2661,7 +2639,7 @@ class ShallowReactive extends ReactivePrimitive {
  */
 class Store {
     /**
-     * @type {Map<string, ReactivePrimitive>}
+     * @type {Map<string, ReactiveItem>}
      */
     #items = new Map();
     /**
@@ -2678,7 +2656,7 @@ class Store {
     /** @type {Dictionary<()=>void>} */
     #unsubscribers = new Dictionary();
 
-    /** @type {Map<string, import("./../core/UpdateDataRecord.js").UpdateDataRecord>} */
+    /** @type {Map<string, import("../core/UpdateDataRecord.js").UpdateDataRecord>} */
     #updates;
 
     /** @type {UpdateDataRecordManager} */
@@ -2704,7 +2682,7 @@ class Store {
         });
 
         this.#subscriber = (
-            /** @type {Map<string, import("./../core/UpdateDataRecord.js").UpdateDataRecord>} */ updates,
+            /** @type {Map<string, import("../core/UpdateDataRecord.js").UpdateDataRecord>} */ updates,
             /** @type {Store} */ store
         ) => {
             const storeName = that.#keys.get(store) || '';
@@ -2761,7 +2739,7 @@ class Store {
     /**
      * Adds a reactive item to the store with the given key.
      * @param {string} key - The key to use when adding the item to the store.
-     * @param {ReactivePrimitive} reactiveItem - The reactive item to add to the store.
+     * @param {ReactiveItem} reactiveItem - The reactive item to add to the store.
      * @throws {Error} If an item with the given key already exists in the store.
      */
     #addReactiveItem(key, reactiveItem) {
@@ -2823,7 +2801,7 @@ class Store {
 
     /**
      * Adds one or more reactive items to the store. If an item is a child store, it will be added to the store.
-     * @param {{[key: string]: ReactivePrimitive|Store}} items - An object where the keys are the keys to use when adding the items to the store and the values are the reactive items to add.
+     * @param {{[key: string]: ReactiveItem|Store}} items - An object where the keys are the keys to use when adding the items to the store and the values are the reactive items to add.
      * @throws {Error} If an item with the given key already exists in the store.
      * @throws {Error} If the store is destroyed.
      * @example
@@ -2836,13 +2814,13 @@ class Store {
      */
     addItems(items) {
         if (this.isDestroyed) {
-            throw new Error('Cannot add items to a destroyed store.');
+            throw new Error('Store has been destroyed');
         }
 
         for (const [key, item] of Object.entries(items)) {
             if (item instanceof Store) {
                 this.#addStore(key, item);
-            } else if (item instanceof ReactivePrimitive) {
+            } else if (item instanceof ReactiveItem) {
                 this.#addReactiveItem(key, item);
             }
         }
@@ -2871,6 +2849,10 @@ class Store {
      * @returns {void}
      */
     destroyItem(key) {
+        if (this.isDestroyed) {
+            throw new Error('Store has been destroyed');
+        }
+
         this.#destroyReactiveItem(key);
         this.#destroyChildStore(key);
     }
@@ -2881,7 +2863,9 @@ class Store {
      */
     #removeReactiveItem(key) {
         const item = this.#items.get(key);
-        if (!item) {return;}
+        if (!item) {
+            return;
+        }
 
         // Remove from store maps
         this.#items.delete(key);
@@ -2904,7 +2888,9 @@ class Store {
      */
     #removeChildStore(key) {
         const store = this.#childStores.get(key);
-        if (!store) {return;}
+        if (!store) {
+            return;
+        }
 
         this.#childStores.delete(key);
         this.#keys.delete(store);
@@ -2924,7 +2910,9 @@ class Store {
      */
     #destroyReactiveItem(key) {
         const item = this.#items.get(key);
-        if (!item) {return;}
+        if (!item) {
+            return;
+        }
 
         this.#removeReactiveItem(key);
 
@@ -2938,6 +2926,10 @@ class Store {
      * @returns {void}
      */
     removeItem(key) {
+        if (this.isDestroyed) {
+            throw new Error('Store has been destroyed');
+        }
+
         if (this.#items.has(key)) {
             this.#removeReactiveItem(key);
             return;
@@ -2955,7 +2947,11 @@ class Store {
      * in the store and clears the store of all items.
      */
     destroy() {
-        if (this.#isDestroyed) {return;}
+        if (this.#isDestroyed) {
+            return;
+        }
+
+        this.#isDestroyed = true;
 
         this.#items.forEach((item, key) => {
             this.#destroyReactiveItem(key);
@@ -2977,7 +2973,6 @@ class Store {
         this.eventEmitter.emit('destroy', this);
         this.eventEmitter.unregisterAllEvents();
 
-        this.#isDestroyed = true;
         this.#unsubscribers.removeAll();
     }
 
@@ -2985,7 +2980,11 @@ class Store {
      * Clears all reactive items from the store. This method is useful for resetting a Store to an empty state.
      * It removes all reactive items from the store and clears all child stores. It does not destroy the reactive items.
      */
-    clear() {
+    detachAll() {
+        if (this.isDestroyed) {
+            throw new Error('Store has been destroyed');
+        }
+
         this.#items.forEach((item, key) => {
             this.#removeReactiveItem(key);
         });
@@ -3002,12 +3001,9 @@ class Store {
     /**
      * Retrieves the reactive item with the given key from the store.
      * @param {string} key - The key of the item to retrieve.
-     * @returns {ReactivePrimitive|null} The reactive item with the given key, or null if no such item exists in the store.
+     * @returns {ReactiveItem|null} The reactive item with the given key, or null if no such item exists in the store.
      */
     #getReactiveItem(key) {
-        if (this.isDestroyed) {
-            return null;
-        }
         return this.#items.get(key) || null;
     }
 
@@ -3017,9 +3013,6 @@ class Store {
      * @returns {Store|null} The child store with the given key, or null if no such child store exists in the store.
      */
     #getChildStore(key) {
-        if (this.isDestroyed) {
-            return null;
-        }
         return this.#childStores.get(key) || null;
     }
 
@@ -3027,9 +3020,12 @@ class Store {
      * Retrieves the item with the given key from the store. This method first looks for a reactive item with the given key,
      * and if no such item exists, looks for a child store with the same key.
      * @param {string} key - The key of the item to retrieve.
-     * @returns {ReactivePrimitive|Store|null} The item with the given key, or null if no such item exists in the store.
+     * @returns {ReactiveItem|Store|null} The item with the given key, or null if no such item exists in the store.
      */
     getItem(key) {
+        if (this.isDestroyed) {
+            throw new Error('Store has been destroyed');
+        }
         return this.#getReactiveItem(key) || this.#getChildStore(key) || null;
     }
 
@@ -3040,7 +3036,7 @@ class Store {
      */
     hasItem(key) {
         if (this.isDestroyed) {
-            return false;
+            throw new Error('Store has been destroyed');
         }
         return this.#items.has(key) || this.#childStores.has(key);
     }
@@ -3054,7 +3050,7 @@ class Store {
      */
     getItemNames(filter = 'all') {
         if (this.isDestroyed) {
-            return [];
+            throw new Error('Store has been destroyed');
         }
 
         if (filter === 'reactives') {
@@ -3071,11 +3067,11 @@ class Store {
      *
      * @param {"all"|"reactives"|"stores"} [filter="all"] - The filter to apply when retrieving items. Default is "all".
      * Possible values can be "all", "reactives", or "stores" (if applicable).
-     * @returns {Map<string, ReactivePrimitive|Store>} A Map containing the items that match the filter.
+     * @returns {Map<string, ReactiveItem|Store>} A Map containing the items that match the filter.
      */
-    getItems(filter = 'all') {
+    toMap(filter = 'all') {
         if (this.isDestroyed) {
-            return new Map();
+            throw new Error('Store has been destroyed');
         }
 
         if (filter === 'reactives') {
@@ -3084,7 +3080,7 @@ class Store {
             return this.#childStores;
         }
 
-        /** @type {Map<string, ReactivePrimitive|Store>} */
+        /** @type {Map<string, ReactiveItem|Store>} */
         const result = new Map(this.#items);
 
         this.#childStores.forEach((store, key) => {
@@ -3094,7 +3090,7 @@ class Store {
         return result;
     }
 
-    #itemsAsPlainObject() {
+    #itemsToJSON() {
         const object = {};
 
         this.#items.forEach((item, key) => {
@@ -3105,12 +3101,12 @@ class Store {
         return object;
     }
 
-    #childStoresAsPlainObject() {
+    #childStoresToJSON() {
         const object = {};
 
         this.#childStores.forEach((store, key) => {
             // @ts-ignore
-            object[key] = store.asPlainObject();
+            object[key] = store.toJSON();
         });
 
         return object;
@@ -3134,38 +3130,38 @@ class Store {
      * store.addItems({ a, b, c });
      * c.addItems({ d, e });
      *
-     * console.log(store.asPlainObject());
+     * console.log(store.toJSON());
      * // output: { a: 1, b: 2, c: { d: 3, e: [1, 2, 3] } }
      *
-     * console.log(store.asPlainObject("all"));
+     * console.log(store.toJSON("all"));
      * // output: { a: 1, b: 2, c: { d: 3, e: [1, 2, 3] } }
      *
-     * console.log(store.asPlainObject("reactives"));
+     * console.log(store.toJSON("reactives"));
      * // output: { a: 1, b: 2 }
      *
-     * console.log(store.asPlainObject("stores"));
+     * console.log(store.toJSON("stores"));
      * // output: { c: { d: 3, e: [1, 2, 3] } }
      *
      * store.destroy();
      *
-     * console.log(store.asPlainObject());
+     * console.log(store.toJSON());
      * // output: {}
      * ```
      */
-    asPlainObject(filter = 'all') {
+    toJSON(filter = 'all') {
         if (this.isDestroyed) {
-            return {};
+            throw new Error('Store has been destroyed');
         }
 
         if (filter === 'reactives') {
-            return this.#itemsAsPlainObject();
+            return this.#itemsToJSON();
         } else if (filter === 'stores') {
-            return this.#childStoresAsPlainObject();
+            return this.#childStoresToJSON();
         }
 
         const object = {
-            ...this.#itemsAsPlainObject(),
-            ...this.#childStoresAsPlainObject(),
+            ...this.#itemsToJSON(),
+            ...this.#childStoresToJSON(),
         };
         return object;
     }
@@ -3206,7 +3202,7 @@ class Store {
      */
     subscribe(fn) {
         if (this.isDestroyed) {
-            return () => {};
+            throw new Error('Store has been destroyed');
         }
 
         const that = this;
@@ -3224,7 +3220,7 @@ class Store {
      */
     onDestroy(fn) {
         if (this.isDestroyed) {
-            return () => {};
+            throw new Error('Store has been destroyed');
         }
 
         return this.eventEmitter.on('destroy', fn);
@@ -3234,7 +3230,10 @@ class Store {
      * Mutes the event emitter, preventing any updates from being triggered.
      * Any updates that are scheduled while muted will be queued and executed when unmuteUpdates is called.
      */
-    suppressNotifications() {
+    muteUpdates() {
+        if (this.isDestroyed) {
+            throw new Error('Store has been destroyed');
+        }
         this.eventEmitter.mute();
     }
 
@@ -3243,6 +3242,9 @@ class Store {
      * Any updates that were scheduled while muted will be executed.
      */
     unmuteUpdates() {
+        if (this.isDestroyed) {
+            throw new Error('Store has been destroyed');
+        }
         this.eventEmitter.unmute();
     }
 
@@ -3251,6 +3253,9 @@ class Store {
      * @returns {boolean}
      */
     isMuted() {
+        if (this.isDestroyed) {
+            throw new Error('Store has been destroyed');
+        }
         return this.eventEmitter.isMuted();
     }
 }
@@ -3288,12 +3293,12 @@ function isReactiveWrapper(item) {
  * const list = new ReactiveList();
  *
  * list.subscribe(() => {
- *     console.log('List changed:', list.getItems());
+ *     console.log('List changed:', list.toArray());
  * });
  *
  * list.add(1, 2, 3);                // numbers -> stored as Atom
  * list.setItem(1, 42);
- * list.splice(0, 1);
+ * list.removeRange(0, 1);
  * list.setItems([{ a: 1 }, { b: 2 }]); // objects -> stored as ShallowReactive
  * ```
  */
@@ -3309,7 +3314,7 @@ class ReactiveList {
      */
     constructor() {
         this.#store = new Store();
-        this.#store.suppressNotifications();
+        this.#store.muteUpdates();
 
         this.#lengthAtom = new Atom(0, { name: 'length' });
         this.#store.addItems({ length: this.#lengthAtom });
@@ -3355,7 +3360,7 @@ class ReactiveList {
 
         const startIndex = this.#lengthAtom.value;
         const alreadyMuted = this.#store.isMuted();
-        this.#store.suppressNotifications();
+        this.#store.muteUpdates();
 
         /** @type {{[key:string]: ReactiveWrapper<any>}} */
         const wrappers = {};
@@ -3393,7 +3398,7 @@ class ReactiveList {
      *
      * @returns {T[]} An array containing all values.
      */
-    getItems() {
+    toArray() {
         if (this.isDestroyed) {throw new Error('ReactiveList has been destroyed');}
         const items = [];
         for (let i = 0; i < this.#lengthAtom.value; i++) {
@@ -3416,7 +3421,7 @@ class ReactiveList {
         const wrapper = this.#store.getItem(index.toString());
         if (!isReactiveWrapper(wrapper)) {return;}
         const alreadyMuted = this.#store.isMuted();
-        this.#store.suppressNotifications();
+        this.#store.muteUpdates();
         wrapper.value = value;
         if (!alreadyMuted) {this.#store.unmuteUpdates();}
     }
@@ -3439,7 +3444,7 @@ class ReactiveList {
     setItems(values) {
         if (this.isDestroyed) {throw new Error('ReactiveList has been destroyed');}
         const alreadyMuted = this.#store.isMuted();
-        this.#store.suppressNotifications();
+        this.#store.muteUpdates();
 
         const currentLen = this.#lengthAtom.value;
         const newLen = values.length;
@@ -3488,7 +3493,7 @@ class ReactiveList {
      * @param {number} startIndex - The index at which to start removal.
      * @param {number} count - The number of elements to remove.
      */
-    splice(startIndex, count) {
+    removeRange(startIndex, count) {
         if (this.isDestroyed) {throw new Error('ReactiveList has been destroyed');}
         if (count <= 0) {return;}
 
@@ -3500,7 +3505,7 @@ class ReactiveList {
 
         const newLen = oldLen - actualCount;
         const alreadyMuted = this.#store.isMuted();
-        this.#store.suppressNotifications();
+        this.#store.muteUpdates();
 
         // Shift elements left
         for (let i = startIndex; i < newLen; i++) {
@@ -3530,28 +3535,28 @@ class ReactiveList {
      * @param {number} index - The index of the item to remove.
      */
     removeItem(index) {
-        this.splice(index, 1);
+        this.removeRange(index, 1);
     }
 
     /**
      * Removes the last item of the list.
      */
     removeLastItem() {
-        this.splice(this.#lengthAtom.value - 1, 1);
+        this.removeRange(this.#lengthAtom.value - 1, 1);
     }
 
     /**
      * Removes the first item of the list.
      */
     removeFirstItem() {
-        this.splice(0, 1);
+        this.removeRange(0, 1);
     }
 
     /**
      * Removes all items from the list.
      */
     clear() {
-        this.splice(0, this.#lengthAtom.value);
+        this.removeRange(0, this.#lengthAtom.value);
     }
 
     /**
@@ -3816,7 +3821,7 @@ function when(predicate, fn, options) {
  * const a = atom(0, { name: "a" });
  * let foo = 0;
  *
- * waitTrue(() => a.value > 3).then(() => {
+ * waitUntil(() => a.value > 3).then(() => {
  *     foo++;
  * });
  *
@@ -3825,7 +3830,7 @@ function when(predicate, fn, options) {
  * a.value = 4; // foo = 1
  * ```
  */
-function waitTrue(predicate, options) {
+function waitUntil(predicate, options) {
     return new Promise(resolve => {
         const computed = new Computed(predicate);
         const timeout = options?.timeout || 0;
@@ -4167,55 +4172,72 @@ function computed(fn, options) {
 }
 
 /**
- * Creates a new Collection instance. A Collection is a reactive primitive that holds an array of values. Same as `collection` but
- * returns a new Collection instance.
+ * Creates a new reactive Collection instance that holds an array.
+ * The Collection provides reactivity for array mutations (push, pop, splice, etc.)
+ * and allows subscribing to changes.
+ *
+ * Unlike the `Atom` and `Computed` factories, this function returns the actual
+ * `Collection` instance, not just the proxied array. To access the reactive array,
+ * use the `.value` property.
+ *
  * @template T
- * @param {T[]} value - The array to observe.
- * @param {object} [options] - Options
- * @param {string} [options.name] - The name of Collection object.
- * @param {(a:T, b:T)=>boolean} [options.compareFunction] - A function that compares two values to determine if they are equal.
- * @returns {T[]} The observed array
+ * @param {T[]} value - The initial array to observe.
+ * @param {object} [options] - Configuration options.
+ * @param {string} [options.name] - The name of the Collection (used for debugging).
+ * @param {(a:T, b:T)=>boolean} [options.compareFunction] - Custom equality function.
+ * @returns {Collection<T>} The Collection instance.
+ *
  * @example
  * ```js
- * const items = collection([1, 2, 3]);
- * 
- * items.subscribe(() => {
- *     console.log(items.value);
- });
+ * const coll = collection([1, 2, 3]);
  *
- * items.value.push(4);
- * // output: [1, 2, 3, 4]
+ * // Subscribe to changes
+ * coll.subscribe(() => console.log('changed'));
+ *
+ * // Mutate the array via .value
+ * coll.value.push(4); // triggers subscriber
+ * console.log(coll.value); // [1, 2, 3, 4]
+ *
+ * // Direct property access also works (proxied)
+ * coll.value[0] = 10; // triggers subscriber
  * ```
  */
 function collection(value, options) {
-    const item = new Collection(value, options);
-    return item.value;
+    return new Collection(value, options);
 }
 
 /**
- * Creates a new ShallowReactive instance. An ShallowReactive is a reactive primitive that holds a value. Same as `shallowReactive` but
- * returns a new ShallowReactive instance.
+ * Creates a new reactive ShallowReactive instance that wraps an object.
+ * The ShallowReactive provides reactivity for property assignments and deletions
+ * on the top level of the object (shallow reactivity).
+ *
+ * This function returns the actual `ShallowReactive` instance, not just the proxy.
+ * To access the reactive object, use the `.value` property.
+ *
  * @template T
- * @param {T} value - The object to observe.
- * @param {object} [options] - Options to configure the observable behavior.
- * @param {string} [options.name] - The name of ShallowReactive object.
- * @returns {T} The observed object
+ * @param {T} value - The object to observe (must be a plain object or an instance).
+ * @param {object} [options] - Configuration options.
+ * @param {string} [options.name] - The name of the ShallowReactive (used for debugging).
+ * @returns {ShallowReactive<T>} The ShallowReactive instance.
+ *
  * @example
  * ```js
- * const obj = shallowReactive({ a: 1, b: 2 });
+ * const reactive = shallowReactive({ a: 1, b: 2 });
  *
- * obj.subscribe(() => {
- *     console.log(obj.value);
- * });
+ * // Subscribe to changes
+ * reactive.subscribe(() => console.log('changed'));
  *
- * obj.value.a = 3;
- * // output: { a: 3, b: 2 }
+ * // Modify the object via .value
+ * reactive.value.a = 3; // triggers subscriber
+ * console.log(reactive.value); // { a: 3, b: 2 }
+ *
+ * // Direct property access also works (proxied)
+ * reactive.value.b = 5; // triggers subscriber
  * ```
  */
 function shallowReactive(value, options) {
     // @ts-ignore
-    const item = new ShallowReactive(value, options);
-    return /** @type {T} */ (item.value);
+    return new ShallowReactive(value, options);
 }
 
 /**
@@ -4304,7 +4326,7 @@ function shallowReactive(value, options) {
  * ```
  */
 function makeObservable(obj, annotations, options) {
-    /** @type {{[key:string]:ReactivePrimitive}} */
+    /** @type {{[key:string]:ReactiveItem}} */
     const reactiveStore = {};
     const _options = Object.assign({ name: '' }, options);
 
@@ -4548,4 +4570,4 @@ function makeAutoObservable(obj, overrides = {}, options, filter) {
     return makeObservable(obj, annotations, _options);
 }
 
-export { Atom, Collection, Computed, ReactiveList, ReactivePrimitive, ShallowReactive, Store, atom, autorun, batch, collection, computed, extendObservable, fromPromise, getNow, makeAutoObservable, makeObservable, reaction, runInAction, shallowReactive, untrack, waitTrue, when };
+export { Atom, Collection, Computed, ReactiveItem, ReactiveList, ShallowReactive, Store, atom, autorun, batch, collection, computed, extendObservable, fromPromise, getNow, makeAutoObservable, makeObservable, reaction, runInAction, shallowReactive, untrack, waitUntil, when };

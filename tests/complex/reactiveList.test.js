@@ -63,7 +63,7 @@ test('ReactiveList: clear', t => {
     t.is(list.length, 0);
 });
 
-test('ReactiveList: splice', t => {
+test('ReactiveList: removeRange', t => {
     const list = new ReactiveList();
     const item1 = { name: 'item1' };
     const item2 = { name: 'item2' };
@@ -71,12 +71,12 @@ test('ReactiveList: splice', t => {
     list.add(item1, item2);
 
     t.notThrows(() => {
-        list.splice(2, -1);
+        list.removeRange(2, -1);
     });
     t.notThrows(() => {
-        list.splice(-2, 1);
+        list.removeRange(-2, 1);
     });
-    list.splice(0, 1);
+    list.removeRange(0, 1);
     t.is(list.length, 1);
 });
 
@@ -139,7 +139,7 @@ test('ReactiveList: setItems with multiple items', t => {
 
     const item2 = { name: 'item2' };
     list.setItems([item1, item2]);
-    t.deepEqual(list.getItems(), [item1, item2]);
+    t.deepEqual(list.toArray(), [item1, item2]);
 
     t.is(list.length, 2);
 });
@@ -202,7 +202,7 @@ test('ReactiveList: after destroy', t => {
         list.add(item1, item2);
     });
     t.throws(() => {
-        list.splice(0, 1);
+        list.removeRange(0, 1);
     });
     t.throws(() => {
         list.removeItem(0);
@@ -223,7 +223,7 @@ test('ReactiveList: after destroy', t => {
         list.getItem(0);
     });
     t.throws(() => {
-        list.getItems();
+        list.toArray();
     });
     t.throws(() => {
         list.length;
@@ -254,97 +254,97 @@ test('ReactiveList: subscribe', t => {
     t.is(count, 2);
 });
 
-test('ReactiveList: getItems()', t => {
+test('ReactiveList: toArray()', t => {
     const list = new ReactiveList();
     const item1 = { name: 'item1' };
     const item2 = { name: 'item2' };
 
     list.add(item1, item2);
 
-    t.deepEqual(list.getItems(), [item1, item2]);
+    t.deepEqual(list.toArray(), [item1, item2]);
 });
 
-// ===== Дополнительные тесты для splice и операций удаления =====
+// ===== Дополнительные тесты для removeRange и операций удаления =====
 
-test('ReactiveList: splice removes from middle', t => {
+test('ReactiveList: removeRange removes from middle', t => {
     /** @type {ReactiveList<number>} */
     const list = new ReactiveList();
     list.setItems([1, 2, 3, 4]);
 
-    list.splice(1, 2); // удаляем 2 элемента, начиная с индекса 1
+    list.removeRange(1, 2); // удаляем 2 элемента, начиная с индекса 1
 
     t.is(list.length, 2);
-    t.deepEqual(list.getItems(), [1, 4]);
+    t.deepEqual(list.toArray(), [1, 4]);
 });
 
-test('ReactiveList: splice removes from beginning', t => {
+test('ReactiveList: removeRange removes from beginning', t => {
     const list = new ReactiveList();
     list.setItems([1, 2, 3, 4]);
 
-    list.splice(0, 2);
+    list.removeRange(0, 2);
 
     t.is(list.length, 2);
-    t.deepEqual(list.getItems(), [3, 4]);
+    t.deepEqual(list.toArray(), [3, 4]);
 });
 
-test('ReactiveList: splice removes from end', t => {
+test('ReactiveList: removeRange removes from end', t => {
     const list = new ReactiveList();
     list.setItems([1, 2, 3, 4]);
 
-    list.splice(2, 2);
+    list.removeRange(2, 2);
 
     t.is(list.length, 2);
-    t.deepEqual(list.getItems(), [1, 2]);
+    t.deepEqual(list.toArray(), [1, 2]);
 });
 
-test('ReactiveList: splice removes all items', t => {
+test('ReactiveList: removeRange removes all items', t => {
     const list = new ReactiveList();
     list.setItems([1, 2, 3, 4]);
 
-    list.splice(0, 4);
+    list.removeRange(0, 4);
 
     t.is(list.length, 0);
-    t.deepEqual(list.getItems(), []);
+    t.deepEqual(list.toArray(), []);
 });
 
-test('ReactiveList: splice with count larger than remaining elements', t => {
+test('ReactiveList: removeRange with count larger than remaining elements', t => {
     const list = new ReactiveList();
     list.setItems([1, 2, 3, 4]);
 
-    list.splice(2, 10); // пытаемся удалить 10 элементов, начиная с индекса 2
+    list.removeRange(2, 10); // пытаемся удалить 10 элементов, начиная с индекса 2
 
     t.is(list.length, 2);
-    t.deepEqual(list.getItems(), [1, 2]);
+    t.deepEqual(list.toArray(), [1, 2]);
 });
 
-test('ReactiveList: splice with count = 0 does nothing', t => {
+test('ReactiveList: removeRange with count = 0 does nothing', t => {
     const list = new ReactiveList();
     list.setItems([1, 2, 3]);
 
-    list.splice(1, 0);
+    list.removeRange(1, 0);
 
     t.is(list.length, 3);
-    t.deepEqual(list.getItems(), [1, 2, 3]);
+    t.deepEqual(list.toArray(), [1, 2, 3]);
 });
 
-test('ReactiveList: splice with negative startIndex does nothing', t => {
+test('ReactiveList: removeRange with negative startIndex does nothing', t => {
     const list = new ReactiveList();
     list.setItems([1, 2, 3]);
 
-    list.splice(-1, 1);
+    list.removeRange(-1, 1);
 
     t.is(list.length, 3);
-    t.deepEqual(list.getItems(), [1, 2, 3]);
+    t.deepEqual(list.toArray(), [1, 2, 3]);
 });
 
-test('ReactiveList: splice with startIndex out of range does nothing', t => {
+test('ReactiveList: removeRange with startIndex out of range does nothing', t => {
     const list = new ReactiveList();
     list.setItems([1, 2, 3]);
 
-    list.splice(5, 1);
+    list.removeRange(5, 1);
 
     t.is(list.length, 3);
-    t.deepEqual(list.getItems(), [1, 2, 3]);
+    t.deepEqual(list.toArray(), [1, 2, 3]);
 });
 
 test('ReactiveList: removeItem removes correct element', t => {
@@ -354,7 +354,7 @@ test('ReactiveList: removeItem removes correct element', t => {
     list.removeItem(2);
 
     t.is(list.length, 3);
-    t.deepEqual(list.getItems(), [10, 20, 40]);
+    t.deepEqual(list.toArray(), [10, 20, 40]);
 });
 
 test('ReactiveList: removeFirstItem removes first element', t => {
@@ -364,7 +364,7 @@ test('ReactiveList: removeFirstItem removes first element', t => {
     list.removeFirstItem();
 
     t.is(list.length, 2);
-    t.deepEqual(list.getItems(), [20, 30]);
+    t.deepEqual(list.toArray(), [20, 30]);
 });
 
 test('ReactiveList: removeLastItem removes last element', t => {
@@ -374,7 +374,7 @@ test('ReactiveList: removeLastItem removes last element', t => {
     list.removeLastItem();
 
     t.is(list.length, 2);
-    t.deepEqual(list.getItems(), [10, 20]);
+    t.deepEqual(list.toArray(), [10, 20]);
 });
 
 test('ReactiveList: clear removes all items', t => {
@@ -384,39 +384,39 @@ test('ReactiveList: clear removes all items', t => {
     list.clear();
 
     t.is(list.length, 0);
-    t.deepEqual(list.getItems(), []);
+    t.deepEqual(list.toArray(), []);
 });
 
-test('ReactiveList: multiple splice operations maintain correctness', t => {
+test('ReactiveList: multiple removeRange operations maintain correctness', t => {
     const list = new ReactiveList();
     list.setItems([1, 2, 3, 4, 5, 6]);
 
-    list.splice(1, 2); // удаляем 2,3 -> [1,4,5,6]
-    t.deepEqual(list.getItems(), [1, 4, 5, 6]);
+    list.removeRange(1, 2); // удаляем 2,3 -> [1,4,5,6]
+    t.deepEqual(list.toArray(), [1, 4, 5, 6]);
 
-    list.splice(2, 1); // удаляем 5 -> [1,4,6]
-    t.deepEqual(list.getItems(), [1, 4, 6]);
+    list.removeRange(2, 1); // удаляем 5 -> [1,4,6]
+    t.deepEqual(list.toArray(), [1, 4, 6]);
 
-    list.splice(0, 1); // удаляем 1 -> [4,6]
-    t.deepEqual(list.getItems(), [4, 6]);
+    list.removeRange(0, 1); // удаляем 1 -> [4,6]
+    t.deepEqual(list.toArray(), [4, 6]);
 
     t.is(list.length, 2);
 });
 
-test('ReactiveList: splice after add and setItems', t => {
+test('ReactiveList: removeRange after add and setItems', t => {
     const list = new ReactiveList();
     list.add({ a: 1 }, { b: 2 });
     list.setItems([{ c: 3 }, { d: 4 }]);
 
-    t.deepEqual(list.getItems(), [{ c: 3 }, { d: 4 }]);
+    t.deepEqual(list.toArray(), [{ c: 3 }, { d: 4 }]);
 
-    list.splice(1, 1);
+    list.removeRange(1, 1);
 
     t.is(list.length, 1);
-    t.deepEqual(list.getItems(), [{ c: 3 }]);
+    t.deepEqual(list.toArray(), [{ c: 3 }]);
 });
 
-test('ReactiveList: splice does not break reactivity', t => {
+test('ReactiveList: removeRange does not break reactivity', t => {
     const list = new ReactiveList();
     list.setItems([1, 2, 3]);
 
@@ -425,21 +425,21 @@ test('ReactiveList: splice does not break reactivity', t => {
         callCount++;
     });
 
-    list.splice(1, 1); // удаляем 2 -> [1,3]
+    list.removeRange(1, 1); // удаляем 2 -> [1,3]
 
     t.is(callCount, 1);
-    t.deepEqual(list.getItems(), [1, 3]);
+    t.deepEqual(list.toArray(), [1, 3]);
 
     unsubscribe();
 });
 
-test('ReactiveList: splice handles nested reactive objects', t => {
+test('ReactiveList: removeRange handles nested reactive objects', t => {
     const list = new ReactiveList();
     const obj1 = { x: 1, y: { z: 2 } };
     const obj2 = { x: 3, y: { z: 4 } };
     list.setItems([obj1, obj2]);
 
-    list.splice(0, 1); // удаляем obj1
+    list.removeRange(0, 1); // удаляем obj1
 
     t.is(list.length, 1);
     t.deepEqual(list.getItem(0), obj2);

@@ -24,13 +24,13 @@ export const SHALLOW_REACTIVE = 4;
 export class Engine {
     /**
      * The set of dependencies of the engine.
-     * @type {Set<ReactivePrimitive>}
+     * @type {Set<ReactiveItem>}
      */
     dependencies = new Set();
 
     /**
      * The set of dependents of the engine.
-     * @type {Set<ReactivePrimitive>}
+     * @type {Set<ReactiveItem>}
      */
     dependents = new Set();
 
@@ -48,7 +48,7 @@ export class Engine {
 
     /**
      * Reference to the reactive item.
-     * @type {ReactivePrimitive}
+     * @type {ReactiveItem}
      */
     reactiveItem;
 
@@ -103,7 +103,7 @@ export class Engine {
 
     /**
      * Creates an Engine instance.
-     * @param {ReactivePrimitive} reactiveItem - The reactive item.
+     * @param {ReactiveItem} reactiveItem - The reactive item.
      * @param {ATOM|COMPUTED|COLLECTION|SHALLOW_REACTIVE} type - The type.
      */
     constructor(reactiveItem, type) {
@@ -170,12 +170,12 @@ export class Engine {
     /**
      * Commits a change: creates an UpdateDataRecord, adds to updates, and schedules notification.
      * @param {string} property - The property key.
-     * @param {"set"|"delete"} verb - The operation.
+     * @param {"set"|"delete"} type - The operation.
      * @param {any} oldValue - The previous value (immediate before this change).
      * @param {any} newValue - The new value.
      * @returns {boolean} True if committed (i.e., value actually changed).
      */
-    #commitChange(property, verb, oldValue, newValue) {
+    #commitChange(property, type, oldValue, newValue) {
         let reportedOld = oldValue;
         let compareOld = oldValue;
         if (modeController.batchMode && this.#batchSnapshot?.has(property)) {
@@ -210,7 +210,7 @@ export class Engine {
         }
 
         // 4. Создаём или обновляем запись в updates
-        const record = new UpdateDataRecord(verb, reportedOld, newValue, this.reactiveItem);
+        const record = new UpdateDataRecord(type, reportedOld, newValue, this.reactiveItem);
         this.updates.set(property, record);
         this.version++;
         return true;
@@ -219,19 +219,19 @@ export class Engine {
     /**
      * Legacy method for backward compatibility. Delegates to recordChange + #commitChange.
      * @param {string} property - The property key.
-     * @param {"set"|"delete"} verb - The operation.
+     * @param {"set"|"delete"} type - The operation.
      * @param {any} oldValue - The previous value.
      * @param {any} value - The new value.
      * @returns {boolean} True if an update was added.
      */
-    addUpdate(property, verb, oldValue, value) {
+    addUpdate(property, type, oldValue, value) {
         this.#recordChange(property, oldValue);
-        return this.#commitChange(property, verb, oldValue, value);
+        return this.#commitChange(property, type, oldValue, value);
     }
 
     /**
      * Adds dependencies to this engine.
-     * @param {Set<ReactivePrimitive>} dependencies
+     * @param {Set<ReactiveItem>} dependencies
      */
     addDependencies(dependencies) {
         const array = [];
@@ -249,7 +249,7 @@ export class Engine {
 
     /**
      * Adds a single dependency.
-     * @param {ReactivePrimitive} dependency
+     * @param {ReactiveItem} dependency
      */
     addDependency(dependency) {
         if (!this.dependencies.has(dependency)) {
@@ -259,7 +259,7 @@ export class Engine {
 
     /**
      * Adds a dependent.
-     * @param {ReactivePrimitive} dependent
+     * @param {ReactiveItem} dependent
      * @returns {boolean}
      */
     addDependent(dependent) {
@@ -274,7 +274,7 @@ export class Engine {
 
     /**
      * Removes a dependent.
-     * @param {ReactivePrimitive} dependent
+     * @param {ReactiveItem} dependent
      */
     removeDependent(dependent) {
         this.dependents.delete(dependent);
@@ -282,7 +282,7 @@ export class Engine {
 
     /**
      * Returns all dependents recursively.
-     * @returns {Set<ReactivePrimitive>}
+     * @returns {Set<ReactiveItem>}
      */
     getDeepDependents() {
         const result = new Set();
@@ -306,7 +306,7 @@ export class Engine {
 
     /**
      * Returns sorted array of deep dependents.
-     * @returns {Array<ReactivePrimitive>}
+     * @returns {Array<ReactiveItem>}
      */
     getDeepDependentsArray() {
         const array = Array.from(this.getDeepDependents());
@@ -317,7 +317,7 @@ export class Engine {
     /**
      * Notifies dependents of a message.
      * @param {EngineMessages} message
-     * @param {{sender: ReactivePrimitive, recipients: Set<ReactivePrimitive>}} [ctx]
+     * @param {{sender: ReactiveItem, recipients: Set<ReactiveItem>}} [ctx]
      */
     notifyDependents(message, ctx) {
         if (ctx === undefined) {
@@ -332,7 +332,7 @@ export class Engine {
     /**
      * Notifies dependencies (reverse direction).
      * @param {EngineMessages} message
-     * @param {{sender: ReactivePrimitive, recipients: Set<ReactivePrimitive>}} ctx
+     * @param {{sender: ReactiveItem, recipients: Set<ReactiveItem>}} ctx
      */
     notifyDependencies(message, ctx) {
         for (const dependency of this.dependencies) {
@@ -344,7 +344,7 @@ export class Engine {
     /**
      * Handles incoming messages.
      * @param {EngineMessages} message
-     * @param {{sender: ReactivePrimitive, recipients: Set<ReactivePrimitive>}} ctx
+     * @param {{sender: ReactiveItem, recipients: Set<ReactiveItem>}} ctx
      */
     getMessage(message, ctx) {
         switch (message) {
@@ -369,7 +369,7 @@ export class Engine {
     /**
      * Sets an error and notifies dependents.
      * @param {Error|null} error
-     * @param {{sender: ReactivePrimitive, recipients: Set<ReactivePrimitive>}} [ctx]
+     * @param {{sender: ReactiveItem, recipients: Set<ReactiveItem>}} [ctx]
      */
     setError(error, ctx) {
         if (error === null) {
@@ -393,7 +393,7 @@ export class Engine {
 
     /**
      * Destroys the engine.
-     * @param {{sender: ReactivePrimitive, recipients: Set<ReactivePrimitive>}} [ctx]
+     * @param {{sender: ReactiveItem, recipients: Set<ReactiveItem>}} [ctx]
      */
     destroy(ctx) {
         if (this.isDestroyed) {
@@ -429,14 +429,6 @@ export class Engine {
      */
     hasUpdates() {
         return this.updates.size > 0;
-    }
-
-    /**
-     * Legacy method for compatibility.
-     * @returns {boolean}
-     */
-    checkChangesOldValues() {
-        return this.hasUpdates();
     }
 
     /**
@@ -502,7 +494,7 @@ export class Engine {
 
     /**
      * Updates dependencies to a new set.
-     * @param {Set<ReactivePrimitive>} newDeps
+     * @param {Set<ReactiveItem>} newDeps
      */
     updateDependencies(newDeps) {
         // Remove old dependencies no longer needed

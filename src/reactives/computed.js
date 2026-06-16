@@ -4,12 +4,12 @@ import { COMPUTED } from '../core/Engine.js';
 import { clone, getError } from '../helpers/tools.js';
 import { dependencyTracker } from '../services/dependencyTracker.js';
 import { modeController } from '../services/modeController.js';
-import { ReactivePrimitive } from './ReactivePrimitive.js';
+import { ReactiveItem } from './ReactiveItem.js';
 
 /**
  * Computed is a reactive primitive that holds a value that is computed from other reactive values.
  * It is the base unit of reactive state.
- * @augments ReactivePrimitive
+ * @augments ReactiveItem
  * @template {unknown} T
  * @example
  * ```js
@@ -53,7 +53,7 @@ import { ReactivePrimitive } from './ReactivePrimitive.js';
  * // Output: nothing
  * ```
  */
-class Computed extends ReactivePrimitive {
+class Computed extends ReactiveItem {
     /** @type {T} */
     #currentValue;
 
@@ -128,13 +128,13 @@ class Computed extends ReactivePrimitive {
     }
 
     #collectDependenciesAndInitValue() {
-        dependencyTracker.turnOn();
-        modeController.computedMode = true;
+        dependencyTracker.enable();
+        modeController.isComputing = true;
         /** @type {T} */
         let value;
         try {
             value = this.#fn();
-            if (value instanceof ReactivePrimitive) {
+            if (value instanceof ReactiveItem) {
                 throw new Error(
                     `Computed${
                         this.name ? ` (${this.name})` : ''
@@ -145,8 +145,8 @@ class Computed extends ReactivePrimitive {
             this.engine.setError(getError(e));
         }
 
-        modeController.computedMode = false;
-        dependencyTracker.turnOff();
+        modeController.isComputing = false;
+        dependencyTracker.disable();
 
         if (this.engine.error) {
             throw this.engine.error;
@@ -208,7 +208,7 @@ class Computed extends ReactivePrimitive {
             throw engine.error;
         }
 
-        if (modeController.computedMode) {
+        if (modeController.isComputing) {
             if (this.isStale()) {
                 throw new Error(
                     `Computed${this.name ? ` (${this.name})` : ''}: Dependencies cannot be stale`,
@@ -241,8 +241,30 @@ class Computed extends ReactivePrimitive {
     }
 
     /**
+     * Returns the current cached value of the computed without triggering a recalculation
+     * and without tracking dependencies.
      *
-     * @returns {T}
+     * Unlike the `value` getter, this method does not check if dependencies have changed
+     * and does not recompute the value if it's stale. It simply returns the last
+     * computed value. This is useful for debugging or for accessing the value
+     * without causing side effects (e.g., inside an untracked context).
+     *
+     * If the computed has an error, this method will still return the last cached
+     * value (which may be undefined or a previous value) without rethrowing the error.
+     *
+     * @override
+     * @returns {T} The cached value.
+     *
+     * @example
+     * ```js
+     * const a = atom(1);
+     * const b = computed(() => a.value * 2);
+     *
+     * console.log(b.peekValue()); // 2 (without tracking dependencies)
+     * a.value = 2;
+     * console.log(b.peekValue()); // still 2 (stale, not recomputed)
+     * console.log(b.value);       // 4 (recomputed now)
+     * ```
      */
     peekValue() {
         return this.#currentValue;
@@ -286,7 +308,7 @@ class Computed extends ReactivePrimitive {
         engine.clearError();
 
         // Collect new dependencies if dynamic mode is enabled
-        /** @type {Set<ReactivePrimitive>} */
+        /** @type {Set<ReactiveItem>} */
         const newDeps = new Set();
         const unsubscribe = dependencyTracker.onAdd(item => {
             newDeps.add(item);

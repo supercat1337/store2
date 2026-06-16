@@ -8,7 +8,7 @@ import {
     batch,
     reaction,
     when,
-    waitTrue,
+    waitUntil,
     getNow,
     fromPromise,
     untrack,
@@ -353,11 +353,11 @@ test('runInAction() should work when used in a reaction', t => {
     t.is(b.value, 2);
 });
 
-test('waitTrue', async t => {
+test('waitUntil', async t => {
     const a = new Atom(0, { name: 'a' });
     let foo = 0;
 
-    waitTrue(() => a.value > 3).then(() => {
+    waitUntil(() => a.value > 3).then(() => {
         foo++;
     });
 
@@ -375,11 +375,11 @@ test('waitTrue', async t => {
     t.is(foo, 1);
 });
 
-test('waitTrue with timeout', async t => {
+test('waitUntil with timeout', async t => {
     const a = new Atom(0, { name: 'a' });
     let foo = 0;
 
-    waitTrue(() => a.value > 3, { timeout: 10 }).then(() => {
+    waitUntil(() => a.value > 3, { timeout: 10 }).then(() => {
         t.log(`a = ${a.value}`);
         t.log(foo);
         foo++;
@@ -600,14 +600,14 @@ test('computed', t => {
 
 test('collection', t => {
     const a = collection([0, 1, 2], { name: 'a' });
-    t.is(a.length, 3);
+    t.is(a.value.length, 3);
 });
 
 test('shallowReactive', t => {
     const a = shallowReactive({ foo: 0 }, { name: 'a' });
-    t.is(a.foo, 0);
-    a.foo = 1;
-    t.is(a.foo, 1);
+    t.is(a.value.foo, 0);
+    a.value.foo = 1;
+    t.is(a.value.foo, 1);
 });
 
 test('makeObservable: Class (atom, computed, false)', t => {

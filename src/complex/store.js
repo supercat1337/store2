@@ -2,7 +2,7 @@
 
 import { EventEmitterExt } from '@supercat1337/event-emitter-ext';
 import { UpdateDataRecordManager } from '../core/UpdateDataRecord.js';
-import { ReactivePrimitive } from '../reactives/ReactivePrimitive.js';
+import { ReactiveItem } from '../reactives/ReactiveItem.js';
 import { Dictionary } from '@supercat1337/dictionary';
 
 /**
@@ -27,7 +27,7 @@ import { Dictionary } from '@supercat1337/dictionary';
  * });
  *
  * // mute updates
- * store.suppressNotifications();
+ * store.muteUpdates();
  * childStore.removeItem("childStore");
  * a.value = 3;
  * b.value = 4;
@@ -59,7 +59,7 @@ import { Dictionary } from '@supercat1337/dictionary';
  */
 class Store {
     /**
-     * @type {Map<string, ReactivePrimitive>}
+     * @type {Map<string, ReactiveItem>}
      */
     #items = new Map();
     /**
@@ -76,7 +76,7 @@ class Store {
     /** @type {Dictionary<()=>void>} */
     #unsubscribers = new Dictionary();
 
-    /** @type {Map<string, import("./../core/UpdateDataRecord.js").UpdateDataRecord>} */
+    /** @type {Map<string, import("../core/UpdateDataRecord.js").UpdateDataRecord>} */
     #updates;
 
     /** @type {UpdateDataRecordManager} */
@@ -102,7 +102,7 @@ class Store {
         });
 
         this.#subscriber = (
-            /** @type {Map<string, import("./../core/UpdateDataRecord.js").UpdateDataRecord>} */ updates,
+            /** @type {Map<string, import("../core/UpdateDataRecord.js").UpdateDataRecord>} */ updates,
             /** @type {Store} */ store
         ) => {
             const storeName = that.#keys.get(store) || '';
@@ -159,7 +159,7 @@ class Store {
     /**
      * Adds a reactive item to the store with the given key.
      * @param {string} key - The key to use when adding the item to the store.
-     * @param {ReactivePrimitive} reactiveItem - The reactive item to add to the store.
+     * @param {ReactiveItem} reactiveItem - The reactive item to add to the store.
      * @throws {Error} If an item with the given key already exists in the store.
      */
     #addReactiveItem(key, reactiveItem) {
@@ -221,7 +221,7 @@ class Store {
 
     /**
      * Adds one or more reactive items to the store. If an item is a child store, it will be added to the store.
-     * @param {{[key: string]: ReactivePrimitive|Store}} items - An object where the keys are the keys to use when adding the items to the store and the values are the reactive items to add.
+     * @param {{[key: string]: ReactiveItem|Store}} items - An object where the keys are the keys to use when adding the items to the store and the values are the reactive items to add.
      * @throws {Error} If an item with the given key already exists in the store.
      * @throws {Error} If the store is destroyed.
      * @example
@@ -234,13 +234,13 @@ class Store {
      */
     addItems(items) {
         if (this.isDestroyed) {
-            throw new Error('Cannot add items to a destroyed store.');
+            throw new Error('Store has been destroyed');
         }
 
         for (const [key, item] of Object.entries(items)) {
             if (item instanceof Store) {
                 this.#addStore(key, item);
-            } else if (item instanceof ReactivePrimitive) {
+            } else if (item instanceof ReactiveItem) {
                 this.#addReactiveItem(key, item);
             }
         }
@@ -269,6 +269,10 @@ class Store {
      * @returns {void}
      */
     destroyItem(key) {
+        if (this.isDestroyed) {
+            throw new Error('Store has been destroyed');
+        }
+
         this.#destroyReactiveItem(key);
         this.#destroyChildStore(key);
     }
@@ -279,7 +283,9 @@ class Store {
      */
     #removeReactiveItem(key) {
         const item = this.#items.get(key);
-        if (!item) {return;}
+        if (!item) {
+            return;
+        }
 
         // Remove from store maps
         this.#items.delete(key);
@@ -302,7 +308,9 @@ class Store {
      */
     #removeChildStore(key) {
         const store = this.#childStores.get(key);
-        if (!store) {return;}
+        if (!store) {
+            return;
+        }
 
         this.#childStores.delete(key);
         this.#keys.delete(store);
@@ -322,7 +330,9 @@ class Store {
      */
     #destroyReactiveItem(key) {
         const item = this.#items.get(key);
-        if (!item) {return;}
+        if (!item) {
+            return;
+        }
 
         this.#removeReactiveItem(key);
 
@@ -336,6 +346,10 @@ class Store {
      * @returns {void}
      */
     removeItem(key) {
+        if (this.isDestroyed) {
+            throw new Error('Store has been destroyed');
+        }
+
         if (this.#items.has(key)) {
             this.#removeReactiveItem(key);
             return;
@@ -353,7 +367,11 @@ class Store {
      * in the store and clears the store of all items.
      */
     destroy() {
-        if (this.#isDestroyed) {return;}
+        if (this.#isDestroyed) {
+            return;
+        }
+
+        this.#isDestroyed = true;
 
         this.#items.forEach((item, key) => {
             this.#destroyReactiveItem(key);
@@ -375,7 +393,6 @@ class Store {
         this.eventEmitter.emit('destroy', this);
         this.eventEmitter.unregisterAllEvents();
 
-        this.#isDestroyed = true;
         this.#unsubscribers.removeAll();
     }
 
@@ -383,7 +400,11 @@ class Store {
      * Clears all reactive items from the store. This method is useful for resetting a Store to an empty state.
      * It removes all reactive items from the store and clears all child stores. It does not destroy the reactive items.
      */
-    clear() {
+    detachAll() {
+        if (this.isDestroyed) {
+            throw new Error('Store has been destroyed');
+        }
+
         this.#items.forEach((item, key) => {
             this.#removeReactiveItem(key);
         });
@@ -400,12 +421,9 @@ class Store {
     /**
      * Retrieves the reactive item with the given key from the store.
      * @param {string} key - The key of the item to retrieve.
-     * @returns {ReactivePrimitive|null} The reactive item with the given key, or null if no such item exists in the store.
+     * @returns {ReactiveItem|null} The reactive item with the given key, or null if no such item exists in the store.
      */
     #getReactiveItem(key) {
-        if (this.isDestroyed) {
-            return null;
-        }
         return this.#items.get(key) || null;
     }
 
@@ -415,9 +433,6 @@ class Store {
      * @returns {Store|null} The child store with the given key, or null if no such child store exists in the store.
      */
     #getChildStore(key) {
-        if (this.isDestroyed) {
-            return null;
-        }
         return this.#childStores.get(key) || null;
     }
 
@@ -425,9 +440,12 @@ class Store {
      * Retrieves the item with the given key from the store. This method first looks for a reactive item with the given key,
      * and if no such item exists, looks for a child store with the same key.
      * @param {string} key - The key of the item to retrieve.
-     * @returns {ReactivePrimitive|Store|null} The item with the given key, or null if no such item exists in the store.
+     * @returns {ReactiveItem|Store|null} The item with the given key, or null if no such item exists in the store.
      */
     getItem(key) {
+        if (this.isDestroyed) {
+            throw new Error('Store has been destroyed');
+        }
         return this.#getReactiveItem(key) || this.#getChildStore(key) || null;
     }
 
@@ -438,7 +456,7 @@ class Store {
      */
     hasItem(key) {
         if (this.isDestroyed) {
-            return false;
+            throw new Error('Store has been destroyed');
         }
         return this.#items.has(key) || this.#childStores.has(key);
     }
@@ -452,7 +470,7 @@ class Store {
      */
     getItemNames(filter = 'all') {
         if (this.isDestroyed) {
-            return [];
+            throw new Error('Store has been destroyed');
         }
 
         if (filter === 'reactives') {
@@ -469,11 +487,11 @@ class Store {
      *
      * @param {"all"|"reactives"|"stores"} [filter="all"] - The filter to apply when retrieving items. Default is "all".
      * Possible values can be "all", "reactives", or "stores" (if applicable).
-     * @returns {Map<string, ReactivePrimitive|Store>} A Map containing the items that match the filter.
+     * @returns {Map<string, ReactiveItem|Store>} A Map containing the items that match the filter.
      */
-    getItems(filter = 'all') {
+    toMap(filter = 'all') {
         if (this.isDestroyed) {
-            return new Map();
+            throw new Error('Store has been destroyed');
         }
 
         if (filter === 'reactives') {
@@ -482,7 +500,7 @@ class Store {
             return this.#childStores;
         }
 
-        /** @type {Map<string, ReactivePrimitive|Store>} */
+        /** @type {Map<string, ReactiveItem|Store>} */
         const result = new Map(this.#items);
 
         this.#childStores.forEach((store, key) => {
@@ -492,7 +510,7 @@ class Store {
         return result;
     }
 
-    #itemsAsPlainObject() {
+    #itemsToJSON() {
         const object = {};
 
         this.#items.forEach((item, key) => {
@@ -503,12 +521,12 @@ class Store {
         return object;
     }
 
-    #childStoresAsPlainObject() {
+    #childStoresToJSON() {
         const object = {};
 
         this.#childStores.forEach((store, key) => {
             // @ts-ignore
-            object[key] = store.asPlainObject();
+            object[key] = store.toJSON();
         });
 
         return object;
@@ -532,38 +550,38 @@ class Store {
      * store.addItems({ a, b, c });
      * c.addItems({ d, e });
      *
-     * console.log(store.asPlainObject());
+     * console.log(store.toJSON());
      * // output: { a: 1, b: 2, c: { d: 3, e: [1, 2, 3] } }
      *
-     * console.log(store.asPlainObject("all"));
+     * console.log(store.toJSON("all"));
      * // output: { a: 1, b: 2, c: { d: 3, e: [1, 2, 3] } }
      *
-     * console.log(store.asPlainObject("reactives"));
+     * console.log(store.toJSON("reactives"));
      * // output: { a: 1, b: 2 }
      *
-     * console.log(store.asPlainObject("stores"));
+     * console.log(store.toJSON("stores"));
      * // output: { c: { d: 3, e: [1, 2, 3] } }
      *
      * store.destroy();
      *
-     * console.log(store.asPlainObject());
+     * console.log(store.toJSON());
      * // output: {}
      * ```
      */
-    asPlainObject(filter = 'all') {
+    toJSON(filter = 'all') {
         if (this.isDestroyed) {
-            return {};
+            throw new Error('Store has been destroyed');
         }
 
         if (filter === 'reactives') {
-            return this.#itemsAsPlainObject();
+            return this.#itemsToJSON();
         } else if (filter === 'stores') {
-            return this.#childStoresAsPlainObject();
+            return this.#childStoresToJSON();
         }
 
         const object = {
-            ...this.#itemsAsPlainObject(),
-            ...this.#childStoresAsPlainObject(),
+            ...this.#itemsToJSON(),
+            ...this.#childStoresToJSON(),
         };
         return object;
     }
@@ -604,7 +622,7 @@ class Store {
      */
     subscribe(fn) {
         if (this.isDestroyed) {
-            return () => {};
+            throw new Error('Store has been destroyed');
         }
 
         const that = this;
@@ -622,7 +640,7 @@ class Store {
      */
     onDestroy(fn) {
         if (this.isDestroyed) {
-            return () => {};
+            throw new Error('Store has been destroyed');
         }
 
         return this.eventEmitter.on('destroy', fn);
@@ -632,7 +650,10 @@ class Store {
      * Mutes the event emitter, preventing any updates from being triggered.
      * Any updates that are scheduled while muted will be queued and executed when unmuteUpdates is called.
      */
-    suppressNotifications() {
+    muteUpdates() {
+        if (this.isDestroyed) {
+            throw new Error('Store has been destroyed');
+        }
         this.eventEmitter.mute();
     }
 
@@ -641,6 +662,9 @@ class Store {
      * Any updates that were scheduled while muted will be executed.
      */
     unmuteUpdates() {
+        if (this.isDestroyed) {
+            throw new Error('Store has been destroyed');
+        }
         this.eventEmitter.unmute();
     }
 
@@ -649,6 +673,9 @@ class Store {
      * @returns {boolean}
      */
     isMuted() {
+        if (this.isDestroyed) {
+            throw new Error('Store has been destroyed');
+        }
         return this.eventEmitter.isMuted();
     }
 }

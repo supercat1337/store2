@@ -118,7 +118,7 @@ test('Atom: set value while subscribers are running in batch mode', t => {
 });
 
 test('Atom: get valueUntracked', t => {
-    //t.log("modeController.computedMode", modeController.computedMode, "modeController.batchMode", modeController.batchMode, "modeController.subscribersMode", modeController.subscribersMode);
+    //t.log("modeController.isComputing", modeController.isComputing, "modeController.batchMode", modeController.batchMode, "modeController.subscribersMode", modeController.subscribersMode);
 
     const a = new Atom(0, { name: 'a' });
     const b = new Atom(0, { name: 'b' });

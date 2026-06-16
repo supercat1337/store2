@@ -2,7 +2,7 @@
 
 import { Atom } from '../reactives/Atom.js';
 import { ShallowReactive } from '../reactives/ShallowReactive.js';
-import { Store } from './store.js';
+import { Store } from './Store.js';
 import { isPlainObject } from '../helpers/tools.js';
 
 /**
@@ -35,12 +35,12 @@ function isReactiveWrapper(item) {
  * const list = new ReactiveList();
  *
  * list.subscribe(() => {
- *     console.log('List changed:', list.getItems());
+ *     console.log('List changed:', list.toArray());
  * });
  *
  * list.add(1, 2, 3);                // numbers -> stored as Atom
  * list.setItem(1, 42);
- * list.splice(0, 1);
+ * list.removeRange(0, 1);
  * list.setItems([{ a: 1 }, { b: 2 }]); // objects -> stored as ShallowReactive
  * ```
  */
@@ -56,7 +56,7 @@ export class ReactiveList {
      */
     constructor() {
         this.#store = new Store();
-        this.#store.suppressNotifications();
+        this.#store.muteUpdates();
 
         this.#lengthAtom = new Atom(0, { name: 'length' });
         this.#store.addItems({ length: this.#lengthAtom });
@@ -102,7 +102,7 @@ export class ReactiveList {
 
         const startIndex = this.#lengthAtom.value;
         const alreadyMuted = this.#store.isMuted();
-        this.#store.suppressNotifications();
+        this.#store.muteUpdates();
 
         /** @type {{[key:string]: ReactiveWrapper<any>}} */
         const wrappers = {};
@@ -140,7 +140,7 @@ export class ReactiveList {
      *
      * @returns {T[]} An array containing all values.
      */
-    getItems() {
+    toArray() {
         if (this.isDestroyed) {throw new Error('ReactiveList has been destroyed');}
         const items = [];
         for (let i = 0; i < this.#lengthAtom.value; i++) {
@@ -163,7 +163,7 @@ export class ReactiveList {
         const wrapper = this.#store.getItem(index.toString());
         if (!isReactiveWrapper(wrapper)) {return;}
         const alreadyMuted = this.#store.isMuted();
-        this.#store.suppressNotifications();
+        this.#store.muteUpdates();
         wrapper.value = value;
         if (!alreadyMuted) {this.#store.unmuteUpdates();}
     }
@@ -186,7 +186,7 @@ export class ReactiveList {
     setItems(values) {
         if (this.isDestroyed) {throw new Error('ReactiveList has been destroyed');}
         const alreadyMuted = this.#store.isMuted();
-        this.#store.suppressNotifications();
+        this.#store.muteUpdates();
 
         const currentLen = this.#lengthAtom.value;
         const newLen = values.length;
@@ -235,7 +235,7 @@ export class ReactiveList {
      * @param {number} startIndex - The index at which to start removal.
      * @param {number} count - The number of elements to remove.
      */
-    splice(startIndex, count) {
+    removeRange(startIndex, count) {
         if (this.isDestroyed) {throw new Error('ReactiveList has been destroyed');}
         if (count <= 0) {return;}
 
@@ -247,7 +247,7 @@ export class ReactiveList {
 
         const newLen = oldLen - actualCount;
         const alreadyMuted = this.#store.isMuted();
-        this.#store.suppressNotifications();
+        this.#store.muteUpdates();
 
         // Shift elements left
         for (let i = startIndex; i < newLen; i++) {
@@ -277,28 +277,28 @@ export class ReactiveList {
      * @param {number} index - The index of the item to remove.
      */
     removeItem(index) {
-        this.splice(index, 1);
+        this.removeRange(index, 1);
     }
 
     /**
      * Removes the last item of the list.
      */
     removeLastItem() {
-        this.splice(this.#lengthAtom.value - 1, 1);
+        this.removeRange(this.#lengthAtom.value - 1, 1);
     }
 
     /**
      * Removes the first item of the list.
      */
     removeFirstItem() {
-        this.splice(0, 1);
+        this.removeRange(0, 1);
     }
 
     /**
      * Removes all items from the list.
      */
     clear() {
-        this.splice(0, this.#lengthAtom.value);
+        this.removeRange(0, this.#lengthAtom.value);
     }
 
     /**

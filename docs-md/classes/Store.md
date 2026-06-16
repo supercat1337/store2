@@ -25,7 +25,7 @@ store.subscribe((updates) => {
 });
 
 // mute updates
-store.suppressNotifications();
+store.muteUpdates();
 childStore.removeItem("childStore");
 a.value = 3;
 b.value = 4;
@@ -81,29 +81,29 @@ batch(() => {
 
 - [#addReactiveItem](Store.md##addreactiveitem)
 - [#addStore](Store.md##addstore)
-- [#childStoresAsPlainObject](Store.md##childstoresasplainobject)
+- [#childStoresToJSON](Store.md##childstorestojson)
 - [#destroyChildStore](Store.md##destroychildstore)
 - [#destroyReactiveItem](Store.md##destroyreactiveitem)
 - [#getChildStore](Store.md##getchildstore)
 - [#getReactiveItem](Store.md##getreactiveitem)
-- [#itemsAsPlainObject](Store.md##itemsasplainobject)
+- [#itemsToJSON](Store.md##itemstojson)
 - [#notifySubscribers](Store.md##notifysubscribers)
 - [#removeChildStore](Store.md##removechildstore)
 - [#removeReactiveItem](Store.md##removereactiveitem)
 - [addItems](Store.md#additems)
-- [asPlainObject](Store.md#asplainobject)
-- [clear](Store.md#clear)
 - [destroy](Store.md#destroy)
 - [destroyItem](Store.md#destroyitem)
+- [detachAll](Store.md#detachall)
 - [getItem](Store.md#getitem)
 - [getItemNames](Store.md#getitemnames)
-- [getItems](Store.md#getitems)
 - [hasItem](Store.md#hasitem)
 - [isMuted](Store.md#ismuted)
+- [muteUpdates](Store.md#muteupdates)
 - [onDestroy](Store.md#ondestroy)
 - [removeItem](Store.md#removeitem)
 - [subscribe](Store.md#subscribe)
-- [suppressNotifications](Store.md#suppressnotifications)
+- [toJSON](Store.md#tojson)
+- [toMap](Store.md#tomap)
 - [unmuteUpdates](Store.md#unmuteupdates)
 
 ## Constructors
@@ -118,7 +118,7 @@ batch(() => {
 
 #### Defined in
 
-[src/complex/store.js:89](https://github.com/supercat1337/store2/blob/dcd1ab1b534d7ba2fc0b9fbe897665c53949ace7/src/complex/store.js#L89)
+src/complex/Store.js:89
 
 ## Properties
 
@@ -128,7 +128,7 @@ batch(() => {
 
 #### Defined in
 
-[src/complex/store.js:68](https://github.com/supercat1337/store2/blob/dcd1ab1b534d7ba2fc0b9fbe897665c53949ace7/src/complex/store.js#L68)
+src/complex/Store.js:68
 
 ___
 
@@ -138,17 +138,17 @@ ___
 
 #### Defined in
 
-[src/complex/store.js:74](https://github.com/supercat1337/store2/blob/dcd1ab1b534d7ba2fc0b9fbe897665c53949ace7/src/complex/store.js#L74)
+src/complex/Store.js:74
 
 ___
 
 ### #items
 
-• `Private` **#items**: `Map`\<`string`, [`ReactivePrimitive`](ReactivePrimitive.md)\>
+• `Private` **#items**: `Map`\<`string`, [`ReactiveItem`](ReactiveItem.md)\>
 
 #### Defined in
 
-[src/complex/store.js:64](https://github.com/supercat1337/store2/blob/dcd1ab1b534d7ba2fc0b9fbe897665c53949ace7/src/complex/store.js#L64)
+src/complex/Store.js:64
 
 ___
 
@@ -158,7 +158,7 @@ ___
 
 #### Defined in
 
-[src/complex/store.js:85](https://github.com/supercat1337/store2/blob/dcd1ab1b534d7ba2fc0b9fbe897665c53949ace7/src/complex/store.js#L85)
+src/complex/Store.js:85
 
 ___
 
@@ -183,7 +183,7 @@ ___
 
 #### Defined in
 
-[src/complex/store.js:87](https://github.com/supercat1337/store2/blob/dcd1ab1b534d7ba2fc0b9fbe897665c53949ace7/src/complex/store.js#L87)
+src/complex/Store.js:87
 
 ___
 
@@ -193,7 +193,7 @@ ___
 
 #### Defined in
 
-[src/complex/store.js:77](https://github.com/supercat1337/store2/blob/dcd1ab1b534d7ba2fc0b9fbe897665c53949ace7/src/complex/store.js#L77)
+src/complex/Store.js:77
 
 ___
 
@@ -203,7 +203,7 @@ ___
 
 #### Defined in
 
-[src/complex/store.js:80](https://github.com/supercat1337/store2/blob/dcd1ab1b534d7ba2fc0b9fbe897665c53949ace7/src/complex/store.js#L80)
+src/complex/Store.js:80
 
 ___
 
@@ -213,7 +213,7 @@ ___
 
 #### Defined in
 
-[src/complex/store.js:83](https://github.com/supercat1337/store2/blob/dcd1ab1b534d7ba2fc0b9fbe897665c53949ace7/src/complex/store.js#L83)
+src/complex/Store.js:83
 
 ___
 
@@ -223,7 +223,7 @@ ___
 
 #### Defined in
 
-[src/complex/store.js:71](https://github.com/supercat1337/store2/blob/dcd1ab1b534d7ba2fc0b9fbe897665c53949ace7/src/complex/store.js#L71)
+src/complex/Store.js:71
 
 ## Accessors
 
@@ -259,7 +259,7 @@ console.log(a.isDestroyed); // output: true
 
 #### Defined in
 
-[src/complex/store.js:150](https://github.com/supercat1337/store2/blob/dcd1ab1b534d7ba2fc0b9fbe897665c53949ace7/src/complex/store.js#L150)
+src/complex/Store.js:150
 
 ## Methods
 
@@ -274,7 +274,7 @@ Adds a reactive item to the store with the given key.
 | Name | Type | Description |
 | :------ | :------ | :------ |
 | `key` | `string` | The key to use when adding the item to the store. |
-| `reactiveItem` | [`ReactivePrimitive`](ReactivePrimitive.md) | The reactive item to add to the store. |
+| `reactiveItem` | [`ReactiveItem`](ReactiveItem.md) | The reactive item to add to the store. |
 
 #### Returns
 
@@ -286,7 +286,7 @@ If an item with the given key already exists in the store.
 
 #### Defined in
 
-[src/complex/store.js:165](https://github.com/supercat1337/store2/blob/dcd1ab1b534d7ba2fc0b9fbe897665c53949ace7/src/complex/store.js#L165)
+src/complex/Store.js:165
 
 ___
 
@@ -313,13 +313,13 @@ If a child store with the given key already exists in this store.
 
 #### Defined in
 
-[src/complex/store.js:202](https://github.com/supercat1337/store2/blob/dcd1ab1b534d7ba2fc0b9fbe897665c53949ace7/src/complex/store.js#L202)
+src/complex/Store.js:202
 
 ___
 
-### #childStoresAsPlainObject
+### #childStoresToJSON
 
-▸ **#childStoresAsPlainObject**(): `Object`
+▸ **#childStoresToJSON**(): `Object`
 
 #### Returns
 
@@ -327,7 +327,7 @@ ___
 
 #### Defined in
 
-[src/complex/store.js:506](https://github.com/supercat1337/store2/blob/dcd1ab1b534d7ba2fc0b9fbe897665c53949ace7/src/complex/store.js#L506)
+src/complex/Store.js:524
 
 ___
 
@@ -350,7 +350,7 @@ that is no longer needed. It calls destroy on the child store and removes the ch
 
 #### Defined in
 
-[src/complex/store.js:255](https://github.com/supercat1337/store2/blob/dcd1ab1b534d7ba2fc0b9fbe897665c53949ace7/src/complex/store.js#L255)
+src/complex/Store.js:255
 
 ___
 
@@ -372,7 +372,7 @@ Removes and DESTROYS a reactive item.
 
 #### Defined in
 
-[src/complex/store.js:323](https://github.com/supercat1337/store2/blob/dcd1ab1b534d7ba2fc0b9fbe897665c53949ace7/src/complex/store.js#L323)
+src/complex/Store.js:331
 
 ___
 
@@ -396,13 +396,13 @@ The child store with the given key, or null if no such child store exists in the
 
 #### Defined in
 
-[src/complex/store.js:417](https://github.com/supercat1337/store2/blob/dcd1ab1b534d7ba2fc0b9fbe897665c53949ace7/src/complex/store.js#L417)
+src/complex/Store.js:435
 
 ___
 
 ### #getReactiveItem
 
-▸ **#getReactiveItem**(`key`): [`ReactivePrimitive`](ReactivePrimitive.md)
+▸ **#getReactiveItem**(`key`): [`ReactiveItem`](ReactiveItem.md)
 
 Retrieves the reactive item with the given key from the store.
 
@@ -414,19 +414,19 @@ Retrieves the reactive item with the given key from the store.
 
 #### Returns
 
-[`ReactivePrimitive`](ReactivePrimitive.md)
+[`ReactiveItem`](ReactiveItem.md)
 
 The reactive item with the given key, or null if no such item exists in the store.
 
 #### Defined in
 
-[src/complex/store.js:405](https://github.com/supercat1337/store2/blob/dcd1ab1b534d7ba2fc0b9fbe897665c53949ace7/src/complex/store.js#L405)
+src/complex/Store.js:426
 
 ___
 
-### #itemsAsPlainObject
+### #itemsToJSON
 
-▸ **#itemsAsPlainObject**(): `Object`
+▸ **#itemsToJSON**(): `Object`
 
 #### Returns
 
@@ -434,7 +434,7 @@ ___
 
 #### Defined in
 
-[src/complex/store.js:495](https://github.com/supercat1337/store2/blob/dcd1ab1b534d7ba2fc0b9fbe897665c53949ace7/src/complex/store.js#L495)
+src/complex/Store.js:513
 
 ___
 
@@ -448,7 +448,7 @@ ___
 
 #### Defined in
 
-[src/complex/store.js:154](https://github.com/supercat1337/store2/blob/dcd1ab1b534d7ba2fc0b9fbe897665c53949ace7/src/complex/store.js#L154)
+src/complex/Store.js:154
 
 ___
 
@@ -470,7 +470,7 @@ Removes a child store WITHOUT destroying it.
 
 #### Defined in
 
-[src/complex/store.js:303](https://github.com/supercat1337/store2/blob/dcd1ab1b534d7ba2fc0b9fbe897665c53949ace7/src/complex/store.js#L303)
+src/complex/Store.js:309
 
 ___
 
@@ -492,7 +492,7 @@ Removes a reactive item from the store WITHOUT destroying it.
 
 #### Defined in
 
-[src/complex/store.js:280](https://github.com/supercat1337/store2/blob/dcd1ab1b534d7ba2fc0b9fbe897665c53949ace7/src/complex/store.js#L280)
+src/complex/Store.js:284
 
 ___
 
@@ -531,79 +531,7 @@ console.log(store.hasItem("a")); // output: true
 
 #### Defined in
 
-[src/complex/store.js:235](https://github.com/supercat1337/store2/blob/dcd1ab1b534d7ba2fc0b9fbe897665c53949ace7/src/complex/store.js#L235)
-
-___
-
-### asPlainObject
-
-▸ **asPlainObject**(`filter?`): `any`
-
-Retrieves the value of this Store as a plain object, optionally filtered by a specified filter.
-
-#### Parameters
-
-| Name | Type | Default value | Description |
-| :------ | :------ | :------ | :------ |
-| `filter?` | ``"all"`` \| ``"reactives"`` \| ``"stores"`` | `'all'` | The filter to apply when retrieving items. Default is "all". Possible values can be "all", "reactives", or "stores" (if applicable). |
-
-#### Returns
-
-`any`
-
-A plain object containing the values of the items that match the filter.
-
-**`Example`**
-
-```js
-const store = new Store();
-const a = atom(1);
-const b = atom(2);
-const c = new Store();
-const d = computed(() => a.value + b.value);
-const e = collection([1, 2, 3]);
-
-store.addItems({ a, b, c });
-c.addItems({ d, e });
-
-console.log(store.asPlainObject());
-// output: { a: 1, b: 2, c: { d: 3, e: [1, 2, 3] } }
-
-console.log(store.asPlainObject("all"));
-// output: { a: 1, b: 2, c: { d: 3, e: [1, 2, 3] } }
-
-console.log(store.asPlainObject("reactives"));
-// output: { a: 1, b: 2 }
-
-console.log(store.asPlainObject("stores"));
-// output: { c: { d: 3, e: [1, 2, 3] } }
-
-store.destroy();
-
-console.log(store.asPlainObject());
-// output: {}
-```
-
-#### Defined in
-
-[src/complex/store.js:553](https://github.com/supercat1337/store2/blob/dcd1ab1b534d7ba2fc0b9fbe897665c53949ace7/src/complex/store.js#L553)
-
-___
-
-### clear
-
-▸ **clear**(): `void`
-
-Clears all reactive items from the store. This method is useful for resetting a Store to an empty state.
-It removes all reactive items from the store and clears all child stores. It does not destroy the reactive items.
-
-#### Returns
-
-`void`
-
-#### Defined in
-
-[src/complex/store.js:386](https://github.com/supercat1337/store2/blob/dcd1ab1b534d7ba2fc0b9fbe897665c53949ace7/src/complex/store.js#L386)
+src/complex/Store.js:235
 
 ___
 
@@ -621,7 +549,7 @@ in the store and clears the store of all items.
 
 #### Defined in
 
-[src/complex/store.js:355](https://github.com/supercat1337/store2/blob/dcd1ab1b534d7ba2fc0b9fbe897665c53949ace7/src/complex/store.js#L355)
+src/complex/Store.js:369
 
 ___
 
@@ -645,13 +573,30 @@ attempts to destroy a child store with the same key.
 
 #### Defined in
 
-[src/complex/store.js:271](https://github.com/supercat1337/store2/blob/dcd1ab1b534d7ba2fc0b9fbe897665c53949ace7/src/complex/store.js#L271)
+src/complex/Store.js:271
+
+___
+
+### detachAll
+
+▸ **detachAll**(): `void`
+
+Clears all reactive items from the store. This method is useful for resetting a Store to an empty state.
+It removes all reactive items from the store and clears all child stores. It does not destroy the reactive items.
+
+#### Returns
+
+`void`
+
+#### Defined in
+
+src/complex/Store.js:403
 
 ___
 
 ### getItem
 
-▸ **getItem**(`key`): [`ReactivePrimitive`](ReactivePrimitive.md) \| [`Store`](Store.md)
+▸ **getItem**(`key`): [`ReactiveItem`](ReactiveItem.md) \| [`Store`](Store.md)
 
 Retrieves the item with the given key from the store. This method first looks for a reactive item with the given key,
 and if no such item exists, looks for a child store with the same key.
@@ -664,13 +609,13 @@ and if no such item exists, looks for a child store with the same key.
 
 #### Returns
 
-[`ReactivePrimitive`](ReactivePrimitive.md) \| [`Store`](Store.md)
+[`ReactiveItem`](ReactiveItem.md) \| [`Store`](Store.md)
 
 The item with the given key, or null if no such item exists in the store.
 
 #### Defined in
 
-[src/complex/store.js:430](https://github.com/supercat1337/store2/blob/dcd1ab1b534d7ba2fc0b9fbe897665c53949ace7/src/complex/store.js#L430)
+src/complex/Store.js:445
 
 ___
 
@@ -694,31 +639,7 @@ An array containing the names of items that match the filter.
 
 #### Defined in
 
-[src/complex/store.js:453](https://github.com/supercat1337/store2/blob/dcd1ab1b534d7ba2fc0b9fbe897665c53949ace7/src/complex/store.js#L453)
-
-___
-
-### getItems
-
-▸ **getItems**(`filter?`): `Map`\<`string`, [`ReactivePrimitive`](ReactivePrimitive.md) \| [`Store`](Store.md)\>
-
-Retrieves all items stored in the Store, optionally filtered by a specified filter.
-
-#### Parameters
-
-| Name | Type | Default value | Description |
-| :------ | :------ | :------ | :------ |
-| `filter?` | ``"all"`` \| ``"reactives"`` \| ``"stores"`` | `'all'` | The filter to apply when retrieving items. Default is "all". Possible values can be "all", "reactives", or "stores" (if applicable). |
-
-#### Returns
-
-`Map`\<`string`, [`ReactivePrimitive`](ReactivePrimitive.md) \| [`Store`](Store.md)\>
-
-A Map containing the items that match the filter.
-
-#### Defined in
-
-[src/complex/store.js:474](https://github.com/supercat1337/store2/blob/dcd1ab1b534d7ba2fc0b9fbe897665c53949ace7/src/complex/store.js#L474)
+src/complex/Store.js:471
 
 ___
 
@@ -742,7 +663,7 @@ true if the item exists, false otherwise.
 
 #### Defined in
 
-[src/complex/store.js:439](https://github.com/supercat1337/store2/blob/dcd1ab1b534d7ba2fc0b9fbe897665c53949ace7/src/complex/store.js#L439)
+src/complex/Store.js:457
 
 ___
 
@@ -758,7 +679,24 @@ Returns whether the event emitter is currently muted.
 
 #### Defined in
 
-[src/complex/store.js:651](https://github.com/supercat1337/store2/blob/dcd1ab1b534d7ba2fc0b9fbe897665c53949ace7/src/complex/store.js#L651)
+src/complex/Store.js:675
+
+___
+
+### muteUpdates
+
+▸ **muteUpdates**(): `void`
+
+Mutes the event emitter, preventing any updates from being triggered.
+Any updates that are scheduled while muted will be queued and executed when unmuteUpdates is called.
+
+#### Returns
+
+`void`
+
+#### Defined in
+
+src/complex/Store.js:653
 
 ___
 
@@ -789,7 +727,7 @@ A function that unsubscribes the given function.
 
 #### Defined in
 
-[src/complex/store.js:623](https://github.com/supercat1337/store2/blob/dcd1ab1b534d7ba2fc0b9fbe897665c53949ace7/src/complex/store.js#L623)
+src/complex/Store.js:641
 
 ___
 
@@ -811,7 +749,7 @@ Removes the reactive item with the given key from the store. This method does no
 
 #### Defined in
 
-[src/complex/store.js:338](https://github.com/supercat1337/store2/blob/dcd1ab1b534d7ba2fc0b9fbe897665c53949ace7/src/complex/store.js#L338)
+src/complex/Store.js:348
 
 ___
 
@@ -872,24 +810,86 @@ console.log(i); // output: 4
 
 #### Defined in
 
-[src/complex/store.js:605](https://github.com/supercat1337/store2/blob/dcd1ab1b534d7ba2fc0b9fbe897665c53949ace7/src/complex/store.js#L605)
+src/complex/Store.js:623
 
 ___
 
-### suppressNotifications
+### toJSON
 
-▸ **suppressNotifications**(): `void`
+▸ **toJSON**(`filter?`): `any`
 
-Mutes the event emitter, preventing any updates from being triggered.
-Any updates that are scheduled while muted will be queued and executed when unmuteUpdates is called.
+Retrieves the value of this Store as a plain object, optionally filtered by a specified filter.
+
+#### Parameters
+
+| Name | Type | Default value | Description |
+| :------ | :------ | :------ | :------ |
+| `filter?` | ``"all"`` \| ``"reactives"`` \| ``"stores"`` | `'all'` | The filter to apply when retrieving items. Default is "all". Possible values can be "all", "reactives", or "stores" (if applicable). |
 
 #### Returns
 
-`void`
+`any`
+
+A plain object containing the values of the items that match the filter.
+
+**`Example`**
+
+```js
+const store = new Store();
+const a = atom(1);
+const b = atom(2);
+const c = new Store();
+const d = computed(() => a.value + b.value);
+const e = collection([1, 2, 3]);
+
+store.addItems({ a, b, c });
+c.addItems({ d, e });
+
+console.log(store.toJSON());
+// output: { a: 1, b: 2, c: { d: 3, e: [1, 2, 3] } }
+
+console.log(store.toJSON("all"));
+// output: { a: 1, b: 2, c: { d: 3, e: [1, 2, 3] } }
+
+console.log(store.toJSON("reactives"));
+// output: { a: 1, b: 2 }
+
+console.log(store.toJSON("stores"));
+// output: { c: { d: 3, e: [1, 2, 3] } }
+
+store.destroy();
+
+console.log(store.toJSON());
+// output: {}
+```
 
 #### Defined in
 
-[src/complex/store.js:635](https://github.com/supercat1337/store2/blob/dcd1ab1b534d7ba2fc0b9fbe897665c53949ace7/src/complex/store.js#L635)
+src/complex/Store.js:571
+
+___
+
+### toMap
+
+▸ **toMap**(`filter?`): `Map`\<`string`, [`ReactiveItem`](ReactiveItem.md) \| [`Store`](Store.md)\>
+
+Retrieves all items stored in the Store, optionally filtered by a specified filter.
+
+#### Parameters
+
+| Name | Type | Default value | Description |
+| :------ | :------ | :------ | :------ |
+| `filter?` | ``"all"`` \| ``"reactives"`` \| ``"stores"`` | `'all'` | The filter to apply when retrieving items. Default is "all". Possible values can be "all", "reactives", or "stores" (if applicable). |
+
+#### Returns
+
+`Map`\<`string`, [`ReactiveItem`](ReactiveItem.md) \| [`Store`](Store.md)\>
+
+A Map containing the items that match the filter.
+
+#### Defined in
+
+src/complex/Store.js:492
 
 ___
 
@@ -906,4 +906,4 @@ Any updates that were scheduled while muted will be executed.
 
 #### Defined in
 
-[src/complex/store.js:643](https://github.com/supercat1337/store2/blob/dcd1ab1b534d7ba2fc0b9fbe897665c53949ace7/src/complex/store.js#L643)
+src/complex/Store.js:664

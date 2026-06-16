@@ -14,25 +14,25 @@
 
 - [oldValue](internal_.UpdateDataRecord.md#oldvalue)
 - [reactiveItem](internal_.UpdateDataRecord.md#reactiveitem)
+- [type](internal_.UpdateDataRecord.md#type)
 - [value](internal_.UpdateDataRecord.md#value)
-- [verb](internal_.UpdateDataRecord.md#verb)
 
 ## Constructors
 
 ### constructor
 
-• **new UpdateDataRecord**(`verb`, `oldValue`, `value`, `reactiveItem?`): [`UpdateDataRecord`](internal_.UpdateDataRecord.md)
+• **new UpdateDataRecord**(`type`, `oldValue`, `value`, `reactiveItem?`): [`UpdateDataRecord`](internal_.UpdateDataRecord.md)
 
-Initializes an instance of UpdateDataRecord with the provided verb, old value, and new value.
+Initializes an instance of UpdateDataRecord with the provided type, old value, and new value.
 
 #### Parameters
 
 | Name | Type | Description |
 | :------ | :------ | :------ |
-| `verb` | ``"set"`` \| ``"delete"`` | The action performed, either "set" or "delete". |
+| `type` | ``"set"`` \| ``"delete"`` | The action performed, either "set" or "delete". |
 | `oldValue` | `any` | The previous value before the update. |
 | `value` | `any` | The new value after the update. |
-| `reactiveItem?` | [`ReactivePrimitive`](ReactivePrimitive.md) | The reactive item that triggered the update. |
+| `reactiveItem?` | [`ReactiveItem`](ReactiveItem.md) | The reactive item that triggered the update. |
 
 #### Returns
 
@@ -40,7 +40,7 @@ Initializes an instance of UpdateDataRecord with the provided verb, old value, a
 
 #### Defined in
 
-[src/core/UpdateDataRecord.js:23](https://github.com/supercat1337/store2/blob/dcd1ab1b534d7ba2fc0b9fbe897665c53949ace7/src/core/UpdateDataRecord.js#L23)
+[src/core/UpdateDataRecord.js:23](https://github.com/supercat1337/store2/blob/092e7aaba8ac2329715b3d46c6a0217f1d1972eb/src/core/UpdateDataRecord.js#L23)
 
 ## Properties
 
@@ -50,17 +50,27 @@ Initializes an instance of UpdateDataRecord with the provided verb, old value, a
 
 #### Defined in
 
-[src/core/UpdateDataRecord.js:11](https://github.com/supercat1337/store2/blob/dcd1ab1b534d7ba2fc0b9fbe897665c53949ace7/src/core/UpdateDataRecord.js#L11)
+[src/core/UpdateDataRecord.js:11](https://github.com/supercat1337/store2/blob/092e7aaba8ac2329715b3d46c6a0217f1d1972eb/src/core/UpdateDataRecord.js#L11)
 
 ___
 
 ### reactiveItem
 
-• **reactiveItem**: [`ReactivePrimitive`](ReactivePrimitive.md)
+• **reactiveItem**: [`ReactiveItem`](ReactiveItem.md)
 
 #### Defined in
 
-[src/core/UpdateDataRecord.js:14](https://github.com/supercat1337/store2/blob/dcd1ab1b534d7ba2fc0b9fbe897665c53949ace7/src/core/UpdateDataRecord.js#L14)
+[src/core/UpdateDataRecord.js:14](https://github.com/supercat1337/store2/blob/092e7aaba8ac2329715b3d46c6a0217f1d1972eb/src/core/UpdateDataRecord.js#L14)
+
+___
+
+### type
+
+• **type**: ``"set"`` \| ``"delete"``
+
+#### Defined in
+
+[src/core/UpdateDataRecord.js:5](https://github.com/supercat1337/store2/blob/092e7aaba8ac2329715b3d46c6a0217f1d1972eb/src/core/UpdateDataRecord.js#L5)
 
 ___
 
@@ -70,14 +80,4 @@ ___
 
 #### Defined in
 
-[src/core/UpdateDataRecord.js:8](https://github.com/supercat1337/store2/blob/dcd1ab1b534d7ba2fc0b9fbe897665c53949ace7/src/core/UpdateDataRecord.js#L8)
-
-___
-
-### verb
-
-• **verb**: ``"set"`` \| ``"delete"``
-
-#### Defined in
-
-[src/core/UpdateDataRecord.js:5](https://github.com/supercat1337/store2/blob/dcd1ab1b534d7ba2fc0b9fbe897665c53949ace7/src/core/UpdateDataRecord.js#L5)
+[src/core/UpdateDataRecord.js:8](https://github.com/supercat1337/store2/blob/092e7aaba8ac2329715b3d46c6a0217f1d1972eb/src/core/UpdateDataRecord.js#L8)

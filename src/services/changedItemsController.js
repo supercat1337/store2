@@ -8,13 +8,13 @@ import { modeController } from './modeController.js';
  * Handles batching, dependency recalculation, and error aggregation.
  */
 class ChangedItemsController {
-    /** @type {Set<ReactivePrimitive>} */
+    /** @type {Set<ReactiveItem>} */
     items = new Set();
 
     /**
      * Adds a reactive item to the set of changed items.
      * If not in batch mode, immediately runs subscribers and clears the set.
-     * @param {ReactivePrimitive} item - The reactive item that changed.
+     * @param {ReactiveItem} item - The reactive item that changed.
      */
     addItem(item) {
         this.items.add(item);
@@ -25,7 +25,7 @@ class ChangedItemsController {
     }
 
     /**
-     * @param {ReactivePrimitive} item
+     * @param {ReactiveItem} item
      */
     removeItem(item) {
         this.items.delete(item);
@@ -45,7 +45,7 @@ class ChangedItemsController {
      * Handles errors and aggregates them if multiple occur.
      */
     runSubscribers() {
-        /** @type {Set<ReactivePrimitive>} */
+        /** @type {Set<ReactiveItem>} */
         const changedItemsWithUpdates = new Set();
 
         // get atoms whose value has changed. compare values
@@ -55,13 +55,13 @@ class ChangedItemsController {
                     changedItemsWithUpdates.add(item);
                 }
             } else {
-                if (item.engine.checkChangesOldValues()) {
+                if (item.engine.hasUpdates()) {
                     changedItemsWithUpdates.add(item);
                 }
             }
         });
 
-        /** @type {Set<ReactivePrimitive>} */
+        /** @type {Set<ReactiveItem>} */
         const itemsToRecalc = new Set();
 
         // get reactive items whose dependents have subscribers
@@ -91,7 +91,7 @@ class ChangedItemsController {
             });
         } else {
             this.items.forEach(item => {
-                if (item.engine.checkChangesOldValues()) {
+                if (item.engine.hasUpdates()) {
                     changedItemsWithUpdates.add(item);
                 }
             });

@@ -48,8 +48,8 @@ test("dependencyTracker: getSetOfUsedReactiveItems()", (t) => {
     t.is(set.has(c), true);
 });
 
-test("dependencyTracker: turnOn() while is turnOn", (t) => {
-    dependencyTracker.turnOn();
+test("dependencyTracker: enable() while is enable", (t) => {
+    dependencyTracker.enable();
 
-    t.throws(() => dependencyTracker.turnOn());
+    t.throws(() => dependencyTracker.enable());
 });

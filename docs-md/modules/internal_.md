@@ -49,7 +49,7 @@
 
 #### Defined in
 
-src/types.d.ts:2
+[src/types.d.ts:2](https://github.com/supercat1337/store2/blob/092e7aaba8ac2329715b3d46c6a0217f1d1972eb/src/types.d.ts#L2)
 
 ___
 
@@ -67,7 +67,7 @@ ___
 
 #### Defined in
 
-[src/core/subscribeController.js:7](https://github.com/supercat1337/store2/blob/dcd1ab1b534d7ba2fc0b9fbe897665c53949ace7/src/core/subscribeController.js#L7)
+[src/core/subscribeController.js:7](https://github.com/supercat1337/store2/blob/092e7aaba8ac2329715b3d46c6a0217f1d1972eb/src/core/subscribeController.js#L7)
 
 ___
 

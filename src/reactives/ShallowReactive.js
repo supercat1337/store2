@@ -3,12 +3,12 @@
 import { SHALLOW_REACTIVE } from '../core/Engine.js';
 import { isPlainObject } from '../helpers/tools.js';
 import { modeController } from '../services/modeController.js';
-import { ReactivePrimitive } from './ReactivePrimitive.js';
+import { ReactiveItem } from './ReactiveItem.js';
 
 /**
  * ShallowReactive is a reactive primitive that holds a shallow object. It is the base unit of reactive state.
  * It is a shallow reactive object, meaning that it only tracks changes to the properties of the object itself, not its nested properties.
- * @augments ReactivePrimitive
+ * @augments ReactiveItem
  * @template {{[key:string]:any}} T
  *  * @example
  * ```js
@@ -20,7 +20,7 @@ import { ReactivePrimitive } from './ReactivePrimitive.js';
  *     bar += 1;
  * });
  *
- * const props = b.data;
+ * const props = b.value;
  * props.foo = 2;
  *
  * console.log(bar);
@@ -44,24 +44,24 @@ import { ReactivePrimitive } from './ReactivePrimitive.js';
  *     bar++;
  * });
  *
- * console.log(b.data.foo);
+ * console.log(b.value.foo);
  * // Outputs: 1
  *
- * b.data.foo = 2;
- * console.log(b.data.foo);
+ * b.value.foo = 2;
+ * console.log(b.value.foo);
  * // Outputs: 2
  *
  * console.log(bar);
  * // Outputs: 1
  *
- * b.data.inc();
- * console.log(b.data.foo);
+ * b.value.inc();
+ * console.log(b.value.foo);
  * // Outputs: 3
  * console.log(bar);
  * // Outputs: 2
  * ```
  */
-class ShallowReactive extends ReactivePrimitive {
+class ShallowReactive extends ReactiveItem {
     /** @type {T} */
     #target;
 
@@ -212,29 +212,11 @@ class ShallowReactive extends ReactivePrimitive {
     }
 
     /**
-     * Sets the value of the ShallowReactive. If the value is an object, it will be proxied and reactive.
-     * This is a synonym for `set value(value)`.
-     * @param {T} value - The new value of the ShallowReactive.
-     */
-    set data(value) {
-        this.setValue(value);
-    }
-
-    /**
      * Retrieves the proxied value of the ShallowReactive. If the engine is destroyed, an error is thrown.
      * Tracks the ShallowReactive for dependency management.
      * @returns {T} The proxied value of the ShallowReactive.
      */
     get value() {
-        return this.getValue();
-    }
-
-    /**
-     * Retrieves the proxied value of the ShallowReactive. If the engine is destroyed, an error is thrown.
-     * Tracks the ShallowReactive for dependency management.
-     * @returns {T} The proxied value of the ShallowReactive.
-     */
-    get data() {
         return this.getValue();
     }
 

@@ -16,12 +16,12 @@ full reactivity. Subscribers are notified only once per batch of changes.
 const list = new ReactiveList();
 
 list.subscribe(() => {
-    console.log('List changed:', list.getItems());
+    console.log('List changed:', list.toArray());
 });
 
 list.add(1, 2, 3);                // numbers -> stored as Atom
 list.setItem(1, 42);
-list.splice(0, 1);
+list.removeRange(0, 1);
 list.setItems([{ a: 1 }, { b: 2 }]); // objects -> stored as ShallowReactive
 ```
 
@@ -55,14 +55,14 @@ list.setItems([{ a: 1 }, { b: 2 }]); // objects -> stored as ShallowReactive
 - [clear](ReactiveList.md#clear)
 - [destroy](ReactiveList.md#destroy)
 - [getItem](ReactiveList.md#getitem)
-- [getItems](ReactiveList.md#getitems)
 - [removeFirstItem](ReactiveList.md#removefirstitem)
 - [removeItem](ReactiveList.md#removeitem)
 - [removeLastItem](ReactiveList.md#removelastitem)
+- [removeRange](ReactiveList.md#removerange)
 - [setItem](ReactiveList.md#setitem)
 - [setItems](ReactiveList.md#setitems)
-- [splice](ReactiveList.md#splice)
 - [subscribe](ReactiveList.md#subscribe)
+- [toArray](ReactiveList.md#toarray)
 
 ## Constructors
 
@@ -84,7 +84,7 @@ Creates a new empty ReactiveList.
 
 #### Defined in
 
-[src/complex/reactiveList.js:57](https://github.com/supercat1337/store2/blob/dcd1ab1b534d7ba2fc0b9fbe897665c53949ace7/src/complex/reactiveList.js#L57)
+src/complex/ReactiveList.js:57
 
 ## Properties
 
@@ -94,7 +94,7 @@ Creates a new empty ReactiveList.
 
 #### Defined in
 
-[src/complex/reactiveList.js:49](https://github.com/supercat1337/store2/blob/dcd1ab1b534d7ba2fc0b9fbe897665c53949ace7/src/complex/reactiveList.js#L49)
+src/complex/ReactiveList.js:49
 
 ___
 
@@ -104,7 +104,7 @@ ___
 
 #### Defined in
 
-[src/complex/reactiveList.js:52](https://github.com/supercat1337/store2/blob/dcd1ab1b534d7ba2fc0b9fbe897665c53949ace7/src/complex/reactiveList.js#L52)
+src/complex/ReactiveList.js:52
 
 ## Accessors
 
@@ -120,7 +120,7 @@ Indicates whether the list has been destroyed.
 
 #### Defined in
 
-[src/complex/reactiveList.js:319](https://github.com/supercat1337/store2/blob/dcd1ab1b534d7ba2fc0b9fbe897665c53949ace7/src/complex/reactiveList.js#L319)
+src/complex/ReactiveList.js:319
 
 ___
 
@@ -136,7 +136,7 @@ Returns the current length of the list.
 
 #### Defined in
 
-[src/complex/reactiveList.js:176](https://github.com/supercat1337/store2/blob/dcd1ab1b534d7ba2fc0b9fbe897665c53949ace7/src/complex/reactiveList.js#L176)
+src/complex/ReactiveList.js:176
 
 ## Methods
 
@@ -162,7 +162,7 @@ The reactive wrapper.
 
 #### Defined in
 
-[src/complex/reactiveList.js:74](https://github.com/supercat1337/store2/blob/dcd1ab1b534d7ba2fc0b9fbe897665c53949ace7/src/complex/reactiveList.js#L74)
+src/complex/ReactiveList.js:74
 
 ___
 
@@ -186,7 +186,7 @@ Works for both Atom and ShallowReactive.
 
 #### Defined in
 
-[src/complex/reactiveList.js:89](https://github.com/supercat1337/store2/blob/dcd1ab1b534d7ba2fc0b9fbe897665c53949ace7/src/complex/reactiveList.js#L89)
+src/complex/ReactiveList.js:89
 
 ___
 
@@ -208,7 +208,7 @@ Adds one or more items to the end of the list.
 
 #### Defined in
 
-[src/complex/reactiveList.js:99](https://github.com/supercat1337/store2/blob/dcd1ab1b534d7ba2fc0b9fbe897665c53949ace7/src/complex/reactiveList.js#L99)
+src/complex/ReactiveList.js:99
 
 ___
 
@@ -224,7 +224,7 @@ Removes all items from the list.
 
 #### Defined in
 
-[src/complex/reactiveList.js:300](https://github.com/supercat1337/store2/blob/dcd1ab1b534d7ba2fc0b9fbe897665c53949ace7/src/complex/reactiveList.js#L300)
+src/complex/ReactiveList.js:300
 
 ___
 
@@ -241,7 +241,7 @@ After destruction, any method call (except `isDestroyed`) will throw an error.
 
 #### Defined in
 
-[src/complex/reactiveList.js:308](https://github.com/supercat1337/store2/blob/dcd1ab1b534d7ba2fc0b9fbe897665c53949ace7/src/complex/reactiveList.js#L308)
+src/complex/ReactiveList.js:308
 
 ___
 
@@ -265,25 +265,7 @@ The value, or undefined if the index is out of bounds.
 
 #### Defined in
 
-[src/complex/reactiveList.js:131](https://github.com/supercat1337/store2/blob/dcd1ab1b534d7ba2fc0b9fbe897665c53949ace7/src/complex/reactiveList.js#L131)
-
-___
-
-### getItems
-
-▸ **getItems**(): `T`[]
-
-Returns a shallow copy of all items in the list as a plain array.
-
-#### Returns
-
-`T`[]
-
-An array containing all values.
-
-#### Defined in
-
-[src/complex/reactiveList.js:143](https://github.com/supercat1337/store2/blob/dcd1ab1b534d7ba2fc0b9fbe897665c53949ace7/src/complex/reactiveList.js#L143)
+src/complex/ReactiveList.js:131
 
 ___
 
@@ -299,7 +281,7 @@ Removes the first item of the list.
 
 #### Defined in
 
-[src/complex/reactiveList.js:293](https://github.com/supercat1337/store2/blob/dcd1ab1b534d7ba2fc0b9fbe897665c53949ace7/src/complex/reactiveList.js#L293)
+src/complex/ReactiveList.js:293
 
 ___
 
@@ -321,7 +303,7 @@ Removes the item at the given index.
 
 #### Defined in
 
-[src/complex/reactiveList.js:279](https://github.com/supercat1337/store2/blob/dcd1ab1b534d7ba2fc0b9fbe897665c53949ace7/src/complex/reactiveList.js#L279)
+src/complex/ReactiveList.js:279
 
 ___
 
@@ -337,7 +319,31 @@ Removes the last item of the list.
 
 #### Defined in
 
-[src/complex/reactiveList.js:286](https://github.com/supercat1337/store2/blob/dcd1ab1b534d7ba2fc0b9fbe897665c53949ace7/src/complex/reactiveList.js#L286)
+src/complex/ReactiveList.js:286
+
+___
+
+### removeRange
+
+▸ **removeRange**(`startIndex`, `count`): `void`
+
+Removes elements from the list starting at `startIndex` and removing `count` items.
+Remaining elements are shifted left. The operation is batched to emit only one notification.
+
+#### Parameters
+
+| Name | Type | Description |
+| :------ | :------ | :------ |
+| `startIndex` | `number` | The index at which to start removal. |
+| `count` | `number` | The number of elements to remove. |
+
+#### Returns
+
+`void`
+
+#### Defined in
+
+src/complex/ReactiveList.js:238
 
 ___
 
@@ -360,7 +366,7 @@ Updates the value at the specified index.
 
 #### Defined in
 
-[src/complex/reactiveList.js:161](https://github.com/supercat1337/store2/blob/dcd1ab1b534d7ba2fc0b9fbe897665c53949ace7/src/complex/reactiveList.js#L161)
+src/complex/ReactiveList.js:161
 
 ___
 
@@ -382,31 +388,7 @@ Replaces the entire content of the list with the given array.
 
 #### Defined in
 
-[src/complex/reactiveList.js:186](https://github.com/supercat1337/store2/blob/dcd1ab1b534d7ba2fc0b9fbe897665c53949ace7/src/complex/reactiveList.js#L186)
-
-___
-
-### splice
-
-▸ **splice**(`startIndex`, `count`): `void`
-
-Removes elements from the list starting at `startIndex` and removing `count` items.
-Remaining elements are shifted left. The operation is batched to emit only one notification.
-
-#### Parameters
-
-| Name | Type | Description |
-| :------ | :------ | :------ |
-| `startIndex` | `number` | The index at which to start removal. |
-| `count` | `number` | The number of elements to remove. |
-
-#### Returns
-
-`void`
-
-#### Defined in
-
-[src/complex/reactiveList.js:238](https://github.com/supercat1337/store2/blob/dcd1ab1b534d7ba2fc0b9fbe897665c53949ace7/src/complex/reactiveList.js#L238)
+src/complex/ReactiveList.js:186
 
 ___
 
@@ -437,4 +419,22 @@ A function to unsubscribe the callback.
 
 #### Defined in
 
-[src/complex/reactiveList.js:330](https://github.com/supercat1337/store2/blob/dcd1ab1b534d7ba2fc0b9fbe897665c53949ace7/src/complex/reactiveList.js#L330)
+src/complex/ReactiveList.js:330
+
+___
+
+### toArray
+
+▸ **toArray**(): `T`[]
+
+Returns a shallow copy of all items in the list as a plain array.
+
+#### Returns
+
+`T`[]
+
+An array containing all values.
+
+#### Defined in
+
+src/complex/ReactiveList.js:143

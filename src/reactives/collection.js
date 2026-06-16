@@ -1,6 +1,6 @@
 // @ts-check
 
-import { ReactivePrimitive } from './ReactivePrimitive.js';
+import { ReactiveItem } from './ReactiveItem.js';
 import { COLLECTION } from '../core/Engine.js';
 import { modeController } from '../services/modeController.js';
 
@@ -10,7 +10,7 @@ import { modeController } from '../services/modeController.js';
  * and allows tracking changes to individual elements and the array length.
  *
  * @template T
- * @augments ReactivePrimitive
+ * @augments ReactiveItem
  * @example
  * ```js
  * const coll = new Collection([1, 2, 3]);
@@ -20,7 +20,7 @@ import { modeController } from '../services/modeController.js';
  * coll.value.push(4); // triggers reactivity
  * ```
  */
-class Collection extends ReactivePrimitive {
+class Collection extends ReactiveItem {
     /** @type {T[]} */
     #target;
     /** @type {T[]} */
@@ -197,24 +197,6 @@ class Collection extends ReactivePrimitive {
      * @returns {T[]} The reactive array proxy.
      */
     get value() {
-        return this.getValue();
-    }
-
-    /**
-     * Alias for `value` setter.
-     *
-     * @param {T[]} value - The new array value.
-     */
-    set data(value) {
-        this.value = value;
-    }
-
-    /**
-     * Alias for `value` getter.
-     *
-     * @returns {T[]} The reactive array proxy.
-     */
-    get data() {
         return this.getValue();
     }
 

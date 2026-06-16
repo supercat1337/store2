@@ -39,7 +39,6 @@
 - [addDependency](internal_.Engine.md#adddependency)
 - [addDependent](internal_.Engine.md#adddependent)
 - [addUpdate](internal_.Engine.md#addupdate)
-- [checkChangesOldValues](internal_.Engine.md#checkchangesoldvalues)
 - [checkChangesTemporary](internal_.Engine.md#checkchangestemporary)
 - [clearError](internal_.Engine.md#clearerror)
 - [clearUpdates](internal_.Engine.md#clearupdates)
@@ -70,7 +69,7 @@ Creates an Engine instance.
 
 | Name | Type | Description |
 | :------ | :------ | :------ |
-| `reactiveItem` | [`ReactivePrimitive`](ReactivePrimitive.md) | The reactive item. |
+| `reactiveItem` | [`ReactiveItem`](ReactiveItem.md) | The reactive item. |
 | `type` | ``1`` \| ``2`` \| ``3`` \| ``4`` | The type. |
 
 #### Returns
@@ -79,7 +78,7 @@ Creates an Engine instance.
 
 #### Defined in
 
-[src/core/Engine.js:109](https://github.com/supercat1337/store2/blob/dcd1ab1b534d7ba2fc0b9fbe897665c53949ace7/src/core/Engine.js#L109)
+[src/core/Engine.js:109](https://github.com/supercat1337/store2/blob/092e7aaba8ac2329715b3d46c6a0217f1d1972eb/src/core/Engine.js#L109)
 
 ## Properties
 
@@ -91,7 +90,7 @@ Snapshot of original values when inside a batch.
 
 #### Defined in
 
-[src/core/Engine.js:90](https://github.com/supercat1337/store2/blob/dcd1ab1b534d7ba2fc0b9fbe897665c53949ace7/src/core/Engine.js#L90)
+[src/core/Engine.js:90](https://github.com/supercat1337/store2/blob/092e7aaba8ac2329715b3d46c6a0217f1d1972eb/src/core/Engine.js#L90)
 
 ___
 
@@ -101,7 +100,7 @@ ___
 
 #### Defined in
 
-[src/core/Engine.js:70](https://github.com/supercat1337/store2/blob/dcd1ab1b534d7ba2fc0b9fbe897665c53949ace7/src/core/Engine.js#L70)
+[src/core/Engine.js:70](https://github.com/supercat1337/store2/blob/092e7aaba8ac2329715b3d46c6a0217f1d1972eb/src/core/Engine.js#L70)
 
 ___
 
@@ -113,31 +112,31 @@ Comparison function for equality.
 
 #### Defined in
 
-[src/core/Engine.js:96](https://github.com/supercat1337/store2/blob/dcd1ab1b534d7ba2fc0b9fbe897665c53949ace7/src/core/Engine.js#L96)
+[src/core/Engine.js:96](https://github.com/supercat1337/store2/blob/092e7aaba8ac2329715b3d46c6a0217f1d1972eb/src/core/Engine.js#L96)
 
 ___
 
 ### dependencies
 
-• **dependencies**: `Set`\<[`ReactivePrimitive`](ReactivePrimitive.md)\>
+• **dependencies**: `Set`\<[`ReactiveItem`](ReactiveItem.md)\>
 
 The set of dependencies of the engine.
 
 #### Defined in
 
-[src/core/Engine.js:29](https://github.com/supercat1337/store2/blob/dcd1ab1b534d7ba2fc0b9fbe897665c53949ace7/src/core/Engine.js#L29)
+[src/core/Engine.js:29](https://github.com/supercat1337/store2/blob/092e7aaba8ac2329715b3d46c6a0217f1d1972eb/src/core/Engine.js#L29)
 
 ___
 
 ### dependents
 
-• **dependents**: `Set`\<[`ReactivePrimitive`](ReactivePrimitive.md)\>
+• **dependents**: `Set`\<[`ReactiveItem`](ReactiveItem.md)\>
 
 The set of dependents of the engine.
 
 #### Defined in
 
-[src/core/Engine.js:35](https://github.com/supercat1337/store2/blob/dcd1ab1b534d7ba2fc0b9fbe897665c53949ace7/src/core/Engine.js#L35)
+[src/core/Engine.js:35](https://github.com/supercat1337/store2/blob/092e7aaba8ac2329715b3d46c6a0217f1d1972eb/src/core/Engine.js#L35)
 
 ___
 
@@ -149,7 +148,7 @@ Unique identifier for ordering.
 
 #### Defined in
 
-[src/core/Engine.js:41](https://github.com/supercat1337/store2/blob/dcd1ab1b534d7ba2fc0b9fbe897665c53949ace7/src/core/Engine.js#L41)
+[src/core/Engine.js:41](https://github.com/supercat1337/store2/blob/092e7aaba8ac2329715b3d46c6a0217f1d1972eb/src/core/Engine.js#L41)
 
 ___
 
@@ -161,19 +160,19 @@ Indicates whether the engine has been destroyed.
 
 #### Defined in
 
-[src/core/Engine.js:65](https://github.com/supercat1337/store2/blob/dcd1ab1b534d7ba2fc0b9fbe897665c53949ace7/src/core/Engine.js#L65)
+[src/core/Engine.js:65](https://github.com/supercat1337/store2/blob/092e7aaba8ac2329715b3d46c6a0217f1d1972eb/src/core/Engine.js#L65)
 
 ___
 
 ### reactiveItem
 
-• **reactiveItem**: [`ReactivePrimitive`](ReactivePrimitive.md)
+• **reactiveItem**: [`ReactiveItem`](ReactiveItem.md)
 
 Reference to the reactive item.
 
 #### Defined in
 
-[src/core/Engine.js:53](https://github.com/supercat1337/store2/blob/dcd1ab1b534d7ba2fc0b9fbe897665c53949ace7/src/core/Engine.js#L53)
+[src/core/Engine.js:53](https://github.com/supercat1337/store2/blob/092e7aaba8ac2329715b3d46c6a0217f1d1972eb/src/core/Engine.js#L53)
 
 ___
 
@@ -185,7 +184,7 @@ Flag indicating that the value should be recalculated.
 
 #### Defined in
 
-[src/core/Engine.js:59](https://github.com/supercat1337/store2/blob/dcd1ab1b534d7ba2fc0b9fbe897665c53949ace7/src/core/Engine.js#L59)
+[src/core/Engine.js:59](https://github.com/supercat1337/store2/blob/092e7aaba8ac2329715b3d46c6a0217f1d1972eb/src/core/Engine.js#L59)
 
 ___
 
@@ -195,7 +194,7 @@ ___
 
 #### Defined in
 
-[src/core/Engine.js:72](https://github.com/supercat1337/store2/blob/dcd1ab1b534d7ba2fc0b9fbe897665c53949ace7/src/core/Engine.js#L72)
+[src/core/Engine.js:72](https://github.com/supercat1337/store2/blob/092e7aaba8ac2329715b3d46c6a0217f1d1972eb/src/core/Engine.js#L72)
 
 ___
 
@@ -207,7 +206,7 @@ Prevents updates from being propagated (used during mass updates).
 
 #### Defined in
 
-[src/core/Engine.js:102](https://github.com/supercat1337/store2/blob/dcd1ab1b534d7ba2fc0b9fbe897665c53949ace7/src/core/Engine.js#L102)
+[src/core/Engine.js:102](https://github.com/supercat1337/store2/blob/092e7aaba8ac2329715b3d46c6a0217f1d1972eb/src/core/Engine.js#L102)
 
 ___
 
@@ -219,7 +218,7 @@ The type of the reactive item.
 
 #### Defined in
 
-[src/core/Engine.js:78](https://github.com/supercat1337/store2/blob/dcd1ab1b534d7ba2fc0b9fbe897665c53949ace7/src/core/Engine.js#L78)
+[src/core/Engine.js:78](https://github.com/supercat1337/store2/blob/092e7aaba8ac2329715b3d46c6a0217f1d1972eb/src/core/Engine.js#L78)
 
 ___
 
@@ -231,7 +230,7 @@ Map of pending updates (property -> UpdateDataRecord).
 
 #### Defined in
 
-[src/core/Engine.js:84](https://github.com/supercat1337/store2/blob/dcd1ab1b534d7ba2fc0b9fbe897665c53949ace7/src/core/Engine.js#L84)
+[src/core/Engine.js:84](https://github.com/supercat1337/store2/blob/092e7aaba8ac2329715b3d46c6a0217f1d1972eb/src/core/Engine.js#L84)
 
 ___
 
@@ -243,7 +242,7 @@ Version number (currently unused, kept for potential future use).
 
 #### Defined in
 
-[src/core/Engine.js:47](https://github.com/supercat1337/store2/blob/dcd1ab1b534d7ba2fc0b9fbe897665c53949ace7/src/core/Engine.js#L47)
+[src/core/Engine.js:47](https://github.com/supercat1337/store2/blob/092e7aaba8ac2329715b3d46c6a0217f1d1972eb/src/core/Engine.js#L47)
 
 ## Accessors
 
@@ -257,13 +256,13 @@ Version number (currently unused, kept for potential future use).
 
 #### Defined in
 
-[src/core/Engine.js:115](https://github.com/supercat1337/store2/blob/dcd1ab1b534d7ba2fc0b9fbe897665c53949ace7/src/core/Engine.js#L115)
+[src/core/Engine.js:115](https://github.com/supercat1337/store2/blob/092e7aaba8ac2329715b3d46c6a0217f1d1972eb/src/core/Engine.js#L115)
 
 ## Methods
 
 ### #commitChange
 
-▸ **#commitChange**(`property`, `verb`, `oldValue`, `newValue`): `boolean`
+▸ **#commitChange**(`property`, `type`, `oldValue`, `newValue`): `boolean`
 
 Commits a change: creates an UpdateDataRecord, adds to updates, and schedules notification.
 
@@ -272,7 +271,7 @@ Commits a change: creates an UpdateDataRecord, adds to updates, and schedules no
 | Name | Type | Description |
 | :------ | :------ | :------ |
 | `property` | `string` | The property key. |
-| `verb` | ``"set"`` \| ``"delete"`` | The operation. |
+| `type` | ``"set"`` \| ``"delete"`` | The operation. |
 | `oldValue` | `any` | The previous value (immediate before this change). |
 | `newValue` | `any` | The new value. |
 
@@ -284,7 +283,7 @@ True if committed (i.e., value actually changed).
 
 #### Defined in
 
-[src/core/Engine.js:178](https://github.com/supercat1337/store2/blob/dcd1ab1b534d7ba2fc0b9fbe897665c53949ace7/src/core/Engine.js#L178)
+[src/core/Engine.js:178](https://github.com/supercat1337/store2/blob/092e7aaba8ac2329715b3d46c6a0217f1d1972eb/src/core/Engine.js#L178)
 
 ___
 
@@ -307,7 +306,7 @@ Records a change attempt. In batch mode, stores the original value.
 
 #### Defined in
 
-[src/core/Engine.js:124](https://github.com/supercat1337/store2/blob/dcd1ab1b534d7ba2fc0b9fbe897665c53949ace7/src/core/Engine.js#L124)
+[src/core/Engine.js:124](https://github.com/supercat1337/store2/blob/092e7aaba8ac2329715b3d46c6a0217f1d1972eb/src/core/Engine.js#L124)
 
 ___
 
@@ -321,7 +320,7 @@ Adds dependencies to this engine.
 
 | Name | Type |
 | :------ | :------ |
-| `dependencies` | `Set`\<[`ReactivePrimitive`](ReactivePrimitive.md)\> |
+| `dependencies` | `Set`\<[`ReactiveItem`](ReactiveItem.md)\> |
 
 #### Returns
 
@@ -329,7 +328,7 @@ Adds dependencies to this engine.
 
 #### Defined in
 
-[src/core/Engine.js:254](https://github.com/supercat1337/store2/blob/dcd1ab1b534d7ba2fc0b9fbe897665c53949ace7/src/core/Engine.js#L254)
+[src/core/Engine.js:236](https://github.com/supercat1337/store2/blob/092e7aaba8ac2329715b3d46c6a0217f1d1972eb/src/core/Engine.js#L236)
 
 ___
 
@@ -343,7 +342,7 @@ Adds a single dependency.
 
 | Name | Type |
 | :------ | :------ |
-| `dependency` | [`ReactivePrimitive`](ReactivePrimitive.md) |
+| `dependency` | [`ReactiveItem`](ReactiveItem.md) |
 
 #### Returns
 
@@ -351,7 +350,7 @@ Adds a single dependency.
 
 #### Defined in
 
-[src/core/Engine.js:272](https://github.com/supercat1337/store2/blob/dcd1ab1b534d7ba2fc0b9fbe897665c53949ace7/src/core/Engine.js#L272)
+[src/core/Engine.js:254](https://github.com/supercat1337/store2/blob/092e7aaba8ac2329715b3d46c6a0217f1d1972eb/src/core/Engine.js#L254)
 
 ___
 
@@ -365,7 +364,7 @@ Adds a dependent.
 
 | Name | Type |
 | :------ | :------ |
-| `dependent` | [`ReactivePrimitive`](ReactivePrimitive.md) |
+| `dependent` | [`ReactiveItem`](ReactiveItem.md) |
 
 #### Returns
 
@@ -373,13 +372,13 @@ Adds a dependent.
 
 #### Defined in
 
-[src/core/Engine.js:283](https://github.com/supercat1337/store2/blob/dcd1ab1b534d7ba2fc0b9fbe897665c53949ace7/src/core/Engine.js#L283)
+[src/core/Engine.js:265](https://github.com/supercat1337/store2/blob/092e7aaba8ac2329715b3d46c6a0217f1d1972eb/src/core/Engine.js#L265)
 
 ___
 
 ### addUpdate
 
-▸ **addUpdate**(`property`, `verb`, `oldValue`, `value`): `boolean`
+▸ **addUpdate**(`property`, `type`, `oldValue`, `value`): `boolean`
 
 Legacy method for backward compatibility. Delegates to recordChange + #commitChange.
 
@@ -388,7 +387,7 @@ Legacy method for backward compatibility. Delegates to recordChange + #commitCha
 | Name | Type | Description |
 | :------ | :------ | :------ |
 | `property` | `string` | The property key. |
-| `verb` | ``"set"`` \| ``"delete"`` | The operation. |
+| `type` | ``"set"`` \| ``"delete"`` | The operation. |
 | `oldValue` | `any` | The previous value. |
 | `value` | `any` | The new value. |
 
@@ -400,23 +399,7 @@ True if an update was added.
 
 #### Defined in
 
-[src/core/Engine.js:245](https://github.com/supercat1337/store2/blob/dcd1ab1b534d7ba2fc0b9fbe897665c53949ace7/src/core/Engine.js#L245)
-
-___
-
-### checkChangesOldValues
-
-▸ **checkChangesOldValues**(): `boolean`
-
-Legacy method for compatibility.
-
-#### Returns
-
-`boolean`
-
-#### Defined in
-
-[src/core/Engine.js:448](https://github.com/supercat1337/store2/blob/dcd1ab1b534d7ba2fc0b9fbe897665c53949ace7/src/core/Engine.js#L448)
+[src/core/Engine.js:227](https://github.com/supercat1337/store2/blob/092e7aaba8ac2329715b3d46c6a0217f1d1972eb/src/core/Engine.js#L227)
 
 ___
 
@@ -435,7 +418,7 @@ True if any changes remain.
 
 #### Defined in
 
-[src/core/Engine.js:457](https://github.com/supercat1337/store2/blob/dcd1ab1b534d7ba2fc0b9fbe897665c53949ace7/src/core/Engine.js#L457)
+[src/core/Engine.js:439](https://github.com/supercat1337/store2/blob/092e7aaba8ac2329715b3d46c6a0217f1d1972eb/src/core/Engine.js#L439)
 
 ___
 
@@ -451,7 +434,7 @@ Clears the current error.
 
 #### Defined in
 
-[src/core/Engine.js:402](https://github.com/supercat1337/store2/blob/dcd1ab1b534d7ba2fc0b9fbe897665c53949ace7/src/core/Engine.js#L402)
+[src/core/Engine.js:390](https://github.com/supercat1337/store2/blob/092e7aaba8ac2329715b3d46c6a0217f1d1972eb/src/core/Engine.js#L390)
 
 ___
 
@@ -467,7 +450,7 @@ Clears all pending updates.
 
 #### Defined in
 
-[src/core/Engine.js:432](https://github.com/supercat1337/store2/blob/dcd1ab1b534d7ba2fc0b9fbe897665c53949ace7/src/core/Engine.js#L432)
+[src/core/Engine.js:422](https://github.com/supercat1337/store2/blob/092e7aaba8ac2329715b3d46c6a0217f1d1972eb/src/core/Engine.js#L422)
 
 ___
 
@@ -482,8 +465,8 @@ Destroys the engine.
 | Name | Type |
 | :------ | :------ |
 | `ctx?` | `Object` |
-| `ctx.recipients` | `Set`\<[`ReactivePrimitive`](ReactivePrimitive.md)\> |
-| `ctx.sender` | [`ReactivePrimitive`](ReactivePrimitive.md) |
+| `ctx.recipients` | `Set`\<[`ReactiveItem`](ReactiveItem.md)\> |
+| `ctx.sender` | [`ReactiveItem`](ReactiveItem.md) |
 
 #### Returns
 
@@ -491,39 +474,39 @@ Destroys the engine.
 
 #### Defined in
 
-[src/core/Engine.js:410](https://github.com/supercat1337/store2/blob/dcd1ab1b534d7ba2fc0b9fbe897665c53949ace7/src/core/Engine.js#L410)
+[src/core/Engine.js:398](https://github.com/supercat1337/store2/blob/092e7aaba8ac2329715b3d46c6a0217f1d1972eb/src/core/Engine.js#L398)
 
 ___
 
 ### getDeepDependents
 
-▸ **getDeepDependents**(): `Set`\<[`ReactivePrimitive`](ReactivePrimitive.md)\>
+▸ **getDeepDependents**(): `Set`\<[`ReactiveItem`](ReactiveItem.md)\>
 
 Returns all dependents recursively.
 
 #### Returns
 
-`Set`\<[`ReactivePrimitive`](ReactivePrimitive.md)\>
+`Set`\<[`ReactiveItem`](ReactiveItem.md)\>
 
 #### Defined in
 
-[src/core/Engine.js:303](https://github.com/supercat1337/store2/blob/dcd1ab1b534d7ba2fc0b9fbe897665c53949ace7/src/core/Engine.js#L303)
+[src/core/Engine.js:287](https://github.com/supercat1337/store2/blob/092e7aaba8ac2329715b3d46c6a0217f1d1972eb/src/core/Engine.js#L287)
 
 ___
 
 ### getDeepDependentsArray
 
-▸ **getDeepDependentsArray**(): [`ReactivePrimitive`](ReactivePrimitive.md)[]
+▸ **getDeepDependentsArray**(): [`ReactiveItem`](ReactiveItem.md)[]
 
 Returns sorted array of deep dependents.
 
 #### Returns
 
-[`ReactivePrimitive`](ReactivePrimitive.md)[]
+[`ReactiveItem`](ReactiveItem.md)[]
 
 #### Defined in
 
-[src/core/Engine.js:325](https://github.com/supercat1337/store2/blob/dcd1ab1b534d7ba2fc0b9fbe897665c53949ace7/src/core/Engine.js#L325)
+[src/core/Engine.js:311](https://github.com/supercat1337/store2/blob/092e7aaba8ac2329715b3d46c6a0217f1d1972eb/src/core/Engine.js#L311)
 
 ___
 
@@ -539,8 +522,8 @@ Handles incoming messages.
 | :------ | :------ |
 | `message` | `number` |
 | `ctx` | `Object` |
-| `ctx.recipients` | `Set`\<[`ReactivePrimitive`](ReactivePrimitive.md)\> |
-| `ctx.sender` | [`ReactivePrimitive`](ReactivePrimitive.md) |
+| `ctx.recipients` | `Set`\<[`ReactiveItem`](ReactiveItem.md)\> |
+| `ctx.sender` | [`ReactiveItem`](ReactiveItem.md) |
 
 #### Returns
 
@@ -548,7 +531,7 @@ Handles incoming messages.
 
 #### Defined in
 
-[src/core/Engine.js:363](https://github.com/supercat1337/store2/blob/dcd1ab1b534d7ba2fc0b9fbe897665c53949ace7/src/core/Engine.js#L363)
+[src/core/Engine.js:349](https://github.com/supercat1337/store2/blob/092e7aaba8ac2329715b3d46c6a0217f1d1972eb/src/core/Engine.js#L349)
 
 ___
 
@@ -564,7 +547,7 @@ Checks if there are any pending updates.
 
 #### Defined in
 
-[src/core/Engine.js:440](https://github.com/supercat1337/store2/blob/dcd1ab1b534d7ba2fc0b9fbe897665c53949ace7/src/core/Engine.js#L440)
+[src/core/Engine.js:430](https://github.com/supercat1337/store2/blob/092e7aaba8ac2329715b3d46c6a0217f1d1972eb/src/core/Engine.js#L430)
 
 ___
 
@@ -589,7 +572,7 @@ True if the change is effective.
 
 #### Defined in
 
-[src/core/Engine.js:139](https://github.com/supercat1337/store2/blob/dcd1ab1b534d7ba2fc0b9fbe897665c53949ace7/src/core/Engine.js#L139)
+[src/core/Engine.js:139](https://github.com/supercat1337/store2/blob/092e7aaba8ac2329715b3d46c6a0217f1d1972eb/src/core/Engine.js#L139)
 
 ___
 
@@ -613,7 +596,7 @@ Alternative version that accepts explicit oldValue (preferred).
 
 #### Defined in
 
-[src/core/Engine.js:162](https://github.com/supercat1337/store2/blob/dcd1ab1b534d7ba2fc0b9fbe897665c53949ace7/src/core/Engine.js#L162)
+[src/core/Engine.js:162](https://github.com/supercat1337/store2/blob/092e7aaba8ac2329715b3d46c6a0217f1d1972eb/src/core/Engine.js#L162)
 
 ___
 
@@ -629,8 +612,8 @@ Notifies dependencies (reverse direction).
 | :------ | :------ |
 | `message` | `number` |
 | `ctx` | `Object` |
-| `ctx.recipients` | `Set`\<[`ReactivePrimitive`](ReactivePrimitive.md)\> |
-| `ctx.sender` | [`ReactivePrimitive`](ReactivePrimitive.md) |
+| `ctx.recipients` | `Set`\<[`ReactiveItem`](ReactiveItem.md)\> |
+| `ctx.sender` | [`ReactiveItem`](ReactiveItem.md) |
 
 #### Returns
 
@@ -638,7 +621,7 @@ Notifies dependencies (reverse direction).
 
 #### Defined in
 
-[src/core/Engine.js:351](https://github.com/supercat1337/store2/blob/dcd1ab1b534d7ba2fc0b9fbe897665c53949ace7/src/core/Engine.js#L351)
+[src/core/Engine.js:337](https://github.com/supercat1337/store2/blob/092e7aaba8ac2329715b3d46c6a0217f1d1972eb/src/core/Engine.js#L337)
 
 ___
 
@@ -654,8 +637,8 @@ Notifies dependents of a message.
 | :------ | :------ |
 | `message` | `number` |
 | `ctx?` | `Object` |
-| `ctx.recipients` | `Set`\<[`ReactivePrimitive`](ReactivePrimitive.md)\> |
-| `ctx.sender` | [`ReactivePrimitive`](ReactivePrimitive.md) |
+| `ctx.recipients` | `Set`\<[`ReactiveItem`](ReactiveItem.md)\> |
+| `ctx.sender` | [`ReactiveItem`](ReactiveItem.md) |
 
 #### Returns
 
@@ -663,7 +646,7 @@ Notifies dependents of a message.
 
 #### Defined in
 
-[src/core/Engine.js:336](https://github.com/supercat1337/store2/blob/dcd1ab1b534d7ba2fc0b9fbe897665c53949ace7/src/core/Engine.js#L336)
+[src/core/Engine.js:322](https://github.com/supercat1337/store2/blob/092e7aaba8ac2329715b3d46c6a0217f1d1972eb/src/core/Engine.js#L322)
 
 ___
 
@@ -683,7 +666,7 @@ If destroyed or in subscribers mode.
 
 #### Defined in
 
-[src/core/Engine.js:510](https://github.com/supercat1337/store2/blob/dcd1ab1b534d7ba2fc0b9fbe897665c53949ace7/src/core/Engine.js#L510)
+[src/core/Engine.js:486](https://github.com/supercat1337/store2/blob/092e7aaba8ac2329715b3d46c6a0217f1d1972eb/src/core/Engine.js#L486)
 
 ___
 
@@ -697,7 +680,7 @@ Removes a dependent.
 
 | Name | Type |
 | :------ | :------ |
-| `dependent` | [`ReactivePrimitive`](ReactivePrimitive.md) |
+| `dependent` | [`ReactiveItem`](ReactiveItem.md) |
 
 #### Returns
 
@@ -705,7 +688,7 @@ Removes a dependent.
 
 #### Defined in
 
-[src/core/Engine.js:295](https://github.com/supercat1337/store2/blob/dcd1ab1b534d7ba2fc0b9fbe897665c53949ace7/src/core/Engine.js#L295)
+[src/core/Engine.js:279](https://github.com/supercat1337/store2/blob/092e7aaba8ac2329715b3d46c6a0217f1d1972eb/src/core/Engine.js#L279)
 
 ___
 
@@ -721,8 +704,8 @@ Sets an error and notifies dependents.
 | :------ | :------ |
 | `error` | `Error` |
 | `ctx?` | `Object` |
-| `ctx.recipients` | `Set`\<[`ReactivePrimitive`](ReactivePrimitive.md)\> |
-| `ctx.sender` | [`ReactivePrimitive`](ReactivePrimitive.md) |
+| `ctx.recipients` | `Set`\<[`ReactiveItem`](ReactiveItem.md)\> |
+| `ctx.sender` | [`ReactiveItem`](ReactiveItem.md) |
 
 #### Returns
 
@@ -730,7 +713,7 @@ Sets an error and notifies dependents.
 
 #### Defined in
 
-[src/core/Engine.js:388](https://github.com/supercat1337/store2/blob/dcd1ab1b534d7ba2fc0b9fbe897665c53949ace7/src/core/Engine.js#L388)
+[src/core/Engine.js:374](https://github.com/supercat1337/store2/blob/092e7aaba8ac2329715b3d46c6a0217f1d1972eb/src/core/Engine.js#L374)
 
 ___
 
@@ -744,7 +727,7 @@ Updates dependencies to a new set.
 
 | Name | Type |
 | :------ | :------ |
-| `newDeps` | `Set`\<[`ReactivePrimitive`](ReactivePrimitive.md)\> |
+| `newDeps` | `Set`\<[`ReactiveItem`](ReactiveItem.md)\> |
 
 #### Returns
 
@@ -752,7 +735,7 @@ Updates dependencies to a new set.
 
 #### Defined in
 
-[src/core/Engine.js:523](https://github.com/supercat1337/store2/blob/dcd1ab1b534d7ba2fc0b9fbe897665c53949ace7/src/core/Engine.js#L523)
+[src/core/Engine.js:499](https://github.com/supercat1337/store2/blob/092e7aaba8ac2329715b3d46c6a0217f1d1972eb/src/core/Engine.js#L499)
 
 ___
 
@@ -768,4 +751,4 @@ Called after a value change to schedule notifications.
 
 #### Defined in
 
-[src/core/Engine.js:501](https://github.com/supercat1337/store2/blob/dcd1ab1b534d7ba2fc0b9fbe897665c53949ace7/src/core/Engine.js#L501)
+[src/core/Engine.js:475](https://github.com/supercat1337/store2/blob/092e7aaba8ac2329715b3d46c6a0217f1d1972eb/src/core/Engine.js#L475)

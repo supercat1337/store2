@@ -5,11 +5,11 @@ import { compareAny, getError } from '../helpers/tools.js';
 import { dependencyTracker } from '../services/dependencyTracker.js';
 
 /**
- * ReactivePrimitive is the base class for all reactive items. It provides methods for subscribing to changes,
+ * ReactiveItem is the base class for all reactive items. It provides methods for subscribing to changes,
  * getting the current value, and checking for errors.
  * @private
  */
-class ReactivePrimitive {
+class ReactiveItem {
     engine;
 
     name = '';
@@ -24,7 +24,7 @@ class ReactivePrimitive {
 
     /**
      * Subscribes a function to be called whenever the value of this reactive item changes.
-     * @param {(updates: Map<string, import("./../core/UpdateDataRecord.js").UpdateDataRecord>)=>void} fn - The function to be called whenever the value of this reactive item changes.
+     * @param {(updates: Map<string, import("../core/UpdateDataRecord.js").UpdateDataRecord>)=>void} fn - The function to be called whenever the value of this reactive item changes.
      * @param {object} [options] - Optional options.
      * @param {number} [options.delay] - The delay in milliseconds before the function is called.
      * @param {AbortSignal} [options.signal] - The signal to abort the subscription.
@@ -132,7 +132,7 @@ class ReactivePrimitive {
     /**
      * Subscribes a function to be called when the reactive item is destroyed.
      * The function is called with no arguments.
-     * @param {(reactiveItem:ReactivePrimitive)=>void} fn - The function to be called.
+     * @param {(reactiveItem:ReactiveItem)=>void} fn - The function to be called.
      * @returns {()=>void} A function that unsubscribes the given function.
      */
     onDestroy(fn) {
@@ -182,4 +182,4 @@ class ReactivePrimitive {
     }
 }
 
-export { ReactivePrimitive };
+export { ReactiveItem };

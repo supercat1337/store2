@@ -162,7 +162,7 @@ The library also provides functions for more complex reactive patterns:
 - `autorun` – run a function whenever its dependencies change (static dependencies).
 - `batch` – group multiple updates into one notification.
 - `reaction` – track specific data and run an effect when it changes.
-- `when` / `waitTrue` – wait for a condition to become true.
+- `when` / `waitUntil` – wait for a condition to become true.
 - `fromPromise` – observe a promise's pending/resolved/rejected state.
 - `getNow` – a reactive timestamp that updates periodically.
 - `makeObservable` / `makeAutoObservable` / `extendObservable` – add reactivity to existing objects.

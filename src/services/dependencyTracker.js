@@ -6,7 +6,7 @@ import { modeController } from './modeController.js';
 
 class Tracker {
     #isActive = false;
-    /** @type {Set<ReactivePrimitive>} */
+    /** @type {Set<ReactiveItem>} */
     #store = new Set();
     #eventEmitter = new EventEmitterLite();
 
@@ -16,7 +16,7 @@ class Tracker {
     /**
      * Returns the current contents of the tracker's store, which is a set of all reactive items that have been
      * accessed since the tracker was last turned on. This is useful for debugging and testing purposes.
-     * @returns {Set<ReactivePrimitive>} The current contents of the tracker's store.
+     * @returns {Set<ReactiveItem>} The current contents of the tracker's store.
      */
     get data() {
         return new Set([...this.#store]);
@@ -26,7 +26,7 @@ class Tracker {
     /**
      * Returns a sorted array of all reactive items in the tracker's store. The items are sorted by their internal id,
      * ensuring consistent processing order when notified of changes.
-     * @returns {Array<ReactivePrimitive>} A sorted array of reactive items.
+     * @returns {Array<ReactiveItem>} A sorted array of reactive items.
      */
     getAsSortedArray() {
         return Array.from(this.#store).sort(sortReactiveItems);
@@ -35,7 +35,7 @@ class Tracker {
     /**
      * Adds a reactive item to the tracker's store if the tracker is turned on. If the tracker is not turned on, this
      * method does nothing.
-     * @param {ReactivePrimitive} item - The reactive item to add to the tracker's store.
+     * @param {ReactiveItem} item - The reactive item to add to the tracker's store.
      * @param {string} [_key=""]
      */
     add(item, _key = '') {
@@ -51,7 +51,7 @@ class Tracker {
 
     /**
      *
-     * @param {(reactiveItem:ReactivePrimitive)=>void} callback
+     * @param {(reactiveItem:ReactiveItem)=>void} callback
      * @returns {()=>void}
      */
     onAdd(callback) {
@@ -72,7 +72,7 @@ class Tracker {
      * are tracked. If filter is a function, it is called with each reactive item as its argument, and if it returns false, the
      * reactive item is not tracked.
      */
-    turnOn(ctx = {}) {
+    enable(ctx = {}) {
         if (this.#isActive) {
             throw new Error('The tracker is already turned on');
         }
@@ -86,7 +86,7 @@ class Tracker {
      * Disables the tracker. When the tracker is disabled, it will not watch any set operations and will not report
      * anything to any registered listeners. The tracker is off by default.
      */
-    turnOff() {
+    disable() {
         this.#isActive = false;
     }
 }
@@ -102,14 +102,14 @@ export const dependencyTracker = new Tracker();
  * Returns a sorted array of used reactive items.
  * @param {Function} fn - The function to execute and track.
  * @param {...any} args - Arguments to pass to the function.
- * @returns {Array<ReactivePrimitive>} Sorted array of reactive items accessed.
+ * @returns {Array<ReactiveItem>} Sorted array of reactive items accessed.
  */
 export function getArrayOfUsedReactiveItems(fn, ...args) {
-    dependencyTracker.turnOn();
+    dependencyTracker.enable();
     try {
         fn(...args);
     } finally {
-        dependencyTracker.turnOff();
+        dependencyTracker.disable();
     }
     return dependencyTracker.getAsSortedArray();
 }
@@ -119,14 +119,14 @@ export function getArrayOfUsedReactiveItems(fn, ...args) {
  * Returns a Set of used reactive items.
  * @param {Function} fn - The function to execute and track.
  * @param {...any} args - Arguments to pass to the function.
- * @returns {Set<ReactivePrimitive>} Set of reactive items accessed.
+ * @returns {Set<ReactiveItem>} Set of reactive items accessed.
  */
 export function getSetOfUsedReactiveItems(fn, ...args) {
-    dependencyTracker.turnOn();
+    dependencyTracker.enable();
     try {
         fn(...args);
     } finally {
-        dependencyTracker.turnOff();
+        dependencyTracker.disable();
     }
     return dependencyTracker.data;
 }

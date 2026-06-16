@@ -13,8 +13,8 @@
 - [Atom](classes/Atom.md)
 - [Collection](classes/Collection.md)
 - [Computed](classes/Computed.md)
+- [ReactiveItem](classes/ReactiveItem.md)
 - [ReactiveList](classes/ReactiveList.md)
-- [ReactivePrimitive](classes/ReactivePrimitive.md)
 - [ShallowReactive](classes/ShallowReactive.md)
 - [Store](classes/Store.md)
 
@@ -34,7 +34,7 @@
 - [runInAction](modules.md#runinaction)
 - [shallowReactive](modules.md#shallowreactive)
 - [untrack](modules.md#untrack)
-- [waitTrue](modules.md#waittrue)
+- [waitUntil](modules.md#waituntil)
 - [when](modules.md#when)
 
 ## Functions
@@ -81,7 +81,7 @@ count.value = 1;
 
 #### Defined in
 
-[src/api/api.js:558](https://github.com/supercat1337/store2/blob/dcd1ab1b534d7ba2fc0b9fbe897665c53949ace7/src/api/api.js#L558)
+[src/api/api.js:558](https://github.com/supercat1337/store2/blob/092e7aaba8ac2329715b3d46c6a0217f1d1972eb/src/api/api.js#L558)
 
 ___
 
@@ -147,7 +147,7 @@ console.log(a.value, b.value, foo); // 2 2 4
 
 #### Defined in
 
-[src/api/api.js:51](https://github.com/supercat1337/store2/blob/dcd1ab1b534d7ba2fc0b9fbe897665c53949ace7/src/api/api.js#L51)
+[src/api/api.js:51](https://github.com/supercat1337/store2/blob/092e7aaba8ac2329715b3d46c6a0217f1d1972eb/src/api/api.js#L51)
 
 ___
 
@@ -196,16 +196,21 @@ console.log(a.value, b.value, foo); // 1 1 2
 
 #### Defined in
 
-[src/api/api.js:342](https://github.com/supercat1337/store2/blob/dcd1ab1b534d7ba2fc0b9fbe897665c53949ace7/src/api/api.js#L342)
+[src/api/api.js:342](https://github.com/supercat1337/store2/blob/092e7aaba8ac2329715b3d46c6a0217f1d1972eb/src/api/api.js#L342)
 
 ___
 
 ### collection
 
-▸ **collection**\<`T`\>(`value`, `options?`): `T`[]
+▸ **collection**\<`T`\>(`value`, `options?`): [`Collection`](classes/Collection.md)\<`T`\>
 
-Creates a new Collection instance. A Collection is a reactive primitive that holds an array of values. Same as `collection` but
-returns a new Collection instance.
+Creates a new reactive Collection instance that holds an array.
+The Collection provides reactivity for array mutations (push, pop, splice, etc.)
+and allows subscribing to changes.
+
+Unlike the `Atom` and `Computed` factories, this function returns the actual
+`Collection` instance, not just the proxied array. To access the reactive array,
+use the `.value` property.
 
 #### Type parameters
 
@@ -217,33 +222,36 @@ returns a new Collection instance.
 
 | Name | Type | Description |
 | :------ | :------ | :------ |
-| `value` | `T`[] | The array to observe. |
-| `options?` | `Object` | Options |
-| `options.compareFunction` | (`a`: `T`, `b`: `T`) => `boolean` | A function that compares two values to determine if they are equal. |
-| `options.name` | `string` | The name of Collection object. |
+| `value` | `T`[] | The initial array to observe. |
+| `options?` | `Object` | Configuration options. |
+| `options.compareFunction` | (`a`: `T`, `b`: `T`) => `boolean` | Custom equality function. |
+| `options.name` | `string` | The name of the Collection (used for debugging). |
 
 #### Returns
 
-`T`[]
+[`Collection`](classes/Collection.md)\<`T`\>
 
-The observed array
+The Collection instance.
 
 **`Example`**
 
 ```js
-const items = collection([1, 2, 3]);
+const coll = collection([1, 2, 3]);
 
-items.subscribe(() => {
-    console.log(items.value);
-});
+// Subscribe to changes
+coll.subscribe(() => console.log('changed'));
 
-items.value.push(4);
-// output: [1, 2, 3, 4]
+// Mutate the array via .value
+coll.value.push(4); // triggers subscriber
+console.log(coll.value); // [1, 2, 3, 4]
+
+// Direct property access also works (proxied)
+coll.value[0] = 10; // triggers subscriber
 ```
 
 #### Defined in
 
-[src/api/api.js:609](https://github.com/supercat1337/store2/blob/dcd1ab1b534d7ba2fc0b9fbe897665c53949ace7/src/api/api.js#L609)
+[src/api/api.js:619](https://github.com/supercat1337/store2/blob/092e7aaba8ac2329715b3d46c6a0217f1d1972eb/src/api/api.js#L619)
 
 ___
 
@@ -291,7 +299,7 @@ a.value = 1;
 
 #### Defined in
 
-[src/api/api.js:584](https://github.com/supercat1337/store2/blob/dcd1ab1b534d7ba2fc0b9fbe897665c53949ace7/src/api/api.js#L584)
+[src/api/api.js:584](https://github.com/supercat1337/store2/blob/092e7aaba8ac2329715b3d46c6a0217f1d1972eb/src/api/api.js#L584)
 
 ___
 
@@ -354,7 +362,7 @@ console.log(foo); // 2
 
 #### Defined in
 
-[src/api/api.js:846](https://github.com/supercat1337/store2/blob/dcd1ab1b534d7ba2fc0b9fbe897665c53949ace7/src/api/api.js#L846)
+[src/api/api.js:863](https://github.com/supercat1337/store2/blob/092e7aaba8ac2329715b3d46c6a0217f1d1972eb/src/api/api.js#L863)
 
 ___
 
@@ -415,7 +423,7 @@ await fromPromiseResult.case({
 
 #### Defined in
 
-[src/api/api.js:471](https://github.com/supercat1337/store2/blob/dcd1ab1b534d7ba2fc0b9fbe897665c53949ace7/src/api/api.js#L471)
+[src/api/api.js:471](https://github.com/supercat1337/store2/blob/092e7aaba8ac2329715b3d46c6a0217f1d1972eb/src/api/api.js#L471)
 
 ___
 
@@ -454,7 +462,7 @@ const unsubscribe = now.subscribe(() => {
 
 #### Defined in
 
-[src/api/api.js:413](https://github.com/supercat1337/store2/blob/dcd1ab1b534d7ba2fc0b9fbe897665c53949ace7/src/api/api.js#L413)
+[src/api/api.js:413](https://github.com/supercat1337/store2/blob/092e7aaba8ac2329715b3d46c6a0217f1d1972eb/src/api/api.js#L413)
 
 ___
 
@@ -516,7 +524,7 @@ console.log(foo); // 3
 
 #### Defined in
 
-[src/api/api.js:890](https://github.com/supercat1337/store2/blob/dcd1ab1b534d7ba2fc0b9fbe897665c53949ace7/src/api/api.js#L890)
+[src/api/api.js:907](https://github.com/supercat1337/store2/blob/092e7aaba8ac2329715b3d46c6a0217f1d1972eb/src/api/api.js#L907)
 
 ___
 
@@ -624,7 +632,7 @@ console.log(foo); // 3
 
 #### Defined in
 
-[src/api/api.js:725](https://github.com/supercat1337/store2/blob/dcd1ab1b534d7ba2fc0b9fbe897665c53949ace7/src/api/api.js#L725)
+[src/api/api.js:742](https://github.com/supercat1337/store2/blob/092e7aaba8ac2329715b3d46c6a0217f1d1972eb/src/api/api.js#L742)
 
 ___
 
@@ -696,7 +704,7 @@ console.log(a.value, b.value, foo); // 2 2 3
 
 #### Defined in
 
-[src/api/api.js:120](https://github.com/supercat1337/store2/blob/dcd1ab1b534d7ba2fc0b9fbe897665c53949ace7/src/api/api.js#L120)
+[src/api/api.js:120](https://github.com/supercat1337/store2/blob/092e7aaba8ac2329715b3d46c6a0217f1d1972eb/src/api/api.js#L120)
 
 ___
 
@@ -739,16 +747,20 @@ console.log(a.value, b.value, count); // 1 1 1
 
 #### Defined in
 
-[src/api/api.js:303](https://github.com/supercat1337/store2/blob/dcd1ab1b534d7ba2fc0b9fbe897665c53949ace7/src/api/api.js#L303)
+[src/api/api.js:303](https://github.com/supercat1337/store2/blob/092e7aaba8ac2329715b3d46c6a0217f1d1972eb/src/api/api.js#L303)
 
 ___
 
 ### shallowReactive
 
-▸ **shallowReactive**\<`T`\>(`value`, `options?`): `T`
+▸ **shallowReactive**\<`T`\>(`value`, `options?`): [`ShallowReactive`](classes/ShallowReactive.md)\<`T`\>
 
-Creates a new ShallowReactive instance. An ShallowReactive is a reactive primitive that holds a value. Same as `shallowReactive` but
-returns a new ShallowReactive instance.
+Creates a new reactive ShallowReactive instance that wraps an object.
+The ShallowReactive provides reactivity for property assignments and deletions
+on the top level of the object (shallow reactivity).
+
+This function returns the actual `ShallowReactive` instance, not just the proxy.
+To access the reactive object, use the `.value` property.
 
 #### Type parameters
 
@@ -760,32 +772,35 @@ returns a new ShallowReactive instance.
 
 | Name | Type | Description |
 | :------ | :------ | :------ |
-| `value` | `T` | The object to observe. |
-| `options?` | `Object` | Options to configure the observable behavior. |
-| `options.name` | `string` | The name of ShallowReactive object. |
+| `value` | `T` | The object to observe (must be a plain object or an instance). |
+| `options?` | `Object` | Configuration options. |
+| `options.name` | `string` | The name of the ShallowReactive (used for debugging). |
 
 #### Returns
 
-`T`
+[`ShallowReactive`](classes/ShallowReactive.md)\<`T`\>
 
-The observed object
+The ShallowReactive instance.
 
 **`Example`**
 
 ```js
-const obj = shallowReactive({ a: 1, b: 2 });
+const reactive = shallowReactive({ a: 1, b: 2 });
 
-obj.subscribe(() => {
-    console.log(obj.value);
-});
+// Subscribe to changes
+reactive.subscribe(() => console.log('changed'));
 
-obj.value.a = 3;
-// output: { a: 3, b: 2 }
+// Modify the object via .value
+reactive.value.a = 3; // triggers subscriber
+console.log(reactive.value); // { a: 3, b: 2 }
+
+// Direct property access also works (proxied)
+reactive.value.b = 5; // triggers subscriber
 ```
 
 #### Defined in
 
-[src/api/api.js:634](https://github.com/supercat1337/store2/blob/dcd1ab1b534d7ba2fc0b9fbe897665c53949ace7/src/api/api.js#L634)
+[src/api/api.js:652](https://github.com/supercat1337/store2/blob/092e7aaba8ac2329715b3d46c6a0217f1d1972eb/src/api/api.js#L652)
 
 ___
 
@@ -840,13 +855,13 @@ console.log(a.value, b.value, foo); // 1 1 2
 
 #### Defined in
 
-[src/api/api.js:380](https://github.com/supercat1337/store2/blob/dcd1ab1b534d7ba2fc0b9fbe897665c53949ace7/src/api/api.js#L380)
+[src/api/api.js:380](https://github.com/supercat1337/store2/blob/092e7aaba8ac2329715b3d46c6a0217f1d1972eb/src/api/api.js#L380)
 
 ___
 
-### waitTrue
+### waitUntil
 
-▸ **waitTrue**(`predicate`, `options?`): `Promise`\<`void`\>
+▸ **waitUntil**(`predicate`, `options?`): `Promise`\<`void`\>
 
 Waits until the given predicate evaluates to true.
 
@@ -870,7 +885,7 @@ A promise that resolves when the predicate evaluates to true.
 const a = atom(0, { name: "a" });
 let foo = 0;
 
-waitTrue(() => a.value > 3).then(() => {
+waitUntil(() => a.value > 3).then(() => {
     foo++;
 });
 
@@ -881,7 +896,7 @@ a.value = 4; // foo = 1
 
 #### Defined in
 
-[src/api/api.js:247](https://github.com/supercat1337/store2/blob/dcd1ab1b534d7ba2fc0b9fbe897665c53949ace7/src/api/api.js#L247)
+[src/api/api.js:247](https://github.com/supercat1337/store2/blob/092e7aaba8ac2329715b3d46c6a0217f1d1972eb/src/api/api.js#L247)
 
 ___
 
@@ -938,4 +953,4 @@ a.value = 5; // foo = 2
 
 #### Defined in
 
-[src/api/api.js:195](https://github.com/supercat1337/store2/blob/dcd1ab1b534d7ba2fc0b9fbe897665c53949ace7/src/api/api.js#L195)
+[src/api/api.js:195](https://github.com/supercat1337/store2/blob/092e7aaba8ac2329715b3d46c6a0217f1d1972eb/src/api/api.js#L195)

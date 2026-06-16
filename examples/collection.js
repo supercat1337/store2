@@ -7,7 +7,7 @@ c.subscribe((updates) => {
     let data = [];
     updates.forEach((update, key) => {
         data.push(
-            `verb = ${update.verb}; key = ${key}; value = ${update.value}`
+            `type = ${update.type}; key = ${key}; value = ${update.value}`
         );
     });
     console.log("c.subscribe:\n" + data.join("\n"));
@@ -22,8 +22,8 @@ len.subscribe((updates) => {
 c.data.push(4);
 // Outputs:
 // c.subscribe:
-// verb = set; key = length; value = 4
-// verb = set; key = 3; value = 4
+// type = set; key = length; value = 4
+// type = set; key = 3; value = 4
 
 // len.subscribe:
 // length = 4
@@ -31,12 +31,12 @@ c.data.push(4);
 c.data[0] = 100;
 // Outputs
 // c.subscribe:
-// verb = set; key = 0; value = 100
+// type = set; key = 0; value = 100
 
 c.data.pop();
 // Outputs:
-// verb = delete; key = 3; value = undefined
-// verb = set; key = length; value = 3
+// type = delete; key = 3; value = undefined
+// type = set; key = length; value = 3
 
 // len.subscribe:
 // length = 3

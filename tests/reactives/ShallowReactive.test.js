@@ -66,21 +66,6 @@ test("ShallowReactive: set value", (t) => {
     t.is(foo, 1);
 });
 
-test("ShallowReactive: set data", (t) => {
-    const item1 = { name: "item1" };
-    let foo = 0;
-
-    const shallowReactive = new ShallowReactive({});
-    shallowReactive.subscribe((updates) => {
-        foo++;
-    });
-
-    shallowReactive.data = item1;
-
-    t.deepEqual(shallowReactive.value, item1);
-    t.is(foo, 1);
-});
-
 test("ShallowReactive: delete", (t) => {
     const b = new ShallowReactive({ foo: 1 }, { name: "b" });
 
@@ -113,12 +98,6 @@ test("ShallowReactive: delete while subscribers are running", (t) => {
 test("ShallowReactive: getRawValue", (t) => {
     const b = new ShallowReactive({ foo: 1 }, { name: "b" });
     t.is(b.getRawValue().foo, 1);
-});
-
-test("ShallowReactive: data", (t) => {
-    const b = new ShallowReactive({ foo: 1 }, { name: "b" });
-    t.is(b.data.foo, 1);
-    t.is(b.value === b.data, true);
 });
 
 test("ShallowReactive: observe class", (t) => {
