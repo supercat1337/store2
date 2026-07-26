@@ -15,13 +15,13 @@ test("dependencyTracker: getArrayOfUsedReactiveItems()", (t) => {
     const c = new Computed(() => a.value + 1, { name: "c" });
 
     let array = getArrayOfUsedReactiveItems(() => {
-        t.is(dependencyTracker.isTurnedOn(), true);
+        t.is(dependencyTracker.isActive(), true);
         a.value = 1;
         let foo = c.value;
         t.is(foo, 2);
     });
 
-    t.is(dependencyTracker.isTurnedOn(), false);
+    t.is(dependencyTracker.isActive(), false);
 
     t.is(array.length, 2);
     t.is(array[0].name, "a");
@@ -34,13 +34,13 @@ test("dependencyTracker: getSetOfUsedReactiveItems()", (t) => {
     const c = new Computed(() => a.value + 1, { name: "c" });
 
     let set = getSetOfUsedReactiveItems(() => {
-        t.is(dependencyTracker.isTurnedOn(), true);
+        t.is(dependencyTracker.isActive(), true);
         a.value = 1;
         let foo = c.value;
         t.is(foo, 2);
     });
 
-    t.is(dependencyTracker.isTurnedOn(), false);
+    t.is(dependencyTracker.isActive(), false);
 
     t.is(set.size, 2);
     t.is(set.has(a), true);

@@ -350,3 +350,186 @@ test('Store: detachAll', t => {
     t.false(c.isDestroyed);
     t.false(d.isDestroyed);
 });
+
+test('Store: removeItem with non-existent key does nothing', t => {
+    const store = new Store();
+    const a = new Atom(1);
+    store.addItems({ a });
+    t.notThrows(() => store.removeItem('b'));
+    t.true(store.hasItem('a'));
+});
+
+test('Store: destroyItem with non-existent key does nothing', t => {
+    const store = new Store();
+    const a = new Atom(1);
+    store.addItems({ a });
+    t.notThrows(() => store.destroyItem('b'));
+    t.true(store.hasItem('a'));
+});
+
+test('Store: muteUpdates and unmuteUpdates', t => {
+    const store = new Store();
+    const a = new Atom(1);
+    store.addItems({ a });
+
+    let callCount = 0;
+    store.subscribe(() => callCount++);
+
+    store.muteUpdates();
+    a.value = 2;
+    t.is(callCount, 0);
+    store.unmuteUpdates();
+    t.is(callCount, 1);
+});
+
+test('Store: muteUpdates after destroy throws', t => {
+    const store = new Store();
+    store.destroy();
+    t.throws(() => store.muteUpdates());
+});
+
+test('Store: unmuteUpdates after destroy throws', t => {
+    const store = new Store();
+    store.destroy();
+    t.throws(() => store.unmuteUpdates());
+});
+
+test('Store: isMuted returns correct state', t => {
+    const store = new Store();
+    t.false(store.isMuted());
+    store.muteUpdates();
+    t.true(store.isMuted());
+    store.unmuteUpdates();
+    t.false(store.isMuted());
+});
+
+test('Store: subscribe after destroy throws', t => {
+    const store = new Store();
+    store.destroy();
+    t.throws(() => store.subscribe(() => {}));
+});
+
+test('Store: onDestroy after destroy throws', t => {
+    const store = new Store();
+    store.destroy();
+    t.throws(() => store.onDestroy(() => {}));
+});
+
+test('Store: detachAll does not destroy items', t => {
+    const store = new Store();
+    const a = new Atom(1);
+    const b = new Atom(2);
+    store.addItems({ a, b });
+    store.detachAll();
+    t.false(a.isDestroyed);
+    t.false(b.isDestroyed);
+    t.false(store.hasItem('a'));
+});
+
+test('Store: detachAll after destroy throws', t => {
+    const store = new Store();
+    store.destroy();
+    t.throws(() => store.detachAll());
+});
+
+test('Store: toJSON after destroy throws', t => {
+    const store = new Store();
+    store.destroy();
+    t.throws(() => store.toJSON());
+});
+
+test('Store: toMap after destroy throws', t => {
+    const store = new Store();
+    store.destroy();
+    t.throws(() => store.toMap());
+});
+
+test('Store: getItemNames after destroy throws', t => {
+    const store = new Store();
+    store.destroy();
+    t.throws(() => store.getItemNames());
+});
+
+test('Store: hasItem after destroy throws', t => {
+    const store = new Store();
+    store.destroy();
+    t.throws(() => store.hasItem('a'));
+});
+
+test('Store: destroyItem after store destroyed throws', t => {
+    const store = new Store();
+    store.destroy();
+    t.throws(() => store.destroyItem('a'));
+});
+
+test('Store: removeItem after store destroyed throws', t => {
+    const store = new Store();
+    store.destroy();
+    t.throws(() => store.removeItem('a'));
+});
+
+test('Store: addItems after store destroyed throws', t => {
+    const store = new Store();
+    store.destroy();
+    t.throws(() => store.addItems({ a: new Atom(0) }));
+});
+
+test('Store: getItem after store destroyed throws', t => {
+    const store = new Store();
+    store.destroy();
+    t.throws(() => store.getItem('a'));
+});
+
+test('Store: toJSON after store destroyed throws', t => {
+    const store = new Store();
+    store.destroy();
+    t.throws(() => store.toJSON());
+});
+
+test('Store: toMap after store destroyed throws', t => {
+    const store = new Store();
+    store.destroy();
+    t.throws(() => store.toMap());
+});
+
+test('Store: getItemNames after store destroyed throws', t => {
+    const store = new Store();
+    store.destroy();
+    t.throws(() => store.getItemNames());
+});
+
+test('Store: hasItem after store destroyed throws', t => {
+    const store = new Store();
+    store.destroy();
+    t.throws(() => store.hasItem('a'));
+});
+
+test('Store: isMuted after store destroyed throws', t => {
+    const store = new Store();
+    store.destroy();
+    t.throws(() => store.isMuted());
+});
+
+test('Store: muteUpdates after store destroyed throws', t => {
+    const store = new Store();
+    store.destroy();
+    t.throws(() => store.muteUpdates());
+});
+
+test('Store: unmuteUpdates after store destroyed throws', t => {
+    const store = new Store();
+    store.destroy();
+    t.throws(() => store.unmuteUpdates());
+});
+
+test('Store: subscribe after store destroyed throws', t => {
+    const store = new Store();
+    store.destroy();
+    t.throws(() => store.subscribe(() => {}));
+});
+
+test('Store: onDestroy after store destroyed throws', t => {
+    const store = new Store();
+    store.destroy();
+    t.throws(() => store.onDestroy(() => {}));
+});

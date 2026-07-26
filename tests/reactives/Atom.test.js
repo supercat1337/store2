@@ -177,54 +177,57 @@ test('Atom: hasSubscribers, clearSubscribers, clearAllSubscribers', t => {
     let foo = 0;
     let bar = 0;
 
-    a.onHasSubscribers(() => {
-        foo++;
-    });
+    a.onHasSubscribers(() => foo++);
+    a.onNoSubscribers(() => bar++);
 
-    a.onNoSubscribers(() => {
-        bar++;
-    });
-
-    a.subscribe(() => {
-        // #1
-    });
-
+    const unsub1 = a.subscribe(() => {});
     t.is(a.hasSubscribers(), true);
-    a.clearSubscribers();
-    t.is(a.hasSubscribers(), false);
-
-    a.subscribe(() => {
-        // #2
-    });
-
-    t.is(a.hasSubscribers(), true);
-    a.clearSubscribers();
-    t.is(a.hasSubscribers(), false);
-
-    t.is(foo, 2);
+    t.is(foo, 1);
     t.is(bar, 0);
 
-    a.clearAllSubscribers();
-    let unsubscriber = a.subscribe(() => {
-        // #3
-    });
+    a.clearSubscribers();
+    t.is(a.hasSubscribers(), false);
+    t.is(foo, 1);
+    t.is(bar, 1);
 
-    a.onNoSubscribers(() => {
-        bar++;
-    });
-
+    const unsub2 = a.subscribe(() => {});
     t.is(a.hasSubscribers(), true);
-    unsubscriber();
-
     t.is(foo, 2);
     t.is(bar, 1);
 
-    a.subscribe(() => {
-        // #4
-    });
+    a.clearSubscribers();
+    t.is(a.hasSubscribers(), false);
+    t.is(foo, 2);
+    t.is(bar, 2);
+
+    // clearAllSubscribers удаляет все слушатели, включая внутренние
+    a.clearAllSubscribers();
+    t.is(a.hasSubscribers(), false);
+    t.is(foo, 2);  // onHasSubscribers удалён → не вызовется
+    t.is(bar, 2);  // onNoSubscribers тоже удалён, и нет слушателей 'change' → нет вызова
+
+    // Новая подписка → onHasSubscribers уже не сработает
+    const unsub3 = a.subscribe(() => {});
+    t.is(a.hasSubscribers(), true);
+    t.is(foo, 2);  // не увеличивается
+    t.is(bar, 2);
+
+    // Добавляем новый onNoSubscribers
+    a.onNoSubscribers(() => bar++);
+
+    // Отписываемся → сработает только что добавленный onNoSubscribers
+    unsub3();
+    t.is(a.hasSubscribers(), false);
+    t.is(foo, 2);
+    t.is(bar, 3);  // только один вызов
+
+    // clearSubscribers уже не вызовет onNoSubscribers (слушателей нет)
+    a.clearSubscribers();
+    t.is(bar, 3);
 
     a.destroy();
     t.is(a.hasSubscribers(), false);
+    t.is(bar, 3);
 });
 
 test('Atom: unsubscribe with signal', t => {

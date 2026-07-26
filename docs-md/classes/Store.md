@@ -6,55 +6,6 @@ Store is a reactive container that holds a collection of reactive items.
 You can add, remove and access items via methods of this class.
 It also emits events when items are added, removed or updated.
 
-**`Example`**
-
-```js
-const store = new Store();
-const a = atom(0);
-const b = atom(0);
-
-const childStore = new Store();
-const sum = computed(() => a.value + b.value);
-childStore.addItems({ sum });
-
-store.addItems({ a, b, childStore });
-
-store.subscribe((updates) => {
-    let updatesArr = Array.from(updates.keys());
-    console.log("props", updatesArr);
-});
-
-// mute updates
-store.muteUpdates();
-childStore.removeItem("childStore");
-a.value = 3;
-b.value = 4;
-store.unmuteUpdates();
-// outputs
-// props [ 'a', 'childStore.sum', 'b' ]
-
-// without mute updates
-
-a.value = 1;
-// outputs
-// props [ 'a' ]
-// props [ 'childStore.sum' ]
-
-b.value = 2;
-// outputs
-//props [ 'b' ]
-//props [ 'childStore.sum' ]
-
-// using batch
-batch(() => {
-    a.value = 2;
-    b.value = 3;
-});
-// outputs
-// props [ 'a' ]
-// props [ 'childStore.sum' ]
-```
-
 ## Table of contents
 
 ### Constructors
@@ -64,14 +15,16 @@ batch(() => {
 ### Properties
 
 - [#childStores](Store.md##childstores)
+- [#eventEmitter](Store.md##eventemitter)
 - [#isDestroyed](Store.md##isdestroyed)
 - [#items](Store.md##items)
 - [#keys](Store.md##keys)
+- [#muted](Store.md##muted)
+- [#pendingUpdate](Store.md##pendingupdate)
 - [#subscriber](Store.md##subscriber)
 - [#unsubscribers](Store.md##unsubscribers)
 - [#updates](Store.md##updates)
 - [#updatesManager](Store.md##updatesmanager)
-- [eventEmitter](Store.md#eventemitter)
 
 ### Accessors
 
@@ -118,7 +71,7 @@ batch(() => {
 
 #### Defined in
 
-src/complex/Store.js:89
+src/complex/Store.js:45
 
 ## Properties
 
@@ -128,7 +81,17 @@ src/complex/Store.js:89
 
 #### Defined in
 
-src/complex/Store.js:68
+src/complex/Store.js:21
+
+___
+
+### #eventEmitter
+
+• `Private` **#eventEmitter**: [`EventEmitter`](internal_.EventEmitter.md)\<`string`\>
+
+#### Defined in
+
+src/complex/Store.js:24
 
 ___
 
@@ -138,7 +101,7 @@ ___
 
 #### Defined in
 
-src/complex/Store.js:74
+src/complex/Store.js:27
 
 ___
 
@@ -148,7 +111,7 @@ ___
 
 #### Defined in
 
-src/complex/Store.js:64
+src/complex/Store.js:16
 
 ___
 
@@ -158,7 +121,27 @@ ___
 
 #### Defined in
 
-src/complex/Store.js:85
+src/complex/Store.js:38
+
+___
+
+### #muted
+
+• `Private` **#muted**: `boolean` = `false`
+
+#### Defined in
+
+src/complex/Store.js:42
+
+___
+
+### #pendingUpdate
+
+• `Private` **#pendingUpdate**: `boolean` = `false`
+
+#### Defined in
+
+src/complex/Store.js:43
 
 ___
 
@@ -183,17 +166,17 @@ ___
 
 #### Defined in
 
-src/complex/Store.js:87
+src/complex/Store.js:40
 
 ___
 
 ### #unsubscribers
 
-• `Private` **#unsubscribers**: [`Dictionary`](internal_.Dictionary.md)\<() => `void`\>
+• `Private` **#unsubscribers**: `Map`\<`string`, `Set`\<`Function`\>\>
 
 #### Defined in
 
-src/complex/Store.js:77
+src/complex/Store.js:30
 
 ___
 
@@ -203,7 +186,7 @@ ___
 
 #### Defined in
 
-src/complex/Store.js:80
+src/complex/Store.js:33
 
 ___
 
@@ -213,17 +196,7 @@ ___
 
 #### Defined in
 
-src/complex/Store.js:83
-
-___
-
-### eventEmitter
-
-• **eventEmitter**: [`EventEmitterExt`](internal_.EventEmitterExt.md)\<``"change"`` \| ``"destroy"`` \| ``"clear-updates"``\>
-
-#### Defined in
-
-src/complex/Store.js:71
+src/complex/Store.js:36
 
 ## Accessors
 
@@ -231,35 +204,13 @@ src/complex/Store.js:71
 
 • `get` **isDestroyed**(): `boolean`
 
-This property is set to true when the store is destroyed, and false otherwise.
-It is used to prevent further modifications to the store after it has been destroyed.
-
 #### Returns
 
 `boolean`
 
-**`Example`**
-
-```js
-const store = new Store();
-
-const store2 = new Store();
-const a = atom(1);
-
-store2.addItems({ a });
-store.addItems({ store2 });
-
-console.log(store.hasItem("store2")); // output: true
-
-store2.destroy();
-console.log(store2.hasItem("a")); // output: false
-console.log(store.hasItem("store2")); // output: false
-console.log(a.isDestroyed); // output: true
-```
-
 #### Defined in
 
-src/complex/Store.js:150
+src/complex/Store.js:83
 
 ## Methods
 
@@ -286,7 +237,7 @@ If an item with the given key already exists in the store.
 
 #### Defined in
 
-src/complex/Store.js:165
+src/complex/Store.js:102
 
 ___
 
@@ -313,7 +264,7 @@ If a child store with the given key already exists in this store.
 
 #### Defined in
 
-src/complex/Store.js:202
+src/complex/Store.js:134
 
 ___
 
@@ -327,7 +278,7 @@ ___
 
 #### Defined in
 
-src/complex/Store.js:524
+src/complex/Store.js:430
 
 ___
 
@@ -335,8 +286,7 @@ ___
 
 ▸ **#destroyChildStore**(`key`): `void`
 
-Destroys the child store with the given key. This method is useful for cleaning up after a child store
-that is no longer needed. It calls destroy on the child store and removes the child store from this store.
+Destroys the child store with the given key.
 
 #### Parameters
 
@@ -350,7 +300,7 @@ that is no longer needed. It calls destroy on the child store and removes the ch
 
 #### Defined in
 
-src/complex/Store.js:255
+src/complex/Store.js:183
 
 ___
 
@@ -372,7 +322,7 @@ Removes and DESTROYS a reactive item.
 
 #### Defined in
 
-src/complex/Store.js:331
+src/complex/Store.js:260
 
 ___
 
@@ -380,23 +330,21 @@ ___
 
 ▸ **#getChildStore**(`key`): [`Store`](Store.md)
 
-Retrieves the child store with the given key from the store.
+Retrieves the child store with the given key.
 
 #### Parameters
 
-| Name | Type | Description |
-| :------ | :------ | :------ |
-| `key` | `string` | The key of the child store to retrieve. |
+| Name | Type |
+| :------ | :------ |
+| `key` | `string` |
 
 #### Returns
 
 [`Store`](Store.md)
 
-The child store with the given key, or null if no such child store exists in the store.
-
 #### Defined in
 
-src/complex/Store.js:435
+src/complex/Store.js:348
 
 ___
 
@@ -404,23 +352,21 @@ ___
 
 ▸ **#getReactiveItem**(`key`): [`ReactiveItem`](ReactiveItem.md)
 
-Retrieves the reactive item with the given key from the store.
+Retrieves the reactive item with the given key.
 
 #### Parameters
 
-| Name | Type | Description |
-| :------ | :------ | :------ |
-| `key` | `string` | The key of the item to retrieve. |
+| Name | Type |
+| :------ | :------ |
+| `key` | `string` |
 
 #### Returns
 
 [`ReactiveItem`](ReactiveItem.md)
 
-The reactive item with the given key, or null if no such item exists in the store.
-
 #### Defined in
 
-src/complex/Store.js:426
+src/complex/Store.js:339
 
 ___
 
@@ -434,7 +380,7 @@ ___
 
 #### Defined in
 
-src/complex/Store.js:513
+src/complex/Store.js:421
 
 ___
 
@@ -448,7 +394,7 @@ ___
 
 #### Defined in
 
-src/complex/Store.js:154
+src/complex/Store.js:87
 
 ___
 
@@ -470,7 +416,7 @@ Removes a child store WITHOUT destroying it.
 
 #### Defined in
 
-src/complex/Store.js:309
+src/complex/Store.js:235
 
 ___
 
@@ -492,7 +438,7 @@ Removes a reactive item from the store WITHOUT destroying it.
 
 #### Defined in
 
-src/complex/Store.js:284
+src/complex/Store.js:209
 
 ___
 
@@ -500,13 +446,13 @@ ___
 
 ▸ **addItems**(`items`): `void`
 
-Adds one or more reactive items to the store. If an item is a child store, it will be added to the store.
+Adds one or more reactive items to the store.
 
 #### Parameters
 
-| Name | Type | Description |
-| :------ | :------ | :------ |
-| `items` | `Object` | An object where the keys are the keys to use when adding the items to the store and the values are the reactive items to add. |
+| Name | Type |
+| :------ | :------ |
+| `items` | `Object` |
 
 #### Returns
 
@@ -520,18 +466,9 @@ If an item with the given key already exists in the store.
 
 If the store is destroyed.
 
-**`Example`**
-
-```js
-const store = new Store();
-const a = atom(1);
-store.addItems({ a });
-console.log(store.hasItem("a")); // output: true
-```
-
 #### Defined in
 
-src/complex/Store.js:235
+src/complex/Store.js:165
 
 ___
 
@@ -539,9 +476,7 @@ ___
 
 ▸ **destroy**(): `void`
 
-Destroys all reactive items stored in the Store. This method is useful for cleaning
-up after a Store that is no longer needed. It calls destroy on each reactive item
-in the store and clears the store of all items.
+Destroys all reactive items stored in the Store.
 
 #### Returns
 
@@ -549,7 +484,7 @@ in the store and clears the store of all items.
 
 #### Defined in
 
-src/complex/Store.js:369
+src/complex/Store.js:286
 
 ___
 
@@ -558,8 +493,6 @@ ___
 ▸ **destroyItem**(`key`): `void`
 
 Destroys the item with the given key, whether it's a reactive item or a child store.
-It first attempts to destroy a reactive item with the specified key, and if not found,
-attempts to destroy a child store with the same key.
 
 #### Parameters
 
@@ -573,7 +506,7 @@ attempts to destroy a child store with the same key.
 
 #### Defined in
 
-src/complex/Store.js:271
+src/complex/Store.js:196
 
 ___
 
@@ -581,8 +514,7 @@ ___
 
 ▸ **detachAll**(): `void`
 
-Clears all reactive items from the store. This method is useful for resetting a Store to an empty state.
-It removes all reactive items from the store and clears all child stores. It does not destroy the reactive items.
+Clears all reactive items from the store without destroying them.
 
 #### Returns
 
@@ -590,7 +522,7 @@ It removes all reactive items from the store and clears all child stores. It doe
 
 #### Defined in
 
-src/complex/Store.js:403
+src/complex/Store.js:316
 
 ___
 
@@ -598,24 +530,21 @@ ___
 
 ▸ **getItem**(`key`): [`ReactiveItem`](ReactiveItem.md) \| [`Store`](Store.md)
 
-Retrieves the item with the given key from the store. This method first looks for a reactive item with the given key,
-and if no such item exists, looks for a child store with the same key.
+Retrieves the item with the given key.
 
 #### Parameters
 
-| Name | Type | Description |
-| :------ | :------ | :------ |
-| `key` | `string` | The key of the item to retrieve. |
+| Name | Type |
+| :------ | :------ |
+| `key` | `string` |
 
 #### Returns
 
 [`ReactiveItem`](ReactiveItem.md) \| [`Store`](Store.md)
 
-The item with the given key, or null if no such item exists in the store.
-
 #### Defined in
 
-src/complex/Store.js:445
+src/complex/Store.js:357
 
 ___
 
@@ -623,23 +552,21 @@ ___
 
 ▸ **getItemNames**(`filter?`): `string`[]
 
-Retrieves the names of items stored in the Store, optionally filtered by a specified filter.
+Retrieves the names of items stored.
 
 #### Parameters
 
-| Name | Type | Default value | Description |
-| :------ | :------ | :------ | :------ |
-| `filter?` | ``"all"`` \| ``"reactives"`` \| ``"stores"`` | `'all'` | The filter to apply when retrieving item names. Default is "all". Possible values can be "all", "reactives", or "stores" (if applicable). |
+| Name | Type | Default value |
+| :------ | :------ | :------ |
+| `filter?` | ``"all"`` \| ``"reactives"`` \| ``"stores"`` | `'all'` |
 
 #### Returns
 
 `string`[]
 
-An array containing the names of items that match the filter.
-
 #### Defined in
 
-src/complex/Store.js:471
+src/complex/Store.js:381
 
 ___
 
@@ -647,23 +574,21 @@ ___
 
 ▸ **hasItem**(`key`): `boolean`
 
-Checks if an item with the given key exists in the store.
+Checks if an item with the given key exists.
 
 #### Parameters
 
-| Name | Type | Description |
-| :------ | :------ | :------ |
-| `key` | `string` | The key of the item to check. |
+| Name | Type |
+| :------ | :------ |
+| `key` | `string` |
 
 #### Returns
 
 `boolean`
 
-true if the item exists, false otherwise.
-
 #### Defined in
 
-src/complex/Store.js:457
+src/complex/Store.js:369
 
 ___
 
@@ -679,7 +604,7 @@ Returns whether the event emitter is currently muted.
 
 #### Defined in
 
-src/complex/Store.js:675
+src/complex/Store.js:519
 
 ___
 
@@ -688,7 +613,6 @@ ___
 ▸ **muteUpdates**(): `void`
 
 Mutes the event emitter, preventing any updates from being triggered.
-Any updates that are scheduled while muted will be queued and executed when unmuteUpdates is called.
 
 #### Returns
 
@@ -696,7 +620,7 @@ Any updates that are scheduled while muted will be queued and executed when unmu
 
 #### Defined in
 
-src/complex/Store.js:653
+src/complex/Store.js:494
 
 ___
 
@@ -705,19 +629,16 @@ ___
 ▸ **onDestroy**(`fn`): () => `void`
 
 Subscribes a function to be called when this Store is destroyed.
-The function is called with no arguments.
 
 #### Parameters
 
-| Name | Type | Description |
-| :------ | :------ | :------ |
-| `fn` | (`store`: [`Store`](Store.md)) => `void` | The function to be called. |
+| Name | Type |
+| :------ | :------ |
+| `fn` | (`store`: [`Store`](Store.md)) => `void` |
 
 #### Returns
 
 `fn`
-
-A function that unsubscribes the given function.
 
 ▸ (): `void`
 
@@ -727,7 +648,7 @@ A function that unsubscribes the given function.
 
 #### Defined in
 
-src/complex/Store.js:641
+src/complex/Store.js:483
 
 ___
 
@@ -735,7 +656,7 @@ ___
 
 ▸ **removeItem**(`key`): `void`
 
-Removes the reactive item with the given key from the store. This method does not call destroy on the item.
+Removes the reactive item with the given key from the store (without destroying it).
 
 #### Parameters
 
@@ -749,7 +670,7 @@ Removes the reactive item with the given key from the store. This method does no
 
 #### Defined in
 
-src/complex/Store.js:348
+src/complex/Store.js:274
 
 ___
 
@@ -758,19 +679,16 @@ ___
 ▸ **subscribe**(`fn`): () => `void`
 
 Subscribes a function to be called whenever the value of this Store changes.
-The function is called with a Map of updates, where the keys are the names of the items that changed, and the values are UpdateDataRecord objects.
 
 #### Parameters
 
-| Name | Type | Description |
-| :------ | :------ | :------ |
-| `fn` | (`update`: `Map`\<`string`, [`UpdateDataRecord`](internal_.UpdateDataRecord.md)\>, `store`: [`Store`](Store.md)) => `void` | The function to be called whenever the value of this Atom changes. |
+| Name | Type |
+| :------ | :------ |
+| `fn` | (`update`: `Map`\<`string`, [`UpdateDataRecord`](internal_.UpdateDataRecord.md)\>, `store`: [`Store`](Store.md)) => `void` |
 
 #### Returns
 
 `fn`
-
-A function that unsubscribes the given function.
 
 ▸ (): `void`
 
@@ -778,39 +696,9 @@ A function that unsubscribes the given function.
 
 `void`
 
-**`Example`**
-
-```js
-const store = new Store();
-const a = atom(1);
-const b = atom(2);
-
-const c = new Store();
-const d = new Computed(() => a.value + b.value);
-c.addItems({ d });
-
-store.addItems({ a, b, c });
-
-let i = 0;
-
-store.subscribe((updates) => {
-    let updatesArr = Array.from(updates.keys());
-    console.log(updatesArr);
-    i += 1;
-});
-
-a.value = 2;
-// output: ["a", "c.d"]
-
-b.value = 3;
-// output: ["b", "c.d"]
-
-console.log(i); // output: 4
-```
-
 #### Defined in
 
-src/complex/Store.js:623
+src/complex/Store.js:467
 
 ___
 
@@ -818,54 +706,21 @@ ___
 
 ▸ **toJSON**(`filter?`): `any`
 
-Retrieves the value of this Store as a plain object, optionally filtered by a specified filter.
+Retrieves the value of this Store as a plain object.
 
 #### Parameters
 
-| Name | Type | Default value | Description |
-| :------ | :------ | :------ | :------ |
-| `filter?` | ``"all"`` \| ``"reactives"`` \| ``"stores"`` | `'all'` | The filter to apply when retrieving items. Default is "all". Possible values can be "all", "reactives", or "stores" (if applicable). |
+| Name | Type | Default value |
+| :------ | :------ | :------ |
+| `filter?` | ``"all"`` \| ``"reactives"`` \| ``"stores"`` | `'all'` |
 
 #### Returns
 
 `any`
 
-A plain object containing the values of the items that match the filter.
-
-**`Example`**
-
-```js
-const store = new Store();
-const a = atom(1);
-const b = atom(2);
-const c = new Store();
-const d = computed(() => a.value + b.value);
-const e = collection([1, 2, 3]);
-
-store.addItems({ a, b, c });
-c.addItems({ d, e });
-
-console.log(store.toJSON());
-// output: { a: 1, b: 2, c: { d: 3, e: [1, 2, 3] } }
-
-console.log(store.toJSON("all"));
-// output: { a: 1, b: 2, c: { d: 3, e: [1, 2, 3] } }
-
-console.log(store.toJSON("reactives"));
-// output: { a: 1, b: 2 }
-
-console.log(store.toJSON("stores"));
-// output: { c: { d: 3, e: [1, 2, 3] } }
-
-store.destroy();
-
-console.log(store.toJSON());
-// output: {}
-```
-
 #### Defined in
 
-src/complex/Store.js:571
+src/complex/Store.js:444
 
 ___
 
@@ -873,23 +728,21 @@ ___
 
 ▸ **toMap**(`filter?`): `Map`\<`string`, [`ReactiveItem`](ReactiveItem.md) \| [`Store`](Store.md)\>
 
-Retrieves all items stored in the Store, optionally filtered by a specified filter.
+Retrieves all items stored.
 
 #### Parameters
 
-| Name | Type | Default value | Description |
-| :------ | :------ | :------ | :------ |
-| `filter?` | ``"all"`` \| ``"reactives"`` \| ``"stores"`` | `'all'` | The filter to apply when retrieving items. Default is "all". Possible values can be "all", "reactives", or "stores" (if applicable). |
+| Name | Type | Default value |
+| :------ | :------ | :------ |
+| `filter?` | ``"all"`` \| ``"reactives"`` \| ``"stores"`` | `'all'` |
 
 #### Returns
 
 `Map`\<`string`, [`ReactiveItem`](ReactiveItem.md) \| [`Store`](Store.md)\>
 
-A Map containing the items that match the filter.
-
 #### Defined in
 
-src/complex/Store.js:492
+src/complex/Store.js:400
 
 ___
 
@@ -898,7 +751,6 @@ ___
 ▸ **unmuteUpdates**(): `void`
 
 Unmutes the event emitter, allowing updates to be triggered.
-Any updates that were scheduled while muted will be executed.
 
 #### Returns
 
@@ -906,4 +758,4 @@ Any updates that were scheduled while muted will be executed.
 
 #### Defined in
 
-src/complex/Store.js:664
+src/complex/Store.js:504

@@ -632,7 +632,8 @@ export class ReactiveList<T extends {
     /**
      * Adds one or more items to the end of the list.
      *
-     * @param {...T} values - The values to add.
+     * @param {...T} values - The values to add. Primitives are wrapped in `Atom`,
+     *                        objects and arrays are wrapped in `ShallowReactive`.
      */
     add(...values: T[]): void;
     /**
@@ -652,7 +653,7 @@ export class ReactiveList<T extends {
      * Updates the value at the specified index.
      *
      * @param {number} index - The index to update.
-     * @param {T} value - The new value.
+     * @param {T} value - The new value. Primitives become `Atom`, objects/arrays become `ShallowReactive`.
      */
     setItem(index: number, value: T): void;
     /**
@@ -664,7 +665,7 @@ export class ReactiveList<T extends {
     /**
      * Replaces the entire content of the list with the given array.
      *
-     * @param {T[]} values - The new array of values.
+     * @param {T[]} values - The new array of values. Wrapping follows the same rules as `add()`.
      */
     setItems(values: T[]): void;
     /**
@@ -721,237 +722,87 @@ export type ReactiveWrapper<T> = T extends object ? ShallowReactive<T> : Atom<T>
  * Store is a reactive container that holds a collection of reactive items.
  * You can add, remove and access items via methods of this class.
  * It also emits events when items are added, removed or updated.
- * @example
- * ```js
- * const store = new Store();
- * const a = atom(0);
- * const b = atom(0);
- *
- * const childStore = new Store();
- * const sum = computed(() => a.value + b.value);
- * childStore.addItems({ sum });
- *
- * store.addItems({ a, b, childStore });
- *
- * store.subscribe((updates) => {
- *     let updatesArr = Array.from(updates.keys());
- *     console.log("props", updatesArr);
- * });
- *
- * // mute updates
- * store.muteUpdates();
- * childStore.removeItem("childStore");
- * a.value = 3;
- * b.value = 4;
- * store.unmuteUpdates();
- * // outputs
- * // props [ 'a', 'childStore.sum', 'b' ]
- *
- * // without mute updates
- *
- * a.value = 1;
- * // outputs
- * // props [ 'a' ]
- * // props [ 'childStore.sum' ]
- *
- * b.value = 2;
- * // outputs
- * //props [ 'b' ]
- * //props [ 'childStore.sum' ]
- *
- * // using batch
- * batch(() => {
- *     a.value = 2;
- *     b.value = 3;
- * });
- * // outputs
- * // props [ 'a' ]
- * // props [ 'childStore.sum' ]
- * ```
  */
 export class Store {
-    /** @type {EventEmitterExt<"change"|"destroy"|"clear-updates">} */
-    eventEmitter: EventEmitterExt<"change" | "destroy" | "clear-updates">;
     /**
-     * This property is set to true when the store is destroyed, and false otherwise.
-     * It is used to prevent further modifications to the store after it has been destroyed.
      * @type {boolean}
-     * @example
-     * ```js
-     * const store = new Store();
-     *
-     * const store2 = new Store();
-     * const a = atom(1);
-     *
-     * store2.addItems({ a });
-     * store.addItems({ store2 });
-     *
-     * console.log(store.hasItem("store2")); // output: true
-     *
-     * store2.destroy();
-     * console.log(store2.hasItem("a")); // output: false
-     * console.log(store.hasItem("store2")); // output: false
-     * console.log(a.isDestroyed); // output: true
-     * ```
      */
     get isDestroyed(): boolean;
     /**
-     * Adds one or more reactive items to the store. If an item is a child store, it will be added to the store.
-     * @param {{[key: string]: ReactiveItem|Store}} items - An object where the keys are the keys to use when adding the items to the store and the values are the reactive items to add.
+     * Adds one or more reactive items to the store.
+     * @param {{[key: string]: ReactiveItem|Store}} items
      * @throws {Error} If an item with the given key already exists in the store.
      * @throws {Error} If the store is destroyed.
-     * @example
-     * ```js
-     * const store = new Store();
-     * const a = atom(1);
-     * store.addItems({ a });
-     * console.log(store.hasItem("a")); // output: true
-     * ```
      */
     addItems(items: {
         [key: string]: ReactiveItem | Store;
     }): void;
     /**
      * Destroys the item with the given key, whether it's a reactive item or a child store.
-     * It first attempts to destroy a reactive item with the specified key, and if not found,
-     * attempts to destroy a child store with the same key.
      * @param {string} key - The key of the item or child store to destroy.
-     * @returns {void}
      */
     destroyItem(key: string): void;
     /**
-     * Removes the reactive item with the given key from the store. This method does not call destroy on the item.
+     * Removes the reactive item with the given key from the store (without destroying it).
      * @param {string} key - The key of the item to remove.
-     * @returns {void}
      */
     removeItem(key: string): void;
     /**
-     * Destroys all reactive items stored in the Store. This method is useful for cleaning
-     * up after a Store that is no longer needed. It calls destroy on each reactive item
-     * in the store and clears the store of all items.
+     * Destroys all reactive items stored in the Store.
      */
     destroy(): void;
     /**
-     * Clears all reactive items from the store. This method is useful for resetting a Store to an empty state.
-     * It removes all reactive items from the store and clears all child stores. It does not destroy the reactive items.
+     * Clears all reactive items from the store without destroying them.
      */
     detachAll(): void;
     /**
-     * Retrieves the item with the given key from the store. This method first looks for a reactive item with the given key,
-     * and if no such item exists, looks for a child store with the same key.
-     * @param {string} key - The key of the item to retrieve.
-     * @returns {ReactiveItem|Store|null} The item with the given key, or null if no such item exists in the store.
+     * Retrieves the item with the given key.
+     * @param {string} key
+     * @returns {ReactiveItem|Store|null}
      */
     getItem(key: string): ReactiveItem | Store | null;
     /**
-     * Checks if an item with the given key exists in the store.
-     * @param {string} key - The key of the item to check.
-     * @returns {boolean} true if the item exists, false otherwise.
+     * Checks if an item with the given key exists.
+     * @param {string} key
+     * @returns {boolean}
      */
     hasItem(key: string): boolean;
     /**
-     * Retrieves the names of items stored in the Store, optionally filtered by a specified filter.
-     *
-     * @param {"all"|"reactives"|"stores"} [filter="all"] - The filter to apply when retrieving item names. Default is "all".
-     * Possible values can be "all", "reactives", or "stores" (if applicable).
-     * @returns {Array<string>} An array containing the names of items that match the filter.
+     * Retrieves the names of items stored.
+     * @param {"all"|"reactives"|"stores"} [filter="all"]
+     * @returns {Array<string>}
      */
     getItemNames(filter?: "all" | "reactives" | "stores"): Array<string>;
     /**
-     * Retrieves all items stored in the Store, optionally filtered by a specified filter.
-     *
-     * @param {"all"|"reactives"|"stores"} [filter="all"] - The filter to apply when retrieving items. Default is "all".
-     * Possible values can be "all", "reactives", or "stores" (if applicable).
-     * @returns {Map<string, ReactiveItem|Store>} A Map containing the items that match the filter.
+     * Retrieves all items stored.
+     * @param {"all"|"reactives"|"stores"} [filter="all"]
+     * @returns {Map<string, ReactiveItem|Store>}
      */
     toMap(filter?: "all" | "reactives" | "stores"): Map<string, ReactiveItem | Store>;
     /**
-     * Retrieves the value of this Store as a plain object, optionally filtered by a specified filter.
-     *
-     * @param {"all"|"reactives"|"stores"} [filter="all"] - The filter to apply when retrieving items. Default is "all".
-     * Possible values can be "all", "reactives", or "stores" (if applicable).
-     * @returns {object} A plain object containing the values of the items that match the filter.
-     * @example
-     * ```js
-     * const store = new Store();
-     * const a = atom(1);
-     * const b = atom(2);
-     * const c = new Store();
-     * const d = computed(() => a.value + b.value);
-     * const e = collection([1, 2, 3]);
-     *
-     * store.addItems({ a, b, c });
-     * c.addItems({ d, e });
-     *
-     * console.log(store.toJSON());
-     * // output: { a: 1, b: 2, c: { d: 3, e: [1, 2, 3] } }
-     *
-     * console.log(store.toJSON("all"));
-     * // output: { a: 1, b: 2, c: { d: 3, e: [1, 2, 3] } }
-     *
-     * console.log(store.toJSON("reactives"));
-     * // output: { a: 1, b: 2 }
-     *
-     * console.log(store.toJSON("stores"));
-     * // output: { c: { d: 3, e: [1, 2, 3] } }
-     *
-     * store.destroy();
-     *
-     * console.log(store.toJSON());
-     * // output: {}
-     * ```
+     * Retrieves the value of this Store as a plain object.
+     * @param {"all"|"reactives"|"stores"} [filter="all"]
+     * @returns {object}
      */
     toJSON(filter?: "all" | "reactives" | "stores"): object;
     /**
      * Subscribes a function to be called whenever the value of this Store changes.
-     * The function is called with a Map of updates, where the keys are the names of the items that changed, and the values are UpdateDataRecord objects.
-     * @param {(update: Map<string, UpdateDataRecord>, store: Store)=>void} fn - The function to be called whenever the value of this Atom changes.
-     * @returns {()=>void} A function that unsubscribes the given function.
-     * @example
-     * ```js
-     * const store = new Store();
-     * const a = atom(1);
-     * const b = atom(2);
-     *
-     * const c = new Store();
-     * const d = new Computed(() => a.value + b.value);
-     * c.addItems({ d });
-     *
-     * store.addItems({ a, b, c });
-     *
-     * let i = 0;
-     *
-     * store.subscribe((updates) => {
-     *     let updatesArr = Array.from(updates.keys());
-     *     console.log(updatesArr);
-     *     i += 1;
-     * });
-     *
-     * a.value = 2;
-     * // output: ["a", "c.d"]
-     *
-     * b.value = 3;
-     * // output: ["b", "c.d"]
-     *
-     * console.log(i); // output: 4
-     * ```
+     * @param {(update: Map<string, UpdateDataRecord>, store: Store)=>void} fn
+     * @returns {()=>void}
      */
     subscribe(fn: (update: Map<string, UpdateDataRecord>, store: Store) => void): () => void;
     /**
      * Subscribes a function to be called when this Store is destroyed.
-     * The function is called with no arguments.
-     * @param {(store:Store)=>void} fn - The function to be called.
-     * @returns {()=>void} A function that unsubscribes the given function.
+     * @param {(store:Store)=>void} fn
+     * @returns {()=>void}
      */
     onDestroy(fn: (store: Store) => void): () => void;
     /**
      * Mutes the event emitter, preventing any updates from being triggered.
-     * Any updates that are scheduled while muted will be queued and executed when unmuteUpdates is called.
      */
     muteUpdates(): void;
     /**
      * Unmutes the event emitter, allowing updates to be triggered.
-     * Any updates that were scheduled while muted will be executed.
      */
     unmuteUpdates(): void;
     /**
@@ -1226,66 +1077,65 @@ export class Engine {
 /* From core\subscribeController.d.ts */
 export type Unsubscriber = () => void;
 /**
- * @typedef {()=>void} Unsubscriber
+ * @typedef {() => void} Unsubscriber
+ */
+/**
+ * Manages change subscriptions and lifecycle hooks for a reactive item.
+ * Uses a single EventEmitter for all events: 'change' and 'destroy'.
  */
 export class SubscribeController {
     /**
-     * Returns an array of functions that have been subscribed to the subscribeController.
-     * @returns {Function[]} The functions that have been subscribed.
+     * Returns a copy of the current 'change' subscriber list.
+     * @returns {Function[]}
      */
     getSubscribers(): Function[];
     /**
-     * Subscribes a function to be called whenever the subscribeController schedules a task.
-     * The function is called with no arguments.
-     * @param {(updates: Map<string, UpdateDataRecord>)=>void} fn - The function to be called.
-     * @param {{delay?:number, signal?:AbortSignal}} [options]
-     * @returns {Unsubscriber} A function that unsubscribes the given function.
+     * Subscribes a callback to the 'change' event.
+     *
+     * @param {(updates: Map<string, UpdateDataRecord>) => void} fn
+     * @param {{ delay?: number, signal?: AbortSignal }} [options]
+     * @returns {Unsubscriber}
      */
     subscribe(fn: (updates: Map<string, UpdateDataRecord>) => void, options?: {
         delay?: number;
         signal?: AbortSignal;
     }): Unsubscriber;
     /**
-     * Removes all event listeners from the event emitter. This method is useful for
-     * cleaning up all subscribers that are no longer needed.
-     */
-    clearAllSubscribers(): void;
-    /**
-     * Removes all "change" event listeners from the event emitter. This method is useful for cleaning up
-     * "change" subscribers that are no longer needed.
+     * Removes all 'change' subscribers.
+     * Internal listeners (has/no subscribers) remain intact.
      */
     clearSubscribers(): void;
     /**
-     * Returns true if there are any subscribers, false otherwise.
-     * @returns {boolean} Whether there are any subscribers.
+     * Removes all subscribers, including internal listeners.
+     */
+    clearAllSubscribers(): void;
+    /**
+     * Returns whether there are any 'change' subscribers.
+     * @returns {boolean}
      */
     hasSubscribers(): boolean;
     /**
-     * Destroys the SubscribeController. This method is useful for cleaning up after a SubscribeController
-     * that is no longer needed. It calls clearSubscribers, which removes all subscribers.
+     * Destroys the controller, emits 'destroy', and removes all listeners.
      */
     destroy(): void;
     /**
-     * Subscribes a function to be called whenever a subscriber is added to the subscribeController.
-     * The function is called with no arguments.
-     * @param {function():void} callback - The function to be called.
-     * @returns {Unsubscriber} A function that unsubscribes the given function.
+     * Registers a callback that fires when the first 'change' subscriber is added.
+     * @param {() => void} callback
+     * @returns {Unsubscriber}
      */
     onHasSubscribers(callback: () => void): Unsubscriber;
     /**
-     * Subscribes a function to be called whenever there are no longer any subscribers.
-     * The function is called with no arguments.
-     * @param {function():void} callback - The function to be called.
-     * @returns {Unsubscriber} A function that unsubscribes the given function.
+     * Registers a callback that fires when the last 'change' subscriber is removed.
+     * @param {() => void} callback
+     * @returns {Unsubscriber}
      */
     onNoSubscribers(callback: () => void): Unsubscriber;
     /**
-     * Subscribes a function to be called when the SubscribeController is destroyed.
-     * The function is called with no arguments.
-     * @param {Function} callback - The function to be called.
-     * @returns {Unsubscriber} A function that unsubscribes the given function.
+     * Registers a callback that fires when the controller is destroyed.
+     * @param {() => void} callback
+     * @returns {Unsubscriber}
      */
-    onDestroy(callback: Function): Unsubscriber;
+    onDestroy(callback: () => void): Unsubscriber;
     #private;
 }
 
@@ -1348,6 +1198,14 @@ export function getSortedReactiveItems(...items: (ReactiveItem | Set<ReactiveIte
  * @returns {boolean} true if the value is a plain object, false otherwise.
  */
 export function isPlainObject(obj: any): boolean;
+/**
+ * Checks if two plain objects are equal. If the objects do not have the same set of keys, then this function returns false.
+ * Otherwise, this function checks if each value of the two objects is equal, using the compareAny function.
+ * @param {object} a - The first object to compare.
+ * @param {object} b - The second object to compare.
+ * @returns {boolean} True if the two objects are equal, false otherwise.
+ */
+export function comparePlainObjects(a: object, b: object): boolean;
 /**
  * Checks if two objects are equal. If objects are arrays, then check if stringified versions of them are equal.
  * If objects are not arrays, then check if sorted stringified versions of them are equal.
@@ -2066,7 +1924,7 @@ declare class Tracker {
      * Returns whether the tracker is currently turned on or not.
      * @returns {boolean} true if the tracker is on, false if it is off.
      */
-    isTurnedOn(): boolean;
+    isActive(): boolean;
     /**
      * Turns the tracker on and clears its store. If the tracker is already turned on, an error is thrown.
      * @param {object} [ctx={}] - The context to use when the tracker is turned on.
@@ -2116,10 +1974,10 @@ declare class ModeControllerService {
     isComputing: boolean;
     untrackMode: boolean;
     throwErrorInSubscribers: boolean;
-    /** @type {EventEmitterExt<"batchModeStart"|"batchModeEnd"|"beforeBatchModeEnd">} */
-    batchModeEvents: EventEmitterExt<"batchModeStart" | "batchModeEnd" | "beforeBatchModeEnd">;
-    /** @type {EventEmitterExt<"subscribersModeEnd">} */
-    subscribersModeEvents: EventEmitterExt<"subscribersModeEnd">;
+    /** @type {EventEmitter<"batchModeStart"|"batchModeEnd"|"beforeBatchModeEnd">} */
+    batchModeEvents: EventEmitter<"batchModeStart" | "batchModeEnd" | "beforeBatchModeEnd">;
+    /** @type {EventEmitter<"subscribersModeEnd">} */
+    subscribersModeEvents: EventEmitter<"subscribersModeEnd">;
     /**
      * Subscribes a function to be called whenever the given event is triggered.
      * @param {"batchModeStart"|"batchModeEnd"|"beforeBatchModeEnd"} event - The event to subscribe to.

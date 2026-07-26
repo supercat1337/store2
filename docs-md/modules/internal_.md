@@ -7,9 +7,9 @@
 ### Classes
 
 - [BatchSnapshot](../classes/internal_.BatchSnapshot.md)
-- [Dictionary](../classes/internal_.Dictionary.md)
 - [Engine](../classes/internal_.Engine.md)
-- [EventEmitterExt](../classes/internal_.EventEmitterExt.md)
+- [EventEmitter](../classes/internal_.EventEmitter.md)
+- [EventEmitterLite](../classes/internal_.EventEmitterLite.md)
 - [SubscribeController](../classes/internal_.SubscribeController.md)
 - [UpdateDataRecord](../classes/internal_.UpdateDataRecord.md)
 - [UpdateDataRecordManager](../classes/internal_.UpdateDataRecordManager.md)
@@ -23,6 +23,7 @@
 ### Type Aliases
 
 - [CompareFunction](internal_.md#comparefunction)
+- [Record](internal_.md#record)
 - [Unsubscriber](internal_.md#unsubscriber)
 - [WeakKey](internal_.md#weakkey)
 
@@ -49,7 +50,26 @@
 
 #### Defined in
 
-[src/types.d.ts:2](https://github.com/supercat1337/store2/blob/db27dff8135ce0b18c8545168f48050df8eeffe0/src/types.d.ts#L2)
+[src/types.d.ts:2](https://github.com/supercat1337/store2/blob/e60081710ee7e24f7bcf3bcbc43ae5661fe35f53/src/types.d.ts#L2)
+
+___
+
+### Record
+
+Ƭ **Record**\<`K`, `T`\>: \{ [P in K]: T }
+
+Construct a type with a set of properties K of type T
+
+#### Type parameters
+
+| Name | Type |
+| :------ | :------ |
+| `K` | extends keyof `any` |
+| `T` | `T` |
+
+#### Defined in
+
+node_modules/typescript/lib/lib.es5.d.ts:1606
 
 ___
 
@@ -67,7 +87,7 @@ ___
 
 #### Defined in
 
-[src/core/subscribeController.js:7](https://github.com/supercat1337/store2/blob/db27dff8135ce0b18c8545168f48050df8eeffe0/src/core/subscribeController.js#L7)
+[src/core/subscribeController.js:7](https://github.com/supercat1337/store2/blob/e60081710ee7e24f7bcf3bcbc43ae5661fe35f53/src/core/subscribeController.js#L7)
 
 ___
 

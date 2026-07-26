@@ -1,6 +1,4 @@
-import { EventEmitterExt } from '@supercat1337/event-emitter-ext';
-import { EventEmitterLite } from '@supercat1337/event-emitter';
-import { Dictionary } from '@supercat1337/dictionary';
+import { EventEmitter, EventEmitterLite } from '@supercat1337/event-emitter';
 
 // @ts-check
 
@@ -143,9 +141,6 @@ function compareAny(a, b) {
     if (a === null || b === null) {
         return false;
     }
-    if (a === undefined || b === undefined) {
-        return false;
-    }
 
     if (Array.isArray(a) || Array.isArray(b)) {
         if (!(Array.isArray(a) && Array.isArray(b))) {
@@ -258,160 +253,99 @@ function getError(e) {
 
 
 /**
- * @typedef {()=>void} Unsubscriber
+ * @typedef {() => void} Unsubscriber
  */
 
+/**
+ * Manages change subscriptions and lifecycle hooks for a reactive item.
+ * Uses a single EventEmitter for all events: 'change' and 'destroy'.
+ */
 class SubscribeController {
-    /** @type {EventEmitterExt<"change">} */
-    #eventEmitter;
+    /** @type {EventEmitter} */
+    #emitter;
 
-    /** @type {EventEmitterExt<"#has-listeners"|"#no-listeners"|"destroy">} */
-    #additionalEvents;
     constructor() {
-        this.#eventEmitter = new EventEmitterExt();
-        this.#eventEmitter.registerEvents('change');
-
-        this.#additionalEvents = new EventEmitterExt();
-        this.#additionalEvents.registerEvents('destroy', '#has-listeners', '#no-listeners');
-        // @ts-ignore
-        this.#additionalEvents.noLimitsToEmit = true;
+        this.#emitter = new EventEmitter();
     }
 
     /**
-     * Returns an array of functions that have been subscribed to the subscribeController.
-     * @returns {Function[]} The functions that have been subscribed.
+     * Returns a copy of the current 'change' subscriber list.
+     * @returns {Function[]}
      */
     getSubscribers() {
-        return this.#eventEmitter.getListeners('change');
+        return this.#emitter.getListeners('change');
     }
 
     /**
-     * Subscribes a function to be called whenever the subscribeController schedules a task.
-     * The function is called with no arguments.
-     * @param {(updates: Map<string, import("./UpdateDataRecord.js").UpdateDataRecord>)=>void} fn - The function to be called.
-     * @param {{delay?:number, signal?:AbortSignal}} [options]
-     * @returns {Unsubscriber} A function that unsubscribes the given function.
+     * Subscribes a callback to the 'change' event.
+     *
+     * @param {(updates: Map<string, import("./UpdateDataRecord.js").UpdateDataRecord>) => void} fn
+     * @param {{ delay?: number, signal?: AbortSignal }} [options]
+     * @returns {Unsubscriber}
      */
     subscribe(fn, options) {
-        /** @type {{delay?:number, signal?:AbortSignal}} */
-        const _options = Object.assign({ delay: 0, signal: undefined }, options);
+        const { delay = 0, signal } = options || {};
+        const wrappedFn = delay > 0 ? debounce(fn, delay) : fn;
 
-        const delay = _options.delay || 0;
-
-        /** @type {Function} */
-        const _fn = delay > 0 ? debounce(fn, delay) : fn;
-
-        const hasListeners = this.#eventEmitter.hasListeners('change');
-
-        const unsubscriberInner = this.#eventEmitter.on('change', _fn);
-
-        const unsubscriber = () => {
-            const hasListeners = this.#eventEmitter.hasListeners('change');
-            if (!hasListeners) {
-                return;
-            }
-
-            if (_options.signal instanceof AbortSignal) {
-                _options.signal.removeEventListener('abort', unsubscriber);
-            }
-
-            unsubscriberInner();
-
-            const hasListeners_2 = this.#eventEmitter.hasListeners('change');
-            if (!hasListeners_2) {
-                /*
-                runInAction(() => {
-                    this.#additionalEvents.emit("#no-listeners");
-                });
-                //*/
-                this.#additionalEvents.emit('#no-listeners');
-            }
-        };
-
-        if (_options.signal instanceof AbortSignal) {
-            _options.signal.addEventListener('abort', unsubscriber);
-        }
-
-        // If there are no listeners, emit the #has-listeners event.
-        if (!hasListeners) {
-            /*
-            runInAction(() => {
-                this.#additionalEvents.emit("#has-listeners");
-            });
-            //*/
-
-            this.#additionalEvents.emit('#has-listeners');
-        }
-
-        return unsubscriber;
+        return this.#emitter.on('change', wrappedFn, { signal });
     }
 
     /**
-     * Removes all event listeners from the event emitter. This method is useful for
-     * cleaning up all subscribers that are no longer needed.
-     */
-    clearAllSubscribers() {
-        this.#eventEmitter.removeAllListeners('change');
-
-        this.#additionalEvents.removeAllListeners('destroy');
-        this.#additionalEvents.removeAllListeners('#has-listeners');
-        this.#additionalEvents.removeAllListeners('#no-listeners');
-    }
-
-    /**
-     * Removes all "change" event listeners from the event emitter. This method is useful for cleaning up
-     * "change" subscribers that are no longer needed.
+     * Removes all 'change' subscribers.
+     * Internal listeners (has/no subscribers) remain intact.
      */
     clearSubscribers() {
-        this.#eventEmitter.removeAllListeners('change');
+        this.#emitter.removeAllListenersOf('change');
     }
 
     /**
-     * Returns true if there are any subscribers, false otherwise.
-     * @returns {boolean} Whether there are any subscribers.
+     * Removes all subscribers, including internal listeners.
+     */
+    clearAllSubscribers() {
+        this.#emitter.removeAllListeners({ removeInternalListeners: true });
+    }
+
+    /**
+     * Returns whether there are any 'change' subscribers.
+     * @returns {boolean}
      */
     hasSubscribers() {
-        return this.#eventEmitter.hasListeners('change');
+        return this.#emitter.hasListeners('change');
     }
 
     /**
-     * Destroys the SubscribeController. This method is useful for cleaning up after a SubscribeController
-     * that is no longer needed. It calls clearSubscribers, which removes all subscribers.
+     * Destroys the controller, emits 'destroy', and removes all listeners.
      */
     destroy() {
-        this.#additionalEvents.emit('destroy');
-        this.#eventEmitter.unregisterAllEvents();
-        this.#additionalEvents.unregisterAllEvents();
+        this.#emitter.emit('destroy');
+        this.#emitter.removeAllListeners({ removeInternalListeners: true });
     }
 
     /**
-     * Subscribes a function to be called whenever a subscriber is added to the subscribeController.
-     * The function is called with no arguments.
-     * @param {function():void} callback - The function to be called.
-     * @returns {Unsubscriber} A function that unsubscribes the given function.
+     * Registers a callback that fires when the first 'change' subscriber is added.
+     * @param {() => void} callback
+     * @returns {Unsubscriber}
      */
     onHasSubscribers(callback) {
-        return this.#additionalEvents.on('#has-listeners', callback);
+        return this.#emitter.onHasEventListeners('change', () => callback());
     }
 
     /**
-     * Subscribes a function to be called whenever there are no longer any subscribers.
-     * The function is called with no arguments.
-     * @param {function():void} callback - The function to be called.
-     * @returns {Unsubscriber} A function that unsubscribes the given function.
+     * Registers a callback that fires when the last 'change' subscriber is removed.
+     * @param {() => void} callback
+     * @returns {Unsubscriber}
      */
     onNoSubscribers(callback) {
-        return this.#additionalEvents.on('#no-listeners', callback);
+        return this.#emitter.onNoEventListeners('change', () => callback());
     }
 
     /**
-     * Subscribes a function to be called when the SubscribeController is destroyed.
-     * The function is called with no arguments.
-     * @param {Function} callback - The function to be called.
-     * @returns {Unsubscriber} A function that unsubscribes the given function.
+     * Registers a callback that fires when the controller is destroyed.
+     * @param {() => void} callback
+     * @returns {Unsubscriber}
      */
     onDestroy(callback) {
-        return this.#additionalEvents.on('destroy', callback);
+        return this.#emitter.on('destroy', callback);
     }
 }
 
@@ -426,20 +360,16 @@ class ModeControllerService {
     #batchDepth = 0;
     #subscribersMode = false;
 
-    /** @type {EventEmitterExt<"batchModeStart"|"batchModeEnd"|"beforeBatchModeEnd">} */
+    /** @type {EventEmitter<"batchModeStart"|"batchModeEnd"|"beforeBatchModeEnd">} */
     batchModeEvents;
 
-    /** @type {EventEmitterExt<"subscribersModeEnd">} */
+    /** @type {EventEmitter<"subscribersModeEnd">} */
     subscribersModeEvents;
 
     constructor() {
-        this.batchModeEvents = new EventEmitterExt();
-        this.batchModeEvents.registerEvents('batchModeStart', 'beforeBatchModeEnd', 'batchModeEnd');
-        this.batchModeEvents.setListenerRunnerStrategy(1);
+        this.batchModeEvents = new EventEmitter();
 
-        this.subscribersModeEvents = new EventEmitterExt();
-        this.subscribersModeEvents.noLimitsToEmit = true;
-        this.subscribersModeEvents.registerEvents('subscribersModeEnd');
+        this.subscribersModeEvents = new EventEmitter();
     }
 
     /**
@@ -477,7 +407,9 @@ class ModeControllerService {
      * If exiting the last batch, emits "beforeBatchModeEnd" and then "batchModeEnd".
      */
     exitBatch() {
-        if (this.#batchDepth === 0) {return;}
+        if (this.#batchDepth === 0) {
+            return;
+        }
         const isLast = this.#batchDepth === 1;
         if (isLast) {
             this.batchModeEvents.emit('beforeBatchModeEnd');
@@ -507,7 +439,9 @@ class ModeControllerService {
      * Sets the state to indicate that no subscribers are currently running.
      */
     endSubscribersMode() {
-        if (!this.#subscribersMode) {return;}
+        if (!this.#subscribersMode) {
+            return;
+        }
         this.#subscribersMode = false;
         this.subscribersModeEvents.emit('subscribersModeEnd');
     }
@@ -1365,7 +1299,6 @@ class Tracker {
      */
     get data() {
         return new Set([...this.#store]);
-        //return this.#store;
     }
 
     /**
@@ -1407,7 +1340,7 @@ class Tracker {
      * Returns whether the tracker is currently turned on or not.
      * @returns {boolean} true if the tracker is on, false if it is off.
      */
-    isTurnedOn() {
+    isActive() {
         return this.#isActive;
     }
 
@@ -2589,72 +2522,26 @@ class ShallowReactive extends ReactiveItem {
  * Store is a reactive container that holds a collection of reactive items.
  * You can add, remove and access items via methods of this class.
  * It also emits events when items are added, removed or updated.
- * @example
- * ```js
- * const store = new Store();
- * const a = atom(0);
- * const b = atom(0);
- *
- * const childStore = new Store();
- * const sum = computed(() => a.value + b.value);
- * childStore.addItems({ sum });
- *
- * store.addItems({ a, b, childStore });
- *
- * store.subscribe((updates) => {
- *     let updatesArr = Array.from(updates.keys());
- *     console.log("props", updatesArr);
- * });
- *
- * // mute updates
- * store.muteUpdates();
- * childStore.removeItem("childStore");
- * a.value = 3;
- * b.value = 4;
- * store.unmuteUpdates();
- * // outputs
- * // props [ 'a', 'childStore.sum', 'b' ]
- *
- * // without mute updates
- *
- * a.value = 1;
- * // outputs
- * // props [ 'a' ]
- * // props [ 'childStore.sum' ]
- *
- * b.value = 2;
- * // outputs
- * //props [ 'b' ]
- * //props [ 'childStore.sum' ]
- *
- * // using batch
- * batch(() => {
- *     a.value = 2;
- *     b.value = 3;
- * });
- * // outputs
- * // props [ 'a' ]
- * // props [ 'childStore.sum' ]
- * ```
  */
 class Store {
     /**
      * @type {Map<string, ReactiveItem>}
      */
     #items = new Map();
+
     /**
      * @type {Map<string, Store>}
      */
     #childStores = new Map();
 
-    /** @type {EventEmitterExt<"change"|"destroy"|"clear-updates">} */
-    eventEmitter;
+    /** @type {EventEmitter} */
+    #eventEmitter;
 
     /** @type {boolean} */
     #isDestroyed = false;
 
-    /** @type {Dictionary<()=>void>} */
-    #unsubscribers = new Dictionary();
+    /** @type {Map<string, Set<Function>>} */
+    #unsubscribers = new Map();
 
     /** @type {Map<string, import("../core/UpdateDataRecord.js").UpdateDataRecord>} */
     #updates;
@@ -2666,18 +2553,17 @@ class Store {
 
     #subscriber;
 
+    #muted = false;
+    #pendingUpdate = false;
+
     constructor() {
-        this.eventEmitter = new EventEmitterExt();
-        this.eventEmitter.registerEvents('change', 'destroy', 'clear-updates');
-        this.eventEmitter.setListenerRunnerStrategy(1);
+        this.#eventEmitter = new EventEmitter();
 
         this.#updates = new Map();
         this.#updatesManager = new UpdateDataRecordManager(this.#updates);
 
         const that = this;
-        this.eventEmitter.on('clear-updates', () => {
-            //console.log("clear-updates");
-            //console.log(that.#updates);
+        this.#eventEmitter.on('clear-updates', () => {
             that.#updates.clear();
         });
 
@@ -2706,34 +2592,19 @@ class Store {
     }
 
     /**
-     * This property is set to true when the store is destroyed, and false otherwise.
-     * It is used to prevent further modifications to the store after it has been destroyed.
      * @type {boolean}
-     * @example
-     * ```js
-     * const store = new Store();
-     *
-     * const store2 = new Store();
-     * const a = atom(1);
-     *
-     * store2.addItems({ a });
-     * store.addItems({ store2 });
-     *
-     * console.log(store.hasItem("store2")); // output: true
-     *
-     * store2.destroy();
-     * console.log(store2.hasItem("a")); // output: false
-     * console.log(store.hasItem("store2")); // output: false
-     * console.log(a.isDestroyed); // output: true
-     * ```
      */
     get isDestroyed() {
         return this.#isDestroyed;
     }
 
     #notifySubscribers() {
-        this.eventEmitter.emit('change');
-        this.eventEmitter.emit('clear-updates');
+        if (this.#muted) {
+            this.#pendingUpdate = true;
+        } else {
+            this.#eventEmitter.emit('change');
+            this.#eventEmitter.emit('clear-updates');
+        }
     }
 
     /**
@@ -2753,24 +2624,19 @@ class Store {
         const that = this;
         // @ts-ignore
         const unsubscriber = reactiveItem.subscribe(this.#subscriber);
-
         const unsubscriber2 = reactiveItem.onDestroy(() => {
-            /*
-            that.#updates.set(
-                key,
-                new UpdateDataRecord(
-                    "delete",
-                    undefined,
-                    undefined,
-                    reactiveItem
-                )
-            );
-            */
             that.#removeReactiveItem(key);
-            //that.#notifySubscribers();
         });
 
-        this.#unsubscribers.add(key, unsubscriber, unsubscriber2);
+        // Store unsubscribers in Map
+        if (!this.#unsubscribers.has(key)) {
+            this.#unsubscribers.set(key, new Set());
+        }
+        const set = this.#unsubscribers.get(key);
+        if (set) {
+            set.add(unsubscriber);
+            set.add(unsubscriber2);
+        }
     }
 
     /**
@@ -2790,27 +2656,25 @@ class Store {
         this.#keys.set(store, storeName);
 
         const unsubscriber = store.subscribe(this.#subscriber);
-
         const unsubscriber2 = store.onDestroy(() => {
             that.#removeChildStore(storeName);
-            //that.#notifySubscribers();
         });
 
-        this.#unsubscribers.add(storeName, unsubscriber, unsubscriber2);
+        if (!this.#unsubscribers.has(storeName)) {
+            this.#unsubscribers.set(storeName, new Set());
+        }
+        const set = this.#unsubscribers.get(storeName);
+        if (set) {
+            set.add(unsubscriber);
+            set.add(unsubscriber2);
+        }
     }
 
     /**
-     * Adds one or more reactive items to the store. If an item is a child store, it will be added to the store.
-     * @param {{[key: string]: ReactiveItem|Store}} items - An object where the keys are the keys to use when adding the items to the store and the values are the reactive items to add.
+     * Adds one or more reactive items to the store.
+     * @param {{[key: string]: ReactiveItem|Store}} items
      * @throws {Error} If an item with the given key already exists in the store.
      * @throws {Error} If the store is destroyed.
-     * @example
-     * ```js
-     * const store = new Store();
-     * const a = atom(1);
-     * store.addItems({ a });
-     * console.log(store.hasItem("a")); // output: true
-     * ```
      */
     addItems(items) {
         if (this.isDestroyed) {
@@ -2827,10 +2691,8 @@ class Store {
     }
 
     /**
-     * Destroys the child store with the given key. This method is useful for cleaning up after a child store
-     * that is no longer needed. It calls destroy on the child store and removes the child store from this store.
+     * Destroys the child store with the given key.
      * @param {string} key - The key of the child store to destroy.
-     * @returns {void}
      */
     #destroyChildStore(key) {
         const childStore = this.#childStores.get(key);
@@ -2843,10 +2705,7 @@ class Store {
 
     /**
      * Destroys the item with the given key, whether it's a reactive item or a child store.
-     * It first attempts to destroy a reactive item with the specified key, and if not found,
-     * attempts to destroy a child store with the same key.
      * @param {string} key - The key of the item or child store to destroy.
-     * @returns {void}
      */
     destroyItem(key) {
         if (this.isDestroyed) {
@@ -2867,17 +2726,18 @@ class Store {
             return;
         }
 
-        // Remove from store maps
         this.#items.delete(key);
         this.#keys.delete(item);
 
-        // Unsubscribe from the item's change events
-        this.#unsubscribers.iterate(key, unsubscriber => {
-            unsubscriber();
-        });
-        this.#unsubscribers.remove(key);
+        // Call and remove all unsubscribers
+        const set = this.#unsubscribers.get(key);
+        if (set) {
+            for (const fn of set) {
+                fn();
+            }
+            this.#unsubscribers.delete(key);
+        }
 
-        // Notify about removal (but do NOT destroy the item)
         this.#updatesManager.removeItem(key);
         this.#notifySubscribers();
     }
@@ -2895,10 +2755,13 @@ class Store {
         this.#childStores.delete(key);
         this.#keys.delete(store);
 
-        this.#unsubscribers.iterate(key, unsubscriber => {
-            unsubscriber();
-        });
-        this.#unsubscribers.remove(key);
+        const set = this.#unsubscribers.get(key);
+        if (set) {
+            for (const fn of set) {
+                fn();
+            }
+            this.#unsubscribers.delete(key);
+        }
 
         this.#updatesManager.removeItem(key);
         this.#notifySubscribers();
@@ -2915,36 +2778,24 @@ class Store {
         }
 
         this.#removeReactiveItem(key);
-
-        // Finally destroy the reactive item
         item.destroy();
     }
 
     /**
-     * Removes the reactive item with the given key from the store. This method does not call destroy on the item.
+     * Removes the reactive item with the given key from the store (without destroying it).
      * @param {string} key - The key of the item to remove.
-     * @returns {void}
      */
     removeItem(key) {
         if (this.isDestroyed) {
             throw new Error('Store has been destroyed');
         }
 
-        if (this.#items.has(key)) {
-            this.#removeReactiveItem(key);
-            return;
-        }
-
-        if (this.#childStores.has(key)) {
-            this.#removeChildStore(key);
-            return;
-        }
+        this.#removeReactiveItem(key);
+        this.#removeChildStore(key);
     }
 
     /**
-     * Destroys all reactive items stored in the Store. This method is useful for cleaning
-     * up after a Store that is no longer needed. It calls destroy on each reactive item
-     * in the store and clears the store of all items.
+     * Destroys all reactive items stored in the Store.
      */
     destroy() {
         if (this.#isDestroyed) {
@@ -2963,22 +2814,18 @@ class Store {
         });
         this.#childStores.clear();
 
-        // Clear updates map to release memory
         this.#updates.clear();
-
-        // Clear the reference to the updates manager (optional, helps GC)
         // @ts-ignore
         this.#updatesManager = null;
 
-        this.eventEmitter.emit('destroy', this);
-        this.eventEmitter.unregisterAllEvents();
+        this.#eventEmitter.emit('destroy', this);
+        this.#eventEmitter.removeAllListeners({ removeInternalListeners: true });
 
-        this.#unsubscribers.removeAll();
+        this.#unsubscribers.clear();
     }
 
     /**
-     * Clears all reactive items from the store. This method is useful for resetting a Store to an empty state.
-     * It removes all reactive items from the store and clears all child stores. It does not destroy the reactive items.
+     * Clears all reactive items from the store without destroying them.
      */
     detachAll() {
         if (this.isDestroyed) {
@@ -2995,32 +2842,31 @@ class Store {
         });
         this.#childStores.clear();
 
-        this.#unsubscribers.removeAll();
+        this.#unsubscribers.clear();
     }
 
     /**
-     * Retrieves the reactive item with the given key from the store.
-     * @param {string} key - The key of the item to retrieve.
-     * @returns {ReactiveItem|null} The reactive item with the given key, or null if no such item exists in the store.
+     * Retrieves the reactive item with the given key.
+     * @param {string} key
+     * @returns {ReactiveItem|null}
      */
     #getReactiveItem(key) {
         return this.#items.get(key) || null;
     }
 
     /**
-     * Retrieves the child store with the given key from the store.
-     * @param {string} key - The key of the child store to retrieve.
-     * @returns {Store|null} The child store with the given key, or null if no such child store exists in the store.
+     * Retrieves the child store with the given key.
+     * @param {string} key
+     * @returns {Store|null}
      */
     #getChildStore(key) {
         return this.#childStores.get(key) || null;
     }
 
     /**
-     * Retrieves the item with the given key from the store. This method first looks for a reactive item with the given key,
-     * and if no such item exists, looks for a child store with the same key.
-     * @param {string} key - The key of the item to retrieve.
-     * @returns {ReactiveItem|Store|null} The item with the given key, or null if no such item exists in the store.
+     * Retrieves the item with the given key.
+     * @param {string} key
+     * @returns {ReactiveItem|Store|null}
      */
     getItem(key) {
         if (this.isDestroyed) {
@@ -3030,9 +2876,9 @@ class Store {
     }
 
     /**
-     * Checks if an item with the given key exists in the store.
-     * @param {string} key - The key of the item to check.
-     * @returns {boolean} true if the item exists, false otherwise.
+     * Checks if an item with the given key exists.
+     * @param {string} key
+     * @returns {boolean}
      */
     hasItem(key) {
         if (this.isDestroyed) {
@@ -3042,11 +2888,9 @@ class Store {
     }
 
     /**
-     * Retrieves the names of items stored in the Store, optionally filtered by a specified filter.
-     *
-     * @param {"all"|"reactives"|"stores"} [filter="all"] - The filter to apply when retrieving item names. Default is "all".
-     * Possible values can be "all", "reactives", or "stores" (if applicable).
-     * @returns {Array<string>} An array containing the names of items that match the filter.
+     * Retrieves the names of items stored.
+     * @param {"all"|"reactives"|"stores"} [filter="all"]
+     * @returns {Array<string>}
      */
     getItemNames(filter = 'all') {
         if (this.isDestroyed) {
@@ -3063,11 +2907,9 @@ class Store {
     }
 
     /**
-     * Retrieves all items stored in the Store, optionally filtered by a specified filter.
-     *
-     * @param {"all"|"reactives"|"stores"} [filter="all"] - The filter to apply when retrieving items. Default is "all".
-     * Possible values can be "all", "reactives", or "stores" (if applicable).
-     * @returns {Map<string, ReactiveItem|Store>} A Map containing the items that match the filter.
+     * Retrieves all items stored.
+     * @param {"all"|"reactives"|"stores"} [filter="all"]
+     * @returns {Map<string, ReactiveItem|Store>}
      */
     toMap(filter = 'all') {
         if (this.isDestroyed) {
@@ -3092,61 +2934,26 @@ class Store {
 
     #itemsToJSON() {
         const object = {};
-
         this.#items.forEach((item, key) => {
             // @ts-ignore
             object[key] = item.getValue();
         });
-
         return object;
     }
 
     #childStoresToJSON() {
         const object = {};
-
         this.#childStores.forEach((store, key) => {
             // @ts-ignore
             object[key] = store.toJSON();
         });
-
         return object;
     }
 
     /**
-     * Retrieves the value of this Store as a plain object, optionally filtered by a specified filter.
-     *
-     * @param {"all"|"reactives"|"stores"} [filter="all"] - The filter to apply when retrieving items. Default is "all".
-     * Possible values can be "all", "reactives", or "stores" (if applicable).
-     * @returns {object} A plain object containing the values of the items that match the filter.
-     * @example
-     * ```js
-     * const store = new Store();
-     * const a = atom(1);
-     * const b = atom(2);
-     * const c = new Store();
-     * const d = computed(() => a.value + b.value);
-     * const e = collection([1, 2, 3]);
-     *
-     * store.addItems({ a, b, c });
-     * c.addItems({ d, e });
-     *
-     * console.log(store.toJSON());
-     * // output: { a: 1, b: 2, c: { d: 3, e: [1, 2, 3] } }
-     *
-     * console.log(store.toJSON("all"));
-     * // output: { a: 1, b: 2, c: { d: 3, e: [1, 2, 3] } }
-     *
-     * console.log(store.toJSON("reactives"));
-     * // output: { a: 1, b: 2 }
-     *
-     * console.log(store.toJSON("stores"));
-     * // output: { c: { d: 3, e: [1, 2, 3] } }
-     *
-     * store.destroy();
-     *
-     * console.log(store.toJSON());
-     * // output: {}
-     * ```
+     * Retrieves the value of this Store as a plain object.
+     * @param {"all"|"reactives"|"stores"} [filter="all"]
+     * @returns {object}
      */
     toJSON(filter = 'all') {
         if (this.isDestroyed) {
@@ -3168,37 +2975,8 @@ class Store {
 
     /**
      * Subscribes a function to be called whenever the value of this Store changes.
-     * The function is called with a Map of updates, where the keys are the names of the items that changed, and the values are UpdateDataRecord objects.
-     * @param {(update: Map<string, import("../core/UpdateDataRecord.js").UpdateDataRecord>, store: Store)=>void} fn - The function to be called whenever the value of this Atom changes.
-     * @returns {()=>void} A function that unsubscribes the given function.
-     * @example
-     * ```js
-     * const store = new Store();
-     * const a = atom(1);
-     * const b = atom(2);
-     *
-     * const c = new Store();
-     * const d = new Computed(() => a.value + b.value);
-     * c.addItems({ d });
-     *
-     * store.addItems({ a, b, c });
-     *
-     * let i = 0;
-     *
-     * store.subscribe((updates) => {
-     *     let updatesArr = Array.from(updates.keys());
-     *     console.log(updatesArr);
-     *     i += 1;
-     * });
-     *
-     * a.value = 2;
-     * // output: ["a", "c.d"]
-     *
-     * b.value = 3;
-     * // output: ["b", "c.d"]
-     *
-     * console.log(i); // output: 4
-     * ```
+     * @param {(update: Map<string, import("../core/UpdateDataRecord.js").UpdateDataRecord>, store: Store)=>void} fn
+     * @returns {()=>void}
      */
     subscribe(fn) {
         if (this.isDestroyed) {
@@ -3206,46 +2984,46 @@ class Store {
         }
 
         const that = this;
-
-        return this.eventEmitter.on('change', () => {
+        return this.#eventEmitter.on('change', () => {
             fn(that.#updates, that);
         });
     }
 
     /**
      * Subscribes a function to be called when this Store is destroyed.
-     * The function is called with no arguments.
-     * @param {(store:Store)=>void} fn - The function to be called.
-     * @returns {()=>void} A function that unsubscribes the given function.
+     * @param {(store:Store)=>void} fn
+     * @returns {()=>void}
      */
     onDestroy(fn) {
         if (this.isDestroyed) {
             throw new Error('Store has been destroyed');
         }
 
-        return this.eventEmitter.on('destroy', fn);
+        return this.#eventEmitter.on('destroy', fn);
     }
 
     /**
      * Mutes the event emitter, preventing any updates from being triggered.
-     * Any updates that are scheduled while muted will be queued and executed when unmuteUpdates is called.
      */
     muteUpdates() {
         if (this.isDestroyed) {
             throw new Error('Store has been destroyed');
         }
-        this.eventEmitter.mute();
+        this.#muted = true;
     }
 
     /**
      * Unmutes the event emitter, allowing updates to be triggered.
-     * Any updates that were scheduled while muted will be executed.
      */
     unmuteUpdates() {
         if (this.isDestroyed) {
             throw new Error('Store has been destroyed');
         }
-        this.eventEmitter.unmute();
+        this.#muted = false;
+        if (this.#pendingUpdate) {
+            this.#pendingUpdate = false;
+            this.#notifySubscribers();
+        }
     }
 
     /**
@@ -3256,7 +3034,7 @@ class Store {
         if (this.isDestroyed) {
             throw new Error('Store has been destroyed');
         }
-        return this.eventEmitter.isMuted();
+        return this.#muted;
     }
 }
 
@@ -3352,11 +3130,16 @@ class ReactiveList {
     /**
      * Adds one or more items to the end of the list.
      *
-     * @param {...T} values - The values to add.
+     * @param {...T} values - The values to add. Primitives are wrapped in `Atom`,
+     *                        objects and arrays are wrapped in `ShallowReactive`.
      */
     add(...values) {
-        if (this.isDestroyed) {throw new Error('ReactiveList has been destroyed');}
-        if (values.length === 0) {return;}
+        if (this.isDestroyed) {
+            throw new Error('ReactiveList has been destroyed');
+        }
+        if (values.length === 0) {
+            return;
+        }
 
         const startIndex = this.#lengthAtom.value;
         const alreadyMuted = this.#store.isMuted();
@@ -3377,7 +3160,9 @@ class ReactiveList {
         }
         this.#lengthAtom.value += values.length;
 
-        if (!alreadyMuted) {this.#store.unmuteUpdates();}
+        if (!alreadyMuted) {
+            this.#store.unmuteUpdates();
+        }
     }
 
     /**
@@ -3387,9 +3172,13 @@ class ReactiveList {
      * @returns {T | undefined} The value, or undefined if the index is out of bounds.
      */
     getItem(index) {
-        if (this.isDestroyed) {throw new Error('ReactiveList has been destroyed');}
+        if (this.isDestroyed) {
+            throw new Error('ReactiveList has been destroyed');
+        }
         const item = this.#store.getItem(index.toString());
-        if (!isReactiveWrapper(item)) {return undefined;}
+        if (!isReactiveWrapper(item)) {
+            return undefined;
+        }
         return item.value;
     }
 
@@ -3399,7 +3188,9 @@ class ReactiveList {
      * @returns {T[]} An array containing all values.
      */
     toArray() {
-        if (this.isDestroyed) {throw new Error('ReactiveList has been destroyed');}
+        if (this.isDestroyed) {
+            throw new Error('ReactiveList has been destroyed');
+        }
         const items = [];
         for (let i = 0; i < this.#lengthAtom.value; i++) {
             const item = this.#store.getItem(i.toString());
@@ -3414,16 +3205,22 @@ class ReactiveList {
      * Updates the value at the specified index.
      *
      * @param {number} index - The index to update.
-     * @param {T} value - The new value.
+     * @param {T} value - The new value. Primitives become `Atom`, objects/arrays become `ShallowReactive`.
      */
     setItem(index, value) {
-        if (this.isDestroyed) {throw new Error('ReactiveList has been destroyed');}
+        if (this.isDestroyed) {
+            throw new Error('ReactiveList has been destroyed');
+        }
         const wrapper = this.#store.getItem(index.toString());
-        if (!isReactiveWrapper(wrapper)) {return;}
+        if (!isReactiveWrapper(wrapper)) {
+            return;
+        }
         const alreadyMuted = this.#store.isMuted();
         this.#store.muteUpdates();
         wrapper.value = value;
-        if (!alreadyMuted) {this.#store.unmuteUpdates();}
+        if (!alreadyMuted) {
+            this.#store.unmuteUpdates();
+        }
     }
 
     /**
@@ -3432,17 +3229,21 @@ class ReactiveList {
      * @returns {number}
      */
     get length() {
-        if (this.isDestroyed) {throw new Error('ReactiveList has been destroyed');}
+        if (this.isDestroyed) {
+            throw new Error('ReactiveList has been destroyed');
+        }
         return this.#lengthAtom.value;
     }
 
     /**
      * Replaces the entire content of the list with the given array.
      *
-     * @param {T[]} values - The new array of values.
+     * @param {T[]} values - The new array of values. Wrapping follows the same rules as `add()`.
      */
     setItems(values) {
-        if (this.isDestroyed) {throw new Error('ReactiveList has been destroyed');}
+        if (this.isDestroyed) {
+            throw new Error('ReactiveList has been destroyed');
+        }
         const alreadyMuted = this.#store.isMuted();
         this.#store.muteUpdates();
 
@@ -3483,7 +3284,9 @@ class ReactiveList {
             this.#lengthAtom.value = newLen;
         }
 
-        if (!alreadyMuted) {this.#store.unmuteUpdates();}
+        if (!alreadyMuted) {
+            this.#store.unmuteUpdates();
+        }
     }
 
     /**
@@ -3494,14 +3297,22 @@ class ReactiveList {
      * @param {number} count - The number of elements to remove.
      */
     removeRange(startIndex, count) {
-        if (this.isDestroyed) {throw new Error('ReactiveList has been destroyed');}
-        if (count <= 0) {return;}
+        if (this.isDestroyed) {
+            throw new Error('ReactiveList has been destroyed');
+        }
+        if (count <= 0) {
+            return;
+        }
 
         const oldLen = this.#lengthAtom.value;
-        if (startIndex < 0 || startIndex >= oldLen) {return;}
+        if (startIndex < 0 || startIndex >= oldLen) {
+            return;
+        }
 
         const actualCount = Math.min(count, oldLen - startIndex);
-        if (actualCount === 0) {return;}
+        if (actualCount === 0) {
+            return;
+        }
 
         const newLen = oldLen - actualCount;
         const alreadyMuted = this.#store.isMuted();
@@ -3526,7 +3337,9 @@ class ReactiveList {
 
         this.#lengthAtom.value = newLen;
 
-        if (!alreadyMuted) {this.#store.unmuteUpdates();}
+        if (!alreadyMuted) {
+            this.#store.unmuteUpdates();
+        }
     }
 
     /**
@@ -3564,7 +3377,9 @@ class ReactiveList {
      * After destruction, any method call (except `isDestroyed`) will throw an error.
      */
     destroy() {
-        if (this.isDestroyed) {return;}
+        if (this.isDestroyed) {
+            return;
+        }
         this.#store.destroy();
         // No need to nullify #lengthAtom; it will be inaccessible because isDestroyed becomes true.
     }
@@ -3586,7 +3401,9 @@ class ReactiveList {
      * @returns {() => void} A function to unsubscribe the callback.
      */
     subscribe(fn) {
-        if (this.isDestroyed) {throw new Error('ReactiveList has been destroyed');}
+        if (this.isDestroyed) {
+            throw new Error('ReactiveList has been destroyed');
+        }
         return this.#store.subscribe(fn);
     }
 }

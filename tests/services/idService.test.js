@@ -24,3 +24,11 @@ test('idService: compareIds', t => {
     t.is(idService.compareIds(id2, id), 1);
     t.is(idService.compareIds(id, id), 0);
 });
+
+test('idService: reset', t => {
+    const id1 = idService.generateId();
+    idService.reset();
+    const id2 = idService.generateId();
+    t.is(id2, 0);
+    // id1 может быть больше 0, но после сброса следующий id = 0
+});

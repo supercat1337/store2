@@ -465,3 +465,22 @@ test('Computed: set value (another atom) 2', t => {
         const b = new Computed(() => a, { name: 'b' });
     });
 });
+
+test('Computed: rethrows existing error when shouldRecalc is false', t => {
+    const a = new Atom(0);
+    const c = new Computed(() => {
+        if (a.value > 5) throw new Error('computed error');
+        return a.value;
+    });
+
+    // Вызываем ошибку
+    a.value = 10;
+    t.throws(() => c.value, { message: /computed error/ });
+    t.true(c.engine.shouldRecalc);
+
+    // Принудительно сбрасываем shouldRecalc (только для теста)
+    c.engine.shouldRecalc = false;
+
+    // Теперь при чтении должна выброситься та же ошибка без пересчёта
+    t.throws(() => c.value, { message: /computed error/ });
+});

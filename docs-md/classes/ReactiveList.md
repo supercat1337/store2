@@ -120,7 +120,7 @@ Indicates whether the list has been destroyed.
 
 #### Defined in
 
-src/complex/ReactiveList.js:319
+src/complex/ReactiveList.js:356
 
 ___
 
@@ -136,7 +136,7 @@ Returns the current length of the list.
 
 #### Defined in
 
-src/complex/ReactiveList.js:176
+src/complex/ReactiveList.js:195
 
 ## Methods
 
@@ -200,7 +200,7 @@ Adds one or more items to the end of the list.
 
 | Name | Type | Description |
 | :------ | :------ | :------ |
-| `...values` | `T`[] | The values to add. |
+| `...values` | `T`[] | The values to add. Primitives are wrapped in `Atom`, objects and arrays are wrapped in `ShallowReactive`. |
 
 #### Returns
 
@@ -208,7 +208,7 @@ Adds one or more items to the end of the list.
 
 #### Defined in
 
-src/complex/ReactiveList.js:99
+src/complex/ReactiveList.js:100
 
 ___
 
@@ -224,7 +224,7 @@ Removes all items from the list.
 
 #### Defined in
 
-src/complex/ReactiveList.js:300
+src/complex/ReactiveList.js:335
 
 ___
 
@@ -241,7 +241,7 @@ After destruction, any method call (except `isDestroyed`) will throw an error.
 
 #### Defined in
 
-src/complex/ReactiveList.js:308
+src/complex/ReactiveList.js:343
 
 ___
 
@@ -265,7 +265,7 @@ The value, or undefined if the index is out of bounds.
 
 #### Defined in
 
-src/complex/ReactiveList.js:131
+src/complex/ReactiveList.js:138
 
 ___
 
@@ -281,7 +281,7 @@ Removes the first item of the list.
 
 #### Defined in
 
-src/complex/ReactiveList.js:293
+src/complex/ReactiveList.js:328
 
 ___
 
@@ -303,7 +303,7 @@ Removes the item at the given index.
 
 #### Defined in
 
-src/complex/ReactiveList.js:279
+src/complex/ReactiveList.js:314
 
 ___
 
@@ -319,7 +319,7 @@ Removes the last item of the list.
 
 #### Defined in
 
-src/complex/ReactiveList.js:286
+src/complex/ReactiveList.js:321
 
 ___
 
@@ -343,7 +343,7 @@ Remaining elements are shifted left. The operation is batched to emit only one n
 
 #### Defined in
 
-src/complex/ReactiveList.js:238
+src/complex/ReactiveList.js:263
 
 ___
 
@@ -358,7 +358,7 @@ Updates the value at the specified index.
 | Name | Type | Description |
 | :------ | :------ | :------ |
 | `index` | `number` | The index to update. |
-| `value` | `T` | The new value. |
+| `value` | `T` | The new value. Primitives become `Atom`, objects/arrays become `ShallowReactive`. |
 
 #### Returns
 
@@ -366,7 +366,7 @@ Updates the value at the specified index.
 
 #### Defined in
 
-src/complex/ReactiveList.js:161
+src/complex/ReactiveList.js:174
 
 ___
 
@@ -380,7 +380,7 @@ Replaces the entire content of the list with the given array.
 
 | Name | Type | Description |
 | :------ | :------ | :------ |
-| `values` | `T`[] | The new array of values. |
+| `values` | `T`[] | The new array of values. Wrapping follows the same rules as `add()`. |
 
 #### Returns
 
@@ -388,7 +388,7 @@ Replaces the entire content of the list with the given array.
 
 #### Defined in
 
-src/complex/ReactiveList.js:186
+src/complex/ReactiveList.js:207
 
 ___
 
@@ -419,7 +419,7 @@ A function to unsubscribe the callback.
 
 #### Defined in
 
-src/complex/ReactiveList.js:330
+src/complex/ReactiveList.js:367
 
 ___
 
@@ -437,4 +437,4 @@ An array containing all values.
 
 #### Defined in
 
-src/complex/ReactiveList.js:143
+src/complex/ReactiveList.js:154

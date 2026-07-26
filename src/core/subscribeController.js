@@ -1,163 +1,102 @@
 // @ts-check
 
-import { EventEmitterExt } from '@supercat1337/event-emitter-ext';
+import { EventEmitter } from '@supercat1337/event-emitter';
 import { debounce } from '../helpers/tools.js';
 
 /**
- * @typedef {()=>void} Unsubscriber
+ * @typedef {() => void} Unsubscriber
  */
 
+/**
+ * Manages change subscriptions and lifecycle hooks for a reactive item.
+ * Uses a single EventEmitter for all events: 'change' and 'destroy'.
+ */
 class SubscribeController {
-    /** @type {EventEmitterExt<"change">} */
-    #eventEmitter;
+    /** @type {EventEmitter} */
+    #emitter;
 
-    /** @type {EventEmitterExt<"#has-listeners"|"#no-listeners"|"destroy">} */
-    #additionalEvents;
     constructor() {
-        this.#eventEmitter = new EventEmitterExt();
-        this.#eventEmitter.registerEvents('change');
-
-        this.#additionalEvents = new EventEmitterExt();
-        this.#additionalEvents.registerEvents('destroy', '#has-listeners', '#no-listeners');
-        // @ts-ignore
-        this.#additionalEvents.noLimitsToEmit = true;
+        this.#emitter = new EventEmitter();
     }
 
     /**
-     * Returns an array of functions that have been subscribed to the subscribeController.
-     * @returns {Function[]} The functions that have been subscribed.
+     * Returns a copy of the current 'change' subscriber list.
+     * @returns {Function[]}
      */
     getSubscribers() {
-        return this.#eventEmitter.getListeners('change');
+        return this.#emitter.getListeners('change');
     }
 
     /**
-     * Subscribes a function to be called whenever the subscribeController schedules a task.
-     * The function is called with no arguments.
-     * @param {(updates: Map<string, import("./UpdateDataRecord.js").UpdateDataRecord>)=>void} fn - The function to be called.
-     * @param {{delay?:number, signal?:AbortSignal}} [options]
-     * @returns {Unsubscriber} A function that unsubscribes the given function.
+     * Subscribes a callback to the 'change' event.
+     *
+     * @param {(updates: Map<string, import("./UpdateDataRecord.js").UpdateDataRecord>) => void} fn
+     * @param {{ delay?: number, signal?: AbortSignal }} [options]
+     * @returns {Unsubscriber}
      */
     subscribe(fn, options) {
-        /** @type {{delay?:number, signal?:AbortSignal}} */
-        const _options = Object.assign({ delay: 0, signal: undefined }, options);
+        const { delay = 0, signal } = options || {};
+        const wrappedFn = delay > 0 ? debounce(fn, delay) : fn;
 
-        const delay = _options.delay || 0;
-
-        /** @type {Function} */
-        const _fn = delay > 0 ? debounce(fn, delay) : fn;
-
-        const hasListeners = this.#eventEmitter.hasListeners('change');
-
-        const unsubscriberInner = this.#eventEmitter.on('change', _fn);
-
-        const unsubscriber = () => {
-            const hasListeners = this.#eventEmitter.hasListeners('change');
-            if (!hasListeners) {
-                return;
-            }
-
-            if (_options.signal instanceof AbortSignal) {
-                _options.signal.removeEventListener('abort', unsubscriber);
-            }
-
-            unsubscriberInner();
-
-            const hasListeners_2 = this.#eventEmitter.hasListeners('change');
-            if (!hasListeners_2) {
-                /*
-                runInAction(() => {
-                    this.#additionalEvents.emit("#no-listeners");
-                });
-                //*/
-                this.#additionalEvents.emit('#no-listeners');
-            }
-        };
-
-        if (_options.signal instanceof AbortSignal) {
-            _options.signal.addEventListener('abort', unsubscriber);
-        }
-
-        // If there are no listeners, emit the #has-listeners event.
-        if (!hasListeners) {
-            /*
-            runInAction(() => {
-                this.#additionalEvents.emit("#has-listeners");
-            });
-            //*/
-
-            this.#additionalEvents.emit('#has-listeners');
-        }
-
-        return unsubscriber;
+        return this.#emitter.on('change', wrappedFn, { signal });
     }
 
     /**
-     * Removes all event listeners from the event emitter. This method is useful for
-     * cleaning up all subscribers that are no longer needed.
-     */
-    clearAllSubscribers() {
-        this.#eventEmitter.removeAllListeners('change');
-
-        this.#additionalEvents.removeAllListeners('destroy');
-        this.#additionalEvents.removeAllListeners('#has-listeners');
-        this.#additionalEvents.removeAllListeners('#no-listeners');
-    }
-
-    /**
-     * Removes all "change" event listeners from the event emitter. This method is useful for cleaning up
-     * "change" subscribers that are no longer needed.
+     * Removes all 'change' subscribers.
+     * Internal listeners (has/no subscribers) remain intact.
      */
     clearSubscribers() {
-        this.#eventEmitter.removeAllListeners('change');
+        this.#emitter.removeAllListenersOf('change');
     }
 
     /**
-     * Returns true if there are any subscribers, false otherwise.
-     * @returns {boolean} Whether there are any subscribers.
+     * Removes all subscribers, including internal listeners.
+     */
+    clearAllSubscribers() {
+        this.#emitter.removeAllListeners({ removeInternalListeners: true });
+    }
+
+    /**
+     * Returns whether there are any 'change' subscribers.
+     * @returns {boolean}
      */
     hasSubscribers() {
-        return this.#eventEmitter.hasListeners('change');
+        return this.#emitter.hasListeners('change');
     }
 
     /**
-     * Destroys the SubscribeController. This method is useful for cleaning up after a SubscribeController
-     * that is no longer needed. It calls clearSubscribers, which removes all subscribers.
+     * Destroys the controller, emits 'destroy', and removes all listeners.
      */
     destroy() {
-        this.#additionalEvents.emit('destroy');
-        this.#eventEmitter.unregisterAllEvents();
-        this.#additionalEvents.unregisterAllEvents();
+        this.#emitter.emit('destroy');
+        this.#emitter.removeAllListeners({ removeInternalListeners: true });
     }
 
     /**
-     * Subscribes a function to be called whenever a subscriber is added to the subscribeController.
-     * The function is called with no arguments.
-     * @param {function():void} callback - The function to be called.
-     * @returns {Unsubscriber} A function that unsubscribes the given function.
+     * Registers a callback that fires when the first 'change' subscriber is added.
+     * @param {() => void} callback
+     * @returns {Unsubscriber}
      */
     onHasSubscribers(callback) {
-        return this.#additionalEvents.on('#has-listeners', callback);
+        return this.#emitter.onHasEventListeners('change', () => callback());
     }
 
     /**
-     * Subscribes a function to be called whenever there are no longer any subscribers.
-     * The function is called with no arguments.
-     * @param {function():void} callback - The function to be called.
-     * @returns {Unsubscriber} A function that unsubscribes the given function.
+     * Registers a callback that fires when the last 'change' subscriber is removed.
+     * @param {() => void} callback
+     * @returns {Unsubscriber}
      */
     onNoSubscribers(callback) {
-        return this.#additionalEvents.on('#no-listeners', callback);
+        return this.#emitter.onNoEventListeners('change', () => callback());
     }
 
     /**
-     * Subscribes a function to be called when the SubscribeController is destroyed.
-     * The function is called with no arguments.
-     * @param {Function} callback - The function to be called.
-     * @returns {Unsubscriber} A function that unsubscribes the given function.
+     * Registers a callback that fires when the controller is destroyed.
+     * @param {() => void} callback
+     * @returns {Unsubscriber}
      */
     onDestroy(callback) {
-        return this.#additionalEvents.on('destroy', callback);
+        return this.#emitter.on('destroy', callback);
     }
 }
 

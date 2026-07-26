@@ -1,6 +1,6 @@
 // @ts-check
 
-import { EventEmitterExt } from '@supercat1337/event-emitter-ext';
+import { EventEmitter } from '@supercat1337/event-emitter';
 
 class ModeControllerService {
     isComputing = false;
@@ -10,20 +10,16 @@ class ModeControllerService {
     #batchDepth = 0;
     #subscribersMode = false;
 
-    /** @type {EventEmitterExt<"batchModeStart"|"batchModeEnd"|"beforeBatchModeEnd">} */
+    /** @type {EventEmitter<"batchModeStart"|"batchModeEnd"|"beforeBatchModeEnd">} */
     batchModeEvents;
 
-    /** @type {EventEmitterExt<"subscribersModeEnd">} */
+    /** @type {EventEmitter<"subscribersModeEnd">} */
     subscribersModeEvents;
 
     constructor() {
-        this.batchModeEvents = new EventEmitterExt();
-        this.batchModeEvents.registerEvents('batchModeStart', 'beforeBatchModeEnd', 'batchModeEnd');
-        this.batchModeEvents.setListenerRunnerStrategy(1);
+        this.batchModeEvents = new EventEmitter();
 
-        this.subscribersModeEvents = new EventEmitterExt();
-        this.subscribersModeEvents.noLimitsToEmit = true;
-        this.subscribersModeEvents.registerEvents('subscribersModeEnd');
+        this.subscribersModeEvents = new EventEmitter();
     }
 
     /**
@@ -61,7 +57,9 @@ class ModeControllerService {
      * If exiting the last batch, emits "beforeBatchModeEnd" and then "batchModeEnd".
      */
     exitBatch() {
-        if (this.#batchDepth === 0) {return;}
+        if (this.#batchDepth === 0) {
+            return;
+        }
         const isLast = this.#batchDepth === 1;
         if (isLast) {
             this.batchModeEvents.emit('beforeBatchModeEnd');
@@ -91,7 +89,9 @@ class ModeControllerService {
      * Sets the state to indicate that no subscribers are currently running.
      */
     endSubscribersMode() {
-        if (!this.#subscribersMode) {return;}
+        if (!this.#subscribersMode) {
+            return;
+        }
         this.#subscribersMode = false;
         this.subscribersModeEvents.emit('subscribersModeEnd');
     }
@@ -107,3 +107,4 @@ class ModeControllerService {
 
 const modeController = new ModeControllerService();
 export { modeController };
+

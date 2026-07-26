@@ -1,8 +1,7 @@
 // @ts-check
 
 import test from 'ava';
-import { ReactiveList } from '../../src/complex/reactiveList.js';
-import { ShallowReactive } from '../../src/reactives/ShallowReactive.js';
+import { batch, ReactiveList } from '../../src/index.js';
 
 test('ReactiveList: add, getItem', t => {
     const list = new ReactiveList();
@@ -347,16 +346,6 @@ test('ReactiveList: removeRange with startIndex out of range does nothing', t =>
     t.deepEqual(list.toArray(), [1, 2, 3]);
 });
 
-test('ReactiveList: removeItem removes correct element', t => {
-    const list = new ReactiveList();
-    list.setItems([10, 20, 30, 40]);
-
-    list.removeItem(2);
-
-    t.is(list.length, 3);
-    t.deepEqual(list.toArray(), [10, 20, 40]);
-});
-
 test('ReactiveList: removeFirstItem removes first element', t => {
     const list = new ReactiveList();
     list.setItems([10, 20, 30]);
@@ -375,16 +364,6 @@ test('ReactiveList: removeLastItem removes last element', t => {
 
     t.is(list.length, 2);
     t.deepEqual(list.toArray(), [10, 20]);
-});
-
-test('ReactiveList: clear removes all items', t => {
-    const list = new ReactiveList();
-    list.setItems([1, 2, 3, 4]);
-
-    list.clear();
-
-    t.is(list.length, 0);
-    t.deepEqual(list.toArray(), []);
 });
 
 test('ReactiveList: multiple removeRange operations maintain correctness', t => {
@@ -446,4 +425,147 @@ test('ReactiveList: removeRange handles nested reactive objects', t => {
     // проверяем, что объект остался реактивным
     list.getItem(0).x = 10;
     t.is(list.getItem(0).x, 10);
+});
+
+test('ReactiveList: add wraps primitives in Atom and objects in ShallowReactive', t => {
+    const list = new ReactiveList();
+    let callCount = 0;
+    list.subscribe(() => callCount++);
+
+    batch(() => {
+        list.add(1, { a: 2 }, 'three');
+        const obj = list.getItem(1);
+        obj.a = 3;
+    });
+
+    t.is(callCount, 1);
+    // проверяем, что объект реактивен
+    const obj2 = list.getItem(1);
+    t.is(obj2.a, 3);
+});
+
+test('ReactiveList: setItems with more items than current', t => {
+    const list = new ReactiveList();
+    list.setItems([1, 2]);
+    t.is(list.length, 2);
+    list.setItems([3, 4, 5, 6]);
+    t.is(list.length, 4);
+    t.deepEqual(list.toArray(), [3, 4, 5, 6]);
+});
+
+test('ReactiveList: setItems with fewer items than current', t => {
+    const list = new ReactiveList();
+    list.setItems([1, 2, 3, 4]);
+    list.setItems([10, 20]);
+    t.is(list.length, 2);
+    t.deepEqual(list.toArray(), [10, 20]);
+});
+
+test('ReactiveList: setItems with empty array clears list', t => {
+    const list = new ReactiveList();
+    list.setItems([1, 2, 3]);
+    list.setItems([]);
+    t.is(list.length, 0);
+    t.deepEqual(list.toArray(), []);
+});
+
+test('ReactiveList: add multiple items triggers one notification', t => {
+    const list = new ReactiveList();
+    let callCount = 0;
+    list.subscribe(() => callCount++);
+    list.add(1, 2, 3, 4, 5);
+    t.is(callCount, 1);
+    t.is(list.length, 5);
+});
+
+test('ReactiveList: removeRange with count 0 does nothing', t => {
+    const list = new ReactiveList();
+    list.setItems([1, 2, 3]);
+    let callCount = 0;
+    list.subscribe(() => callCount++);
+    list.removeRange(1, 0);
+    t.is(callCount, 0);
+    t.deepEqual(list.toArray(), [1, 2, 3]);
+});
+
+test('ReactiveList: removeRange with negative start does nothing', t => {
+    const list = new ReactiveList();
+    list.setItems([1, 2, 3]);
+    list.removeRange(-1, 1);
+    t.deepEqual(list.toArray(), [1, 2, 3]);
+});
+
+test('ReactiveList: removeRange with start out of bounds does nothing', t => {
+    const list = new ReactiveList();
+    list.setItems([1, 2, 3]);
+    list.removeRange(5, 1);
+    t.deepEqual(list.toArray(), [1, 2, 3]);
+});
+
+test('ReactiveList: removeRange with count larger than remaining truncates', t => {
+    const list = new ReactiveList();
+    list.setItems([1, 2, 3, 4]);
+    list.removeRange(2, 10);
+    t.deepEqual(list.toArray(), [1, 2]);
+});
+
+test('ReactiveList: removeItem removes correct element', t => {
+    const list = new ReactiveList();
+    list.setItems([10, 20, 30, 40]);
+    list.removeItem(2);
+    t.deepEqual(list.toArray(), [10, 20, 40]);
+});
+
+test('ReactiveList: removeFirstItem and removeLastItem', t => {
+    const list = new ReactiveList();
+    list.setItems([1, 2, 3, 4]);
+    list.removeFirstItem();
+    t.deepEqual(list.toArray(), [2, 3, 4]);
+    list.removeLastItem();
+    t.deepEqual(list.toArray(), [2, 3]);
+});
+
+test('ReactiveList: clear removes all items', t => {
+    const list = new ReactiveList();
+    list.setItems([1, 2, 3]);
+    list.clear();
+    t.is(list.length, 0);
+    t.deepEqual(list.toArray(), []);
+});
+
+test('ReactiveList: isDestroyed returns true after destroy', t => {
+    const list = new ReactiveList();
+    t.false(list.isDestroyed);
+    list.destroy();
+    t.true(list.isDestroyed);
+});
+
+test('ReactiveList: getItem returns undefined for out of bounds', t => {
+    const list = new ReactiveList();
+    list.setItems([1, 2]);
+    t.is(list.getItem(2), undefined);
+    t.is(list.getItem(-1), undefined);
+});
+
+test('ReactiveList: toArray returns copy of items', t => {
+    const list = new ReactiveList();
+    list.setItems([1, 2, 3]);
+    const arr = list.toArray();
+    arr.push(4);
+    t.is(list.length, 3);
+    t.deepEqual(list.toArray(), [1, 2, 3]);
+});
+
+test('ReactiveList: removeRange with source out of bounds sets dest to undefined', t => {
+    const list = new ReactiveList();
+    list.setItems([1, 2, 3]);
+
+    // Удаляем 2 элемента, начиная с индекса 1 → удаляем [2, 3]
+    // Ожидаем: остаётся [1], а элемент с индексом 1 становится undefined
+    list.removeRange(1, 2);
+
+    t.is(list.length, 1);
+    t.deepEqual(list.toArray(), [1]);
+    t.is(list.getItem(0), 1);
+    t.is(list.getItem(1), undefined);
 });

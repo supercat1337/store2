@@ -4,6 +4,9 @@
 
 [\<internal\>](../modules/internal_.md).SubscribeController
 
+Manages change subscriptions and lifecycle hooks for a reactive item.
+Uses a single EventEmitter for all events: 'change' and 'destroy'.
+
 ## Table of contents
 
 ### Constructors
@@ -12,8 +15,7 @@
 
 ### Properties
 
-- [#additionalEvents](internal_.SubscribeController.md##additionalevents)
-- [#eventEmitter](internal_.SubscribeController.md##eventemitter)
+- [#emitter](internal_.SubscribeController.md##emitter)
 
 ### Methods
 
@@ -39,27 +41,17 @@
 
 #### Defined in
 
-[src/core/subscribeController.js:16](https://github.com/supercat1337/store2/blob/db27dff8135ce0b18c8545168f48050df8eeffe0/src/core/subscribeController.js#L16)
+[src/core/subscribeController.js:18](https://github.com/supercat1337/store2/blob/e60081710ee7e24f7bcf3bcbc43ae5661fe35f53/src/core/subscribeController.js#L18)
 
 ## Properties
 
-### #additionalEvents
+### #emitter
 
-• `Private` **#additionalEvents**: [`EventEmitterExt`](internal_.EventEmitterExt.md)\<``"#has-listeners"`` \| ``"#no-listeners"`` \| ``"destroy"``\>
-
-#### Defined in
-
-[src/core/subscribeController.js:15](https://github.com/supercat1337/store2/blob/db27dff8135ce0b18c8545168f48050df8eeffe0/src/core/subscribeController.js#L15)
-
-___
-
-### #eventEmitter
-
-• `Private` **#eventEmitter**: [`EventEmitterExt`](internal_.EventEmitterExt.md)\<``"change"``\>
+• `Private` **#emitter**: [`EventEmitter`](internal_.EventEmitter.md)\<`string`\>
 
 #### Defined in
 
-[src/core/subscribeController.js:12](https://github.com/supercat1337/store2/blob/db27dff8135ce0b18c8545168f48050df8eeffe0/src/core/subscribeController.js#L12)
+[src/core/subscribeController.js:16](https://github.com/supercat1337/store2/blob/e60081710ee7e24f7bcf3bcbc43ae5661fe35f53/src/core/subscribeController.js#L16)
 
 ## Methods
 
@@ -67,8 +59,7 @@ ___
 
 ▸ **clearAllSubscribers**(): `void`
 
-Removes all event listeners from the event emitter. This method is useful for
-cleaning up all subscribers that are no longer needed.
+Removes all subscribers, including internal listeners.
 
 #### Returns
 
@@ -76,7 +67,7 @@ cleaning up all subscribers that are no longer needed.
 
 #### Defined in
 
-[src/core/subscribeController.js:99](https://github.com/supercat1337/store2/blob/db27dff8135ce0b18c8545168f48050df8eeffe0/src/core/subscribeController.js#L99)
+[src/core/subscribeController.js:55](https://github.com/supercat1337/store2/blob/e60081710ee7e24f7bcf3bcbc43ae5661fe35f53/src/core/subscribeController.js#L55)
 
 ___
 
@@ -84,8 +75,8 @@ ___
 
 ▸ **clearSubscribers**(): `void`
 
-Removes all "change" event listeners from the event emitter. This method is useful for cleaning up
-"change" subscribers that are no longer needed.
+Removes all 'change' subscribers.
+Internal listeners (has/no subscribers) remain intact.
 
 #### Returns
 
@@ -93,7 +84,7 @@ Removes all "change" event listeners from the event emitter. This method is usef
 
 #### Defined in
 
-[src/core/subscribeController.js:111](https://github.com/supercat1337/store2/blob/db27dff8135ce0b18c8545168f48050df8eeffe0/src/core/subscribeController.js#L111)
+[src/core/subscribeController.js:48](https://github.com/supercat1337/store2/blob/e60081710ee7e24f7bcf3bcbc43ae5661fe35f53/src/core/subscribeController.js#L48)
 
 ___
 
@@ -101,8 +92,7 @@ ___
 
 ▸ **destroy**(): `void`
 
-Destroys the SubscribeController. This method is useful for cleaning up after a SubscribeController
-that is no longer needed. It calls clearSubscribers, which removes all subscribers.
+Destroys the controller, emits 'destroy', and removes all listeners.
 
 #### Returns
 
@@ -110,7 +100,7 @@ that is no longer needed. It calls clearSubscribers, which removes all subscribe
 
 #### Defined in
 
-[src/core/subscribeController.js:127](https://github.com/supercat1337/store2/blob/db27dff8135ce0b18c8545168f48050df8eeffe0/src/core/subscribeController.js#L127)
+[src/core/subscribeController.js:70](https://github.com/supercat1337/store2/blob/e60081710ee7e24f7bcf3bcbc43ae5661fe35f53/src/core/subscribeController.js#L70)
 
 ___
 
@@ -118,17 +108,15 @@ ___
 
 ▸ **getSubscribers**(): `Function`[]
 
-Returns an array of functions that have been subscribed to the subscribeController.
+Returns a copy of the current 'change' subscriber list.
 
 #### Returns
 
 `Function`[]
 
-The functions that have been subscribed.
-
 #### Defined in
 
-[src/core/subscribeController.js:30](https://github.com/supercat1337/store2/blob/db27dff8135ce0b18c8545168f48050df8eeffe0/src/core/subscribeController.js#L30)
+[src/core/subscribeController.js:26](https://github.com/supercat1337/store2/blob/e60081710ee7e24f7bcf3bcbc43ae5661fe35f53/src/core/subscribeController.js#L26)
 
 ___
 
@@ -136,17 +124,15 @@ ___
 
 ▸ **hasSubscribers**(): `boolean`
 
-Returns true if there are any subscribers, false otherwise.
+Returns whether there are any 'change' subscribers.
 
 #### Returns
 
 `boolean`
 
-Whether there are any subscribers.
-
 #### Defined in
 
-[src/core/subscribeController.js:119](https://github.com/supercat1337/store2/blob/db27dff8135ce0b18c8545168f48050df8eeffe0/src/core/subscribeController.js#L119)
+[src/core/subscribeController.js:63](https://github.com/supercat1337/store2/blob/e60081710ee7e24f7bcf3bcbc43ae5661fe35f53/src/core/subscribeController.js#L63)
 
 ___
 
@@ -154,24 +140,21 @@ ___
 
 ▸ **onDestroy**(`callback`): [`Unsubscriber`](../modules/internal_.md#unsubscriber)
 
-Subscribes a function to be called when the SubscribeController is destroyed.
-The function is called with no arguments.
+Registers a callback that fires when the controller is destroyed.
 
 #### Parameters
 
-| Name | Type | Description |
-| :------ | :------ | :------ |
-| `callback` | `Function` | The function to be called. |
+| Name | Type |
+| :------ | :------ |
+| `callback` | () => `void` |
 
 #### Returns
 
 [`Unsubscriber`](../modules/internal_.md#unsubscriber)
 
-A function that unsubscribes the given function.
-
 #### Defined in
 
-[src/core/subscribeController.js:159](https://github.com/supercat1337/store2/blob/db27dff8135ce0b18c8545168f48050df8eeffe0/src/core/subscribeController.js#L159)
+[src/core/subscribeController.js:98](https://github.com/supercat1337/store2/blob/e60081710ee7e24f7bcf3bcbc43ae5661fe35f53/src/core/subscribeController.js#L98)
 
 ___
 
@@ -179,24 +162,21 @@ ___
 
 ▸ **onHasSubscribers**(`callback`): [`Unsubscriber`](../modules/internal_.md#unsubscriber)
 
-Subscribes a function to be called whenever a subscriber is added to the subscribeController.
-The function is called with no arguments.
+Registers a callback that fires when the first 'change' subscriber is added.
 
 #### Parameters
 
-| Name | Type | Description |
-| :------ | :------ | :------ |
-| `callback` | () => `void` | The function to be called. |
+| Name | Type |
+| :------ | :------ |
+| `callback` | () => `void` |
 
 #### Returns
 
 [`Unsubscriber`](../modules/internal_.md#unsubscriber)
 
-A function that unsubscribes the given function.
-
 #### Defined in
 
-[src/core/subscribeController.js:139](https://github.com/supercat1337/store2/blob/db27dff8135ce0b18c8545168f48050df8eeffe0/src/core/subscribeController.js#L139)
+[src/core/subscribeController.js:80](https://github.com/supercat1337/store2/blob/e60081710ee7e24f7bcf3bcbc43ae5661fe35f53/src/core/subscribeController.js#L80)
 
 ___
 
@@ -204,24 +184,21 @@ ___
 
 ▸ **onNoSubscribers**(`callback`): [`Unsubscriber`](../modules/internal_.md#unsubscriber)
 
-Subscribes a function to be called whenever there are no longer any subscribers.
-The function is called with no arguments.
+Registers a callback that fires when the last 'change' subscriber is removed.
 
 #### Parameters
 
-| Name | Type | Description |
-| :------ | :------ | :------ |
-| `callback` | () => `void` | The function to be called. |
+| Name | Type |
+| :------ | :------ |
+| `callback` | () => `void` |
 
 #### Returns
 
 [`Unsubscriber`](../modules/internal_.md#unsubscriber)
 
-A function that unsubscribes the given function.
-
 #### Defined in
 
-[src/core/subscribeController.js:149](https://github.com/supercat1337/store2/blob/db27dff8135ce0b18c8545168f48050df8eeffe0/src/core/subscribeController.js#L149)
+[src/core/subscribeController.js:89](https://github.com/supercat1337/store2/blob/e60081710ee7e24f7bcf3bcbc43ae5661fe35f53/src/core/subscribeController.js#L89)
 
 ___
 
@@ -229,24 +206,21 @@ ___
 
 ▸ **subscribe**(`fn`, `options?`): [`Unsubscriber`](../modules/internal_.md#unsubscriber)
 
-Subscribes a function to be called whenever the subscribeController schedules a task.
-The function is called with no arguments.
+Subscribes a callback to the 'change' event.
 
 #### Parameters
 
-| Name | Type | Description |
-| :------ | :------ | :------ |
-| `fn` | (`updates`: `Map`\<`string`, [`UpdateDataRecord`](internal_.UpdateDataRecord.md)\>) => `void` | The function to be called. |
-| `options?` | `Object` |  |
-| `options.delay?` | `number` | - |
-| `options.signal?` | `AbortSignal` | - |
+| Name | Type |
+| :------ | :------ |
+| `fn` | (`updates`: `Map`\<`string`, [`UpdateDataRecord`](internal_.UpdateDataRecord.md)\>) => `void` |
+| `options?` | `Object` |
+| `options.delay?` | `number` |
+| `options.signal?` | `AbortSignal` |
 
 #### Returns
 
 [`Unsubscriber`](../modules/internal_.md#unsubscriber)
 
-A function that unsubscribes the given function.
-
 #### Defined in
 
-[src/core/subscribeController.js:41](https://github.com/supercat1337/store2/blob/db27dff8135ce0b18c8545168f48050df8eeffe0/src/core/subscribeController.js#L41)
+[src/core/subscribeController.js:37](https://github.com/supercat1337/store2/blob/e60081710ee7e24f7bcf3bcbc43ae5661fe35f53/src/core/subscribeController.js#L37)

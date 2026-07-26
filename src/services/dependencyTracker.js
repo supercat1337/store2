@@ -20,7 +20,6 @@ class Tracker {
      */
     get data() {
         return new Set([...this.#store]);
-        //return this.#store;
     }
 
     /**
@@ -62,7 +61,7 @@ class Tracker {
      * Returns whether the tracker is currently turned on or not.
      * @returns {boolean} true if the tracker is on, false if it is off.
      */
-    isTurnedOn() {
+    isActive() {
         return this.#isActive;
     }
 

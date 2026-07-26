@@ -1,80 +1,33 @@
 // @ts-check
 
-import { EventEmitterExt } from '@supercat1337/event-emitter-ext';
+import { EventEmitter } from '@supercat1337/event-emitter';
 import { UpdateDataRecordManager } from '../core/UpdateDataRecord.js';
 import { ReactiveItem } from '../reactives/ReactiveItem.js';
-import { Dictionary } from '@supercat1337/dictionary';
 
 /**
  * Store is a reactive container that holds a collection of reactive items.
  * You can add, remove and access items via methods of this class.
  * It also emits events when items are added, removed or updated.
- * @example
- * ```js
- * const store = new Store();
- * const a = atom(0);
- * const b = atom(0);
- *
- * const childStore = new Store();
- * const sum = computed(() => a.value + b.value);
- * childStore.addItems({ sum });
- *
- * store.addItems({ a, b, childStore });
- *
- * store.subscribe((updates) => {
- *     let updatesArr = Array.from(updates.keys());
- *     console.log("props", updatesArr);
- * });
- *
- * // mute updates
- * store.muteUpdates();
- * childStore.removeItem("childStore");
- * a.value = 3;
- * b.value = 4;
- * store.unmuteUpdates();
- * // outputs
- * // props [ 'a', 'childStore.sum', 'b' ]
- *
- * // without mute updates
- *
- * a.value = 1;
- * // outputs
- * // props [ 'a' ]
- * // props [ 'childStore.sum' ]
- *
- * b.value = 2;
- * // outputs
- * //props [ 'b' ]
- * //props [ 'childStore.sum' ]
- *
- * // using batch
- * batch(() => {
- *     a.value = 2;
- *     b.value = 3;
- * });
- * // outputs
- * // props [ 'a' ]
- * // props [ 'childStore.sum' ]
- * ```
  */
 class Store {
     /**
      * @type {Map<string, ReactiveItem>}
      */
     #items = new Map();
+
     /**
      * @type {Map<string, Store>}
      */
     #childStores = new Map();
 
-    /** @type {EventEmitterExt<"change"|"destroy"|"clear-updates">} */
-    eventEmitter;
+    /** @type {EventEmitter} */
+    #eventEmitter;
 
     /** @type {boolean} */
     #isDestroyed = false;
 
-    /** @type {Dictionary<()=>void>} */
-    #unsubscribers = new Dictionary();
+    /** @type {Map<string, Set<Function>>} */
+    #unsubscribers = new Map();
 
     /** @type {Map<string, import("../core/UpdateDataRecord.js").UpdateDataRecord>} */
     #updates;
@@ -86,18 +39,17 @@ class Store {
 
     #subscriber;
 
+    #muted = false;
+    #pendingUpdate = false;
+
     constructor() {
-        this.eventEmitter = new EventEmitterExt();
-        this.eventEmitter.registerEvents('change', 'destroy', 'clear-updates');
-        this.eventEmitter.setListenerRunnerStrategy(1);
+        this.#eventEmitter = new EventEmitter();
 
         this.#updates = new Map();
         this.#updatesManager = new UpdateDataRecordManager(this.#updates);
 
         const that = this;
-        this.eventEmitter.on('clear-updates', () => {
-            //console.log("clear-updates");
-            //console.log(that.#updates);
+        this.#eventEmitter.on('clear-updates', () => {
             that.#updates.clear();
         });
 
@@ -126,34 +78,19 @@ class Store {
     }
 
     /**
-     * This property is set to true when the store is destroyed, and false otherwise.
-     * It is used to prevent further modifications to the store after it has been destroyed.
      * @type {boolean}
-     * @example
-     * ```js
-     * const store = new Store();
-     *
-     * const store2 = new Store();
-     * const a = atom(1);
-     *
-     * store2.addItems({ a });
-     * store.addItems({ store2 });
-     *
-     * console.log(store.hasItem("store2")); // output: true
-     *
-     * store2.destroy();
-     * console.log(store2.hasItem("a")); // output: false
-     * console.log(store.hasItem("store2")); // output: false
-     * console.log(a.isDestroyed); // output: true
-     * ```
      */
     get isDestroyed() {
         return this.#isDestroyed;
     }
 
     #notifySubscribers() {
-        this.eventEmitter.emit('change');
-        this.eventEmitter.emit('clear-updates');
+        if (this.#muted) {
+            this.#pendingUpdate = true;
+        } else {
+            this.#eventEmitter.emit('change');
+            this.#eventEmitter.emit('clear-updates');
+        }
     }
 
     /**
@@ -173,24 +110,19 @@ class Store {
         const that = this;
         // @ts-ignore
         const unsubscriber = reactiveItem.subscribe(this.#subscriber);
-
         const unsubscriber2 = reactiveItem.onDestroy(() => {
-            /*
-            that.#updates.set(
-                key,
-                new UpdateDataRecord(
-                    "delete",
-                    undefined,
-                    undefined,
-                    reactiveItem
-                )
-            );
-            */
             that.#removeReactiveItem(key);
-            //that.#notifySubscribers();
         });
 
-        this.#unsubscribers.add(key, unsubscriber, unsubscriber2);
+        // Store unsubscribers in Map
+        if (!this.#unsubscribers.has(key)) {
+            this.#unsubscribers.set(key, new Set());
+        }
+        const set = this.#unsubscribers.get(key);
+        if (set) {
+            set.add(unsubscriber);
+            set.add(unsubscriber2);
+        }
     }
 
     /**
@@ -210,27 +142,25 @@ class Store {
         this.#keys.set(store, storeName);
 
         const unsubscriber = store.subscribe(this.#subscriber);
-
         const unsubscriber2 = store.onDestroy(() => {
             that.#removeChildStore(storeName);
-            //that.#notifySubscribers();
         });
 
-        this.#unsubscribers.add(storeName, unsubscriber, unsubscriber2);
+        if (!this.#unsubscribers.has(storeName)) {
+            this.#unsubscribers.set(storeName, new Set());
+        }
+        const set = this.#unsubscribers.get(storeName);
+        if (set) {
+            set.add(unsubscriber);
+            set.add(unsubscriber2);
+        }
     }
 
     /**
-     * Adds one or more reactive items to the store. If an item is a child store, it will be added to the store.
-     * @param {{[key: string]: ReactiveItem|Store}} items - An object where the keys are the keys to use when adding the items to the store and the values are the reactive items to add.
+     * Adds one or more reactive items to the store.
+     * @param {{[key: string]: ReactiveItem|Store}} items
      * @throws {Error} If an item with the given key already exists in the store.
      * @throws {Error} If the store is destroyed.
-     * @example
-     * ```js
-     * const store = new Store();
-     * const a = atom(1);
-     * store.addItems({ a });
-     * console.log(store.hasItem("a")); // output: true
-     * ```
      */
     addItems(items) {
         if (this.isDestroyed) {
@@ -247,10 +177,8 @@ class Store {
     }
 
     /**
-     * Destroys the child store with the given key. This method is useful for cleaning up after a child store
-     * that is no longer needed. It calls destroy on the child store and removes the child store from this store.
+     * Destroys the child store with the given key.
      * @param {string} key - The key of the child store to destroy.
-     * @returns {void}
      */
     #destroyChildStore(key) {
         const childStore = this.#childStores.get(key);
@@ -263,10 +191,7 @@ class Store {
 
     /**
      * Destroys the item with the given key, whether it's a reactive item or a child store.
-     * It first attempts to destroy a reactive item with the specified key, and if not found,
-     * attempts to destroy a child store with the same key.
      * @param {string} key - The key of the item or child store to destroy.
-     * @returns {void}
      */
     destroyItem(key) {
         if (this.isDestroyed) {
@@ -287,17 +212,18 @@ class Store {
             return;
         }
 
-        // Remove from store maps
         this.#items.delete(key);
         this.#keys.delete(item);
 
-        // Unsubscribe from the item's change events
-        this.#unsubscribers.iterate(key, unsubscriber => {
-            unsubscriber();
-        });
-        this.#unsubscribers.remove(key);
+        // Call and remove all unsubscribers
+        const set = this.#unsubscribers.get(key);
+        if (set) {
+            for (const fn of set) {
+                fn();
+            }
+            this.#unsubscribers.delete(key);
+        }
 
-        // Notify about removal (but do NOT destroy the item)
         this.#updatesManager.removeItem(key);
         this.#notifySubscribers();
     }
@@ -315,10 +241,13 @@ class Store {
         this.#childStores.delete(key);
         this.#keys.delete(store);
 
-        this.#unsubscribers.iterate(key, unsubscriber => {
-            unsubscriber();
-        });
-        this.#unsubscribers.remove(key);
+        const set = this.#unsubscribers.get(key);
+        if (set) {
+            for (const fn of set) {
+                fn();
+            }
+            this.#unsubscribers.delete(key);
+        }
 
         this.#updatesManager.removeItem(key);
         this.#notifySubscribers();
@@ -335,36 +264,24 @@ class Store {
         }
 
         this.#removeReactiveItem(key);
-
-        // Finally destroy the reactive item
         item.destroy();
     }
 
     /**
-     * Removes the reactive item with the given key from the store. This method does not call destroy on the item.
+     * Removes the reactive item with the given key from the store (without destroying it).
      * @param {string} key - The key of the item to remove.
-     * @returns {void}
      */
     removeItem(key) {
         if (this.isDestroyed) {
             throw new Error('Store has been destroyed');
         }
 
-        if (this.#items.has(key)) {
-            this.#removeReactiveItem(key);
-            return;
-        }
-
-        if (this.#childStores.has(key)) {
-            this.#removeChildStore(key);
-            return;
-        }
+        this.#removeReactiveItem(key);
+        this.#removeChildStore(key);
     }
 
     /**
-     * Destroys all reactive items stored in the Store. This method is useful for cleaning
-     * up after a Store that is no longer needed. It calls destroy on each reactive item
-     * in the store and clears the store of all items.
+     * Destroys all reactive items stored in the Store.
      */
     destroy() {
         if (this.#isDestroyed) {
@@ -383,22 +300,18 @@ class Store {
         });
         this.#childStores.clear();
 
-        // Clear updates map to release memory
         this.#updates.clear();
-
-        // Clear the reference to the updates manager (optional, helps GC)
         // @ts-ignore
         this.#updatesManager = null;
 
-        this.eventEmitter.emit('destroy', this);
-        this.eventEmitter.unregisterAllEvents();
+        this.#eventEmitter.emit('destroy', this);
+        this.#eventEmitter.removeAllListeners({ removeInternalListeners: true });
 
-        this.#unsubscribers.removeAll();
+        this.#unsubscribers.clear();
     }
 
     /**
-     * Clears all reactive items from the store. This method is useful for resetting a Store to an empty state.
-     * It removes all reactive items from the store and clears all child stores. It does not destroy the reactive items.
+     * Clears all reactive items from the store without destroying them.
      */
     detachAll() {
         if (this.isDestroyed) {
@@ -415,32 +328,31 @@ class Store {
         });
         this.#childStores.clear();
 
-        this.#unsubscribers.removeAll();
+        this.#unsubscribers.clear();
     }
 
     /**
-     * Retrieves the reactive item with the given key from the store.
-     * @param {string} key - The key of the item to retrieve.
-     * @returns {ReactiveItem|null} The reactive item with the given key, or null if no such item exists in the store.
+     * Retrieves the reactive item with the given key.
+     * @param {string} key
+     * @returns {ReactiveItem|null}
      */
     #getReactiveItem(key) {
         return this.#items.get(key) || null;
     }
 
     /**
-     * Retrieves the child store with the given key from the store.
-     * @param {string} key - The key of the child store to retrieve.
-     * @returns {Store|null} The child store with the given key, or null if no such child store exists in the store.
+     * Retrieves the child store with the given key.
+     * @param {string} key
+     * @returns {Store|null}
      */
     #getChildStore(key) {
         return this.#childStores.get(key) || null;
     }
 
     /**
-     * Retrieves the item with the given key from the store. This method first looks for a reactive item with the given key,
-     * and if no such item exists, looks for a child store with the same key.
-     * @param {string} key - The key of the item to retrieve.
-     * @returns {ReactiveItem|Store|null} The item with the given key, or null if no such item exists in the store.
+     * Retrieves the item with the given key.
+     * @param {string} key
+     * @returns {ReactiveItem|Store|null}
      */
     getItem(key) {
         if (this.isDestroyed) {
@@ -450,9 +362,9 @@ class Store {
     }
 
     /**
-     * Checks if an item with the given key exists in the store.
-     * @param {string} key - The key of the item to check.
-     * @returns {boolean} true if the item exists, false otherwise.
+     * Checks if an item with the given key exists.
+     * @param {string} key
+     * @returns {boolean}
      */
     hasItem(key) {
         if (this.isDestroyed) {
@@ -462,11 +374,9 @@ class Store {
     }
 
     /**
-     * Retrieves the names of items stored in the Store, optionally filtered by a specified filter.
-     *
-     * @param {"all"|"reactives"|"stores"} [filter="all"] - The filter to apply when retrieving item names. Default is "all".
-     * Possible values can be "all", "reactives", or "stores" (if applicable).
-     * @returns {Array<string>} An array containing the names of items that match the filter.
+     * Retrieves the names of items stored.
+     * @param {"all"|"reactives"|"stores"} [filter="all"]
+     * @returns {Array<string>}
      */
     getItemNames(filter = 'all') {
         if (this.isDestroyed) {
@@ -483,11 +393,9 @@ class Store {
     }
 
     /**
-     * Retrieves all items stored in the Store, optionally filtered by a specified filter.
-     *
-     * @param {"all"|"reactives"|"stores"} [filter="all"] - The filter to apply when retrieving items. Default is "all".
-     * Possible values can be "all", "reactives", or "stores" (if applicable).
-     * @returns {Map<string, ReactiveItem|Store>} A Map containing the items that match the filter.
+     * Retrieves all items stored.
+     * @param {"all"|"reactives"|"stores"} [filter="all"]
+     * @returns {Map<string, ReactiveItem|Store>}
      */
     toMap(filter = 'all') {
         if (this.isDestroyed) {
@@ -512,61 +420,26 @@ class Store {
 
     #itemsToJSON() {
         const object = {};
-
         this.#items.forEach((item, key) => {
             // @ts-ignore
             object[key] = item.getValue();
         });
-
         return object;
     }
 
     #childStoresToJSON() {
         const object = {};
-
         this.#childStores.forEach((store, key) => {
             // @ts-ignore
             object[key] = store.toJSON();
         });
-
         return object;
     }
 
     /**
-     * Retrieves the value of this Store as a plain object, optionally filtered by a specified filter.
-     *
-     * @param {"all"|"reactives"|"stores"} [filter="all"] - The filter to apply when retrieving items. Default is "all".
-     * Possible values can be "all", "reactives", or "stores" (if applicable).
-     * @returns {object} A plain object containing the values of the items that match the filter.
-     * @example
-     * ```js
-     * const store = new Store();
-     * const a = atom(1);
-     * const b = atom(2);
-     * const c = new Store();
-     * const d = computed(() => a.value + b.value);
-     * const e = collection([1, 2, 3]);
-     *
-     * store.addItems({ a, b, c });
-     * c.addItems({ d, e });
-     *
-     * console.log(store.toJSON());
-     * // output: { a: 1, b: 2, c: { d: 3, e: [1, 2, 3] } }
-     *
-     * console.log(store.toJSON("all"));
-     * // output: { a: 1, b: 2, c: { d: 3, e: [1, 2, 3] } }
-     *
-     * console.log(store.toJSON("reactives"));
-     * // output: { a: 1, b: 2 }
-     *
-     * console.log(store.toJSON("stores"));
-     * // output: { c: { d: 3, e: [1, 2, 3] } }
-     *
-     * store.destroy();
-     *
-     * console.log(store.toJSON());
-     * // output: {}
-     * ```
+     * Retrieves the value of this Store as a plain object.
+     * @param {"all"|"reactives"|"stores"} [filter="all"]
+     * @returns {object}
      */
     toJSON(filter = 'all') {
         if (this.isDestroyed) {
@@ -588,37 +461,8 @@ class Store {
 
     /**
      * Subscribes a function to be called whenever the value of this Store changes.
-     * The function is called with a Map of updates, where the keys are the names of the items that changed, and the values are UpdateDataRecord objects.
-     * @param {(update: Map<string, import("../core/UpdateDataRecord.js").UpdateDataRecord>, store: Store)=>void} fn - The function to be called whenever the value of this Atom changes.
-     * @returns {()=>void} A function that unsubscribes the given function.
-     * @example
-     * ```js
-     * const store = new Store();
-     * const a = atom(1);
-     * const b = atom(2);
-     *
-     * const c = new Store();
-     * const d = new Computed(() => a.value + b.value);
-     * c.addItems({ d });
-     *
-     * store.addItems({ a, b, c });
-     *
-     * let i = 0;
-     *
-     * store.subscribe((updates) => {
-     *     let updatesArr = Array.from(updates.keys());
-     *     console.log(updatesArr);
-     *     i += 1;
-     * });
-     *
-     * a.value = 2;
-     * // output: ["a", "c.d"]
-     *
-     * b.value = 3;
-     * // output: ["b", "c.d"]
-     *
-     * console.log(i); // output: 4
-     * ```
+     * @param {(update: Map<string, import("../core/UpdateDataRecord.js").UpdateDataRecord>, store: Store)=>void} fn
+     * @returns {()=>void}
      */
     subscribe(fn) {
         if (this.isDestroyed) {
@@ -626,46 +470,46 @@ class Store {
         }
 
         const that = this;
-
-        return this.eventEmitter.on('change', () => {
+        return this.#eventEmitter.on('change', () => {
             fn(that.#updates, that);
         });
     }
 
     /**
      * Subscribes a function to be called when this Store is destroyed.
-     * The function is called with no arguments.
-     * @param {(store:Store)=>void} fn - The function to be called.
-     * @returns {()=>void} A function that unsubscribes the given function.
+     * @param {(store:Store)=>void} fn
+     * @returns {()=>void}
      */
     onDestroy(fn) {
         if (this.isDestroyed) {
             throw new Error('Store has been destroyed');
         }
 
-        return this.eventEmitter.on('destroy', fn);
+        return this.#eventEmitter.on('destroy', fn);
     }
 
     /**
      * Mutes the event emitter, preventing any updates from being triggered.
-     * Any updates that are scheduled while muted will be queued and executed when unmuteUpdates is called.
      */
     muteUpdates() {
         if (this.isDestroyed) {
             throw new Error('Store has been destroyed');
         }
-        this.eventEmitter.mute();
+        this.#muted = true;
     }
 
     /**
      * Unmutes the event emitter, allowing updates to be triggered.
-     * Any updates that were scheduled while muted will be executed.
      */
     unmuteUpdates() {
         if (this.isDestroyed) {
             throw new Error('Store has been destroyed');
         }
-        this.eventEmitter.unmute();
+        this.#muted = false;
+        if (this.#pendingUpdate) {
+            this.#pendingUpdate = false;
+            this.#notifySubscribers();
+        }
     }
 
     /**
@@ -676,7 +520,7 @@ class Store {
         if (this.isDestroyed) {
             throw new Error('Store has been destroyed');
         }
-        return this.eventEmitter.isMuted();
+        return this.#muted;
     }
 }
 

@@ -74,7 +74,7 @@ function compareArrays(a, b) {
  * @param {object} b - The second object to compare.
  * @returns {boolean} True if the two objects are equal, false otherwise.
  */
-function comparePlainObjects(a, b) {
+export function comparePlainObjects(a, b) {
     if (a === b) {
         return true;
     }
@@ -121,9 +121,6 @@ export function compareAny(a, b) {
     }
 
     if (a === null || b === null) {
-        return false;
-    }
-    if (a === undefined || b === undefined) {
         return false;
     }
 

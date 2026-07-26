@@ -94,11 +94,16 @@ export class ReactiveList {
     /**
      * Adds one or more items to the end of the list.
      *
-     * @param {...T} values - The values to add.
+     * @param {...T} values - The values to add. Primitives are wrapped in `Atom`,
+     *                        objects and arrays are wrapped in `ShallowReactive`.
      */
     add(...values) {
-        if (this.isDestroyed) {throw new Error('ReactiveList has been destroyed');}
-        if (values.length === 0) {return;}
+        if (this.isDestroyed) {
+            throw new Error('ReactiveList has been destroyed');
+        }
+        if (values.length === 0) {
+            return;
+        }
 
         const startIndex = this.#lengthAtom.value;
         const alreadyMuted = this.#store.isMuted();
@@ -119,7 +124,9 @@ export class ReactiveList {
         }
         this.#lengthAtom.value += values.length;
 
-        if (!alreadyMuted) {this.#store.unmuteUpdates();}
+        if (!alreadyMuted) {
+            this.#store.unmuteUpdates();
+        }
     }
 
     /**
@@ -129,9 +136,13 @@ export class ReactiveList {
      * @returns {T | undefined} The value, or undefined if the index is out of bounds.
      */
     getItem(index) {
-        if (this.isDestroyed) {throw new Error('ReactiveList has been destroyed');}
+        if (this.isDestroyed) {
+            throw new Error('ReactiveList has been destroyed');
+        }
         const item = this.#store.getItem(index.toString());
-        if (!isReactiveWrapper(item)) {return undefined;}
+        if (!isReactiveWrapper(item)) {
+            return undefined;
+        }
         return item.value;
     }
 
@@ -141,7 +152,9 @@ export class ReactiveList {
      * @returns {T[]} An array containing all values.
      */
     toArray() {
-        if (this.isDestroyed) {throw new Error('ReactiveList has been destroyed');}
+        if (this.isDestroyed) {
+            throw new Error('ReactiveList has been destroyed');
+        }
         const items = [];
         for (let i = 0; i < this.#lengthAtom.value; i++) {
             const item = this.#store.getItem(i.toString());
@@ -156,16 +169,22 @@ export class ReactiveList {
      * Updates the value at the specified index.
      *
      * @param {number} index - The index to update.
-     * @param {T} value - The new value.
+     * @param {T} value - The new value. Primitives become `Atom`, objects/arrays become `ShallowReactive`.
      */
     setItem(index, value) {
-        if (this.isDestroyed) {throw new Error('ReactiveList has been destroyed');}
+        if (this.isDestroyed) {
+            throw new Error('ReactiveList has been destroyed');
+        }
         const wrapper = this.#store.getItem(index.toString());
-        if (!isReactiveWrapper(wrapper)) {return;}
+        if (!isReactiveWrapper(wrapper)) {
+            return;
+        }
         const alreadyMuted = this.#store.isMuted();
         this.#store.muteUpdates();
         wrapper.value = value;
-        if (!alreadyMuted) {this.#store.unmuteUpdates();}
+        if (!alreadyMuted) {
+            this.#store.unmuteUpdates();
+        }
     }
 
     /**
@@ -174,17 +193,21 @@ export class ReactiveList {
      * @returns {number}
      */
     get length() {
-        if (this.isDestroyed) {throw new Error('ReactiveList has been destroyed');}
+        if (this.isDestroyed) {
+            throw new Error('ReactiveList has been destroyed');
+        }
         return this.#lengthAtom.value;
     }
 
     /**
      * Replaces the entire content of the list with the given array.
      *
-     * @param {T[]} values - The new array of values.
+     * @param {T[]} values - The new array of values. Wrapping follows the same rules as `add()`.
      */
     setItems(values) {
-        if (this.isDestroyed) {throw new Error('ReactiveList has been destroyed');}
+        if (this.isDestroyed) {
+            throw new Error('ReactiveList has been destroyed');
+        }
         const alreadyMuted = this.#store.isMuted();
         this.#store.muteUpdates();
 
@@ -225,7 +248,9 @@ export class ReactiveList {
             this.#lengthAtom.value = newLen;
         }
 
-        if (!alreadyMuted) {this.#store.unmuteUpdates();}
+        if (!alreadyMuted) {
+            this.#store.unmuteUpdates();
+        }
     }
 
     /**
@@ -236,14 +261,22 @@ export class ReactiveList {
      * @param {number} count - The number of elements to remove.
      */
     removeRange(startIndex, count) {
-        if (this.isDestroyed) {throw new Error('ReactiveList has been destroyed');}
-        if (count <= 0) {return;}
+        if (this.isDestroyed) {
+            throw new Error('ReactiveList has been destroyed');
+        }
+        if (count <= 0) {
+            return;
+        }
 
         const oldLen = this.#lengthAtom.value;
-        if (startIndex < 0 || startIndex >= oldLen) {return;}
+        if (startIndex < 0 || startIndex >= oldLen) {
+            return;
+        }
 
         const actualCount = Math.min(count, oldLen - startIndex);
-        if (actualCount === 0) {return;}
+        if (actualCount === 0) {
+            return;
+        }
 
         const newLen = oldLen - actualCount;
         const alreadyMuted = this.#store.isMuted();
@@ -268,7 +301,9 @@ export class ReactiveList {
 
         this.#lengthAtom.value = newLen;
 
-        if (!alreadyMuted) {this.#store.unmuteUpdates();}
+        if (!alreadyMuted) {
+            this.#store.unmuteUpdates();
+        }
     }
 
     /**
@@ -306,7 +341,9 @@ export class ReactiveList {
      * After destruction, any method call (except `isDestroyed`) will throw an error.
      */
     destroy() {
-        if (this.isDestroyed) {return;}
+        if (this.isDestroyed) {
+            return;
+        }
         this.#store.destroy();
         // No need to nullify #lengthAtom; it will be inaccessible because isDestroyed becomes true.
     }
@@ -328,7 +365,9 @@ export class ReactiveList {
      * @returns {() => void} A function to unsubscribe the callback.
      */
     subscribe(fn) {
-        if (this.isDestroyed) {throw new Error('ReactiveList has been destroyed');}
+        if (this.isDestroyed) {
+            throw new Error('ReactiveList has been destroyed');
+        }
         return this.#store.subscribe(fn);
     }
 }

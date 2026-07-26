@@ -1,0 +1,8 @@
+{
+    "name": "store2-examples",
+    "private": true,
+    "type": "module",
+    "dependencies": {
+        "@supercat1337/store2": "file:.."
+    }
+}

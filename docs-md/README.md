@@ -11,15 +11,14 @@ A lightweight, efficient, and fully reactive state management library for JavaSc
 
 ## Features
 
-- **MobX-inspired mental model** – predictable transparent reactive graph, but lightweight and dependency‑free
-- **Reactive primitives** – `Atom`, `Computed`, `Collection`, `ShallowReactive`
-- **Reactive containers** – `Store` (key‑value store) and `ReactiveList` (array‑like list)
-- **Declarative APIs** – `autorun`, `reaction`, `when`, `waitUntil`
-- **Batched updates** – group changes with `batch()` to reduce notifications
-- **Observable objects** – `makeObservable`, `makeAutoObservable`, `extendObservable`
-- **Promise integration** – `fromPromise` to observe pending/resolved/rejected states
-- **Tiny and fast** – no external runtime dependencies (except tiny event‑emitter helpers)
-- **Fully typed** – via JSDoc and generated `.d.ts` files
+- **MobX-inspired mental model** – predictable transparent reactive graph, but lightweight and dependency‑free (only one tiny dependency: `@supercat1337/event-emitter`).
+- **Reactive primitives** – `Atom`, `Computed`, `Collection`, `ShallowReactive`.
+- **Reactive containers** – `Store` (key‑value store) and `ReactiveList` (array‑like list).
+- **Declarative APIs** – `autorun`, `reaction`, `when`, `waitUntil`.
+- **Batched updates** – group changes with `batch()` to reduce notifications.
+- **Observable objects** – `makeObservable`, `makeAutoObservable`, `extendObservable`.
+- **Promise integration** – `fromPromise` to observe pending/resolved/rejected states.
+- **Tiny and fast** – only one external dependency (event emitter), fully typed via JSDoc.
 
 ---
 
@@ -88,6 +87,8 @@ count.subscribe(() => console.log('count changed:', count.value));
 count.value++; // triggers the subscriber
 ```
 
+📖 Full documentation: [`Atom`](docs-md/classes/Atom.md)
+
 ### Computed
 
 A `Computed` derives its value from other reactive sources. It caches the result and updates only when dependencies change.
@@ -100,6 +101,8 @@ console.log(sum.value); // 5
 a.value = 5; // sum is automatically recalculated
 console.log(sum.value); // 8
 ```
+
+📖 Full documentation: [`Computed`](docs-md/classes/Computed.md)
 
 ### Collection
 
@@ -114,6 +117,8 @@ items.value.push(4); // triggers notification
 console.log(items.value); // [1, 2, 3, 4]
 ```
 
+📖 Full documentation: [`Collection`](docs-md/classes/Collection.md)
+
 ### ShallowReactive
 
 `shallowReactive` turns a plain object into a reactive proxy. Only direct property changes are tracked (nested objects are not made reactive).
@@ -125,6 +130,8 @@ const state = shallowReactive({ name: 'Alice', age: 30 });
 state.subscribe(() => console.log('state updated'));
 state.age = 31; // triggers notification
 ```
+
+📖 Full documentation: [`ShallowReactive`](docs-md/classes/ShallowReactive.md)
 
 ---
 
@@ -160,6 +167,8 @@ y.value = 200;
 store.unmuteUpdates(); // only one notification with both changes
 ```
 
+📖 Full documentation: [`Store`](docs-md/classes/Store.md)
+
 ### ReactiveList
 
 `ReactiveList` is a reactive array‑like list. It automatically wraps primitives in `Atom` and objects in `ShallowReactive`. It provides methods to add, remove, update, and clear items.
@@ -175,6 +184,8 @@ list.setItem(1, 42); // update value at index 1
 list.removeItem(0); // remove first element
 console.log(list.toArray()); // [42, 3]
 ```
+
+📖 Full documentation: [`ReactiveList`](docs-md/classes/ReactiveList.md)
 
 ---
 
@@ -196,7 +207,7 @@ a.value = 5; // Output: 7
 
 ### `reaction(dataFn, effectFn, options)`
 
-Tracks dependencies inside `dataFn` and runs `effectFn` whenever those dependencies change. Useful when you need to react to a subset of state.
+Tracks dependencies inside `dataFn` and runs `effectFn` whenever those dependencies change.
 
 ```js
 reaction(
@@ -280,26 +291,28 @@ autorun(() => {
 counter.increment(); // logs "Double: 2"
 ```
 
+📖 Full API documentation: [`docs-md/README.md`](docs-md/README.md)
+
 ---
 
 ## Important Notes / Known Limitations
 
-- **Static dependency collection in `autorun` and `reaction`**  
+- **Static dependency collection in `autorun` and `reaction`**
   Dependencies are captured **only once** – during the first execution of the tracked function. If your function conditionally uses different reactive items, changes to items not used in the first run **will not** trigger the effect. Use `computed` or restructure to ensure all possible dependencies are touched.
 
-- **`Atom` clones objects shallowly**  
+- **`Atom` clones objects shallowly**
   When you assign an object/array to an `Atom`, it is shallow‑cloned (`Object.assign` or `slice`). Mutating nested properties **will not** trigger reactivity. Use `Collection` or `ShallowReactive` for nested structures.
 
-- **`Collection` and `ShallowReactive` return Proxies**  
+- **`Collection` and `ShallowReactive` return Proxies**
   The `.value` property of a `Collection` and the result of `shallowReactive()` are reactive Proxies. Direct mutations via the proxy are tracked; using the raw underlying value (via `.getRawValue()`) breaks reactivity.
 
-- **Destructuring breaks reactivity**  
+- **Destructuring breaks reactivity**
   When using `shallowReactive` or accessing properties of a `Collection`, destructuring fields (e.g., `const { name, age } = state`) breaks reactivity for those variables. Always access properties directly through the reactive object (e.g., `state.age`) to ensure dependencies are tracked correctly.
 
-- **Error handling in Computed**  
+- **Error handling in Computed**
   If a `Computed` function throws an error, the error is caught and stored. The computed will re‑throw the same error until its dependencies change, at which point it will try to recompute.
 
-- **Destroyed items**  
+- **Destroyed items**
   Calling `destroy()` on a reactive item cleans up all subscriptions and dependencies. Further operations (except checking `isDestroyed`) will throw an error.
 
 ---
@@ -307,6 +320,13 @@ counter.increment(); // logs "Double: 2"
 ## TypeScript Support
 
 This library is written in plain JavaScript with JSDoc annotations. Type definitions are generated automatically and shipped with the package. You get full IntelliSense and type checking in supporting editors.
+
+---
+
+## Documentation & Examples
+
+- **Full API Documentation**: [`docs-md/README.md`](docs-md/README.md)
+- **Examples**: Check out the [`examples/`](examples/) folder for runnable code snippets covering all features.
 
 ---
 
@@ -318,6 +338,5 @@ MIT © 2025 Albert Bazaleev
 
 ## Links
 
-- [Full Documentation](https://supercat1337.github.io/store2/docs/index.html)
 - [GitHub Repository](https://github.com/supercat1337/store2)
 - [NPM Package](https://www.npmjs.com/package/@supercat1337/store2)

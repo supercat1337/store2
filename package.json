@@ -6,14 +6,20 @@
     "license": "MIT",
     "type": "module",
     "moduleResolution": "nodenext",
+    "main": "src/index.js",
+    "exports": {
+        ".": "./src/index.js"
+    },
+    "types": "dist/types.d.ts",
     "scripts": {
         "test": "c8 ava",
         "test_custom": "c8 ava ./tests/api/api.test.js:744-786",
         "clean": "shx rm -rf ./dist && shx mkdir ./dist",
         "build_esm": "rollup ./src/index.js --file ./dist/store2.esm.js --format es",
+        "build_esm_min": "esbuild ./src/index.js --format=esm --bundle --platform=neutral --minify --outfile=./dist/store2.esm.min.js",
         "gen_types": "npx tsc --project my.tsconfig.types.json",
         "bundle_types": "node scripts/bundle-types.js",
-        "build": "npm run clean && npm run build_esm && npm run gen_types && npm run bundle_types && shx rm -rf dist/types-temp",
+        "build": "npm run clean && npm run build_esm && npm run gen_types && npm run bundle_types && shx rm -rf dist/types-temp && npm run build_esm_min",
         "lint": "eslint src/ tests/ scripts/",
         "lint_fix": "npm run lint -- --fix",
         "docs": "typedoc --tsconfig \"my.tsconfig.docs.json\" --options \"typedoc.json\"",
@@ -48,9 +54,7 @@
     "homepage": "https://github.com/supercat1337/store2",
     "site": "https://github.com/supercat1337/store2",
     "dependencies": {
-        "@supercat1337/dictionary": "^1.0.0",
-        "@supercat1337/event-emitter": "^2.0.1",
-        "@supercat1337/event-emitter-ext": "^1.0.8"
+        "@supercat1337/event-emitter": "^3.0.0"
     },
     "ava": {
         "files": [

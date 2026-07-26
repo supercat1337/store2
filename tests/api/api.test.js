@@ -1249,3 +1249,56 @@ test('makeAutoObservable 5', t => {
     object.increment();
     t.is(foo, 3);
 });
+
+test('extendObservable with overrides', t => {
+    class MyClass {
+        value = 0;
+    }
+    const obj = new MyClass();
+    extendObservable(obj, { extra: 5 }, { extra: 'atom' });
+    let foo = 0;
+    autorun(() => {
+        foo++;
+        obj.extra;
+    });
+    t.is(foo, 1);
+    obj.extra++;
+    t.is(foo, 2);
+});
+
+test('extendObservable with false override (ignored)', t => {
+    const obj = {};
+    extendObservable(obj, { a: 1, b: 2 }, { a: 'atom', b: false });
+    let foo = 0;
+    autorun(() => {
+        foo++;
+        obj.a;   // реактивное
+        obj.b;   // не реактивно
+    });
+    t.is(foo, 1);
+    obj.a = 3;
+    t.is(foo, 2);
+    obj.b = 3;
+    t.is(foo, 2); // b не вызывает перезапуск
+});
+
+test('makeAutoObservable with filter', t => {
+    class Test {
+        a = 1;
+        b = 2;
+        get c() { return this.a + this.b; }
+    }
+    const obj = new Test();
+    // Передаём фильтр только для свойства a
+    makeAutoObservable(obj, {}, {}, new Set(['a']));
+    let foo = 0;
+    autorun(() => {
+        foo++;
+        obj.c; // с зависит от a и b, но b не реактивно, поэтому изменения b не вызовут перезапуск
+    });
+    t.is(foo, 1);
+    obj.a = 2;
+    t.is(foo, 2);
+    obj.b = 3;
+    t.is(foo, 2); // b не отслеживается
+});

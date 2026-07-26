@@ -10,8 +10,7 @@
         "moduleResolution": "NodeNext",
         "paths": {
             "@supercat1337/store2": ["./src/index.js"],
-            "@supercat1337/store2/*": ["./src/*"],
-            "@/*": ["./src/*"]
+            "@supercat1337/store2/*": ["./src/*"]
         }
     },
     "include": ["src/**/*", "examples/**/*"],
