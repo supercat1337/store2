@@ -1,15 +1,12 @@
 {
     "name": "@supercat1337/store2",
-    "version": "2.0.0",
+    "version": "2.0.1",
     "description": "A lightweight, efficient, and easy-to-use reactive state management system for JavaScript applications.",
     "author": "Albert Bazaleev",
     "license": "MIT",
     "type": "module",
     "moduleResolution": "nodenext",
-    "main": "src/index.js",
-    "exports": {
-        ".": "./src/index.js"
-    },
+    "main": "dist/store2.esm.js",
     "types": "dist/types.d.ts",
     "scripts": {
         "test": "c8 ava",
