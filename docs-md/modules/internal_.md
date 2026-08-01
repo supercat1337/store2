@@ -17,12 +17,18 @@
 ### Interfaces
 
 - [ArrayLike](../interfaces/internal_.ArrayLike.md)
+- [Iterable](../interfaces/internal_.Iterable.md)
+- [Iterator](../interfaces/internal_.Iterator.md)
+- [IteratorReturnResult](../interfaces/internal_.IteratorReturnResult.md)
+- [IteratorYieldResult](../interfaces/internal_.IteratorYieldResult.md)
 - [PropertyDescriptor](../interfaces/internal_.PropertyDescriptor.md)
 - [ProxyHandler](../interfaces/internal_.ProxyHandler.md)
+- [TypedPropertyDescriptor](../interfaces/internal_.TypedPropertyDescriptor.md)
 
 ### Type Aliases
 
 - [CompareFunction](internal_.md#comparefunction)
+- [IteratorResult](internal_.md#iteratorresult)
 - [Record](internal_.md#record)
 - [Unsubscriber](internal_.md#unsubscriber)
 - [WeakKey](internal_.md#weakkey)
@@ -50,7 +56,24 @@
 
 #### Defined in
 
-[src/types.d.ts:2](https://github.com/supercat1337/store2/blob/e60081710ee7e24f7bcf3bcbc43ae5661fe35f53/src/types.d.ts#L2)
+[src/types.d.ts:2](https://github.com/supercat1337/store2/blob/9da5639fccaa4ac6e1305ac63d79571e83475e23/src/types.d.ts#L2)
+
+___
+
+### IteratorResult
+
+Ƭ **IteratorResult**\<`T`, `TReturn`\>: [`IteratorYieldResult`](../interfaces/internal_.IteratorYieldResult.md)\<`T`\> \| [`IteratorReturnResult`](../interfaces/internal_.IteratorReturnResult.md)\<`TReturn`\>
+
+#### Type parameters
+
+| Name | Type |
+| :------ | :------ |
+| `T` | `T` |
+| `TReturn` | `any` |
+
+#### Defined in
+
+node_modules/typescript/lib/lib.es2015.iterable.d.ts:39
 
 ___
 
@@ -87,7 +110,7 @@ ___
 
 #### Defined in
 
-[src/core/subscribeController.js:7](https://github.com/supercat1337/store2/blob/e60081710ee7e24f7bcf3bcbc43ae5661fe35f53/src/core/subscribeController.js#L7)
+[src/core/subscribeController.js:7](https://github.com/supercat1337/store2/blob/9da5639fccaa4ac6e1305ac63d79571e83475e23/src/core/subscribeController.js#L7)
 
 ___
 

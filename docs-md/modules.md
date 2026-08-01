@@ -23,16 +23,27 @@
 - [atom](modules.md#atom)
 - [autorun](modules.md#autorun)
 - [batch](modules.md#batch)
+- [clone](modules.md#clone)
 - [collection](modules.md#collection)
+- [compareAny](modules.md#compareany)
+- [comparePlainObjects](modules.md#compareplainobjects)
 - [computed](modules.md#computed)
+- [debounce](modules.md#debounce)
 - [extendObservable](modules.md#extendobservable)
 - [fromPromise](modules.md#frompromise)
+- [getAllPropertyDescriptors](modules.md#getallpropertydescriptors)
+- [getError](modules.md#geterror)
+- [getItemNamesFromSet](modules.md#getitemnamesfromset)
 - [getNow](modules.md#getnow)
+- [getSortedReactiveItems](modules.md#getsortedreactiveitems)
+- [isPlainObject](modules.md#isplainobject)
 - [makeAutoObservable](modules.md#makeautoobservable)
 - [makeObservable](modules.md#makeobservable)
 - [reaction](modules.md#reaction)
 - [runInAction](modules.md#runinaction)
 - [shallowReactive](modules.md#shallowreactive)
+- [sleep](modules.md#sleep)
+- [sortReactiveItems](modules.md#sortreactiveitems)
 - [untrack](modules.md#untrack)
 - [waitUntil](modules.md#waituntil)
 - [when](modules.md#when)
@@ -81,7 +92,7 @@ count.value = 1;
 
 #### Defined in
 
-[src/api/api.js:558](https://github.com/supercat1337/store2/blob/e60081710ee7e24f7bcf3bcbc43ae5661fe35f53/src/api/api.js#L558)
+[src/api/api.js:558](https://github.com/supercat1337/store2/blob/9da5639fccaa4ac6e1305ac63d79571e83475e23/src/api/api.js#L558)
 
 ___
 
@@ -147,7 +158,7 @@ console.log(a.value, b.value, foo); // 2 2 4
 
 #### Defined in
 
-[src/api/api.js:51](https://github.com/supercat1337/store2/blob/e60081710ee7e24f7bcf3bcbc43ae5661fe35f53/src/api/api.js#L51)
+[src/api/api.js:51](https://github.com/supercat1337/store2/blob/9da5639fccaa4ac6e1305ac63d79571e83475e23/src/api/api.js#L51)
 
 ___
 
@@ -196,7 +207,39 @@ console.log(a.value, b.value, foo); // 1 1 2
 
 #### Defined in
 
-[src/api/api.js:342](https://github.com/supercat1337/store2/blob/e60081710ee7e24f7bcf3bcbc43ae5661fe35f53/src/api/api.js#L342)
+[src/api/api.js:342](https://github.com/supercat1337/store2/blob/9da5639fccaa4ac6e1305ac63d79571e83475e23/src/api/api.js#L342)
+
+___
+
+### clone
+
+▸ **clone**\<`T`\>(`obj`): `T`
+
+Clones an object. If the object is an array, the function returns a shallow copy of the array.
+If the object is a plain object, the function returns a shallow copy of the object.
+If the object is not an array or a plain object, the function returns the object as is.
+
+#### Type parameters
+
+| Name |
+| :------ |
+| `T` |
+
+#### Parameters
+
+| Name | Type | Description |
+| :------ | :------ | :------ |
+| `obj` | `T` | The object to clone |
+
+#### Returns
+
+`T`
+
+A shallow copy of the object
+
+#### Defined in
+
+[src/helpers/tools.js:174](https://github.com/supercat1337/store2/blob/9da5639fccaa4ac6e1305ac63d79571e83475e23/src/helpers/tools.js#L174)
 
 ___
 
@@ -251,7 +294,57 @@ coll.value[0] = 10; // triggers subscriber
 
 #### Defined in
 
-[src/api/api.js:619](https://github.com/supercat1337/store2/blob/e60081710ee7e24f7bcf3bcbc43ae5661fe35f53/src/api/api.js#L619)
+[src/api/api.js:619](https://github.com/supercat1337/store2/blob/9da5639fccaa4ac6e1305ac63d79571e83475e23/src/api/api.js#L619)
+
+___
+
+### compareAny
+
+▸ **compareAny**(`a`, `b`): `boolean`
+
+Checks if two objects are equal. If objects are arrays, then check if stringified versions of them are equal.
+If objects are not arrays, then check if sorted stringified versions of them are equal.
+
+#### Parameters
+
+| Name | Type |
+| :------ | :------ |
+| `a` | `unknown` |
+| `b` | `unknown` |
+
+#### Returns
+
+`boolean`
+
+#### Defined in
+
+[src/helpers/tools.js:115](https://github.com/supercat1337/store2/blob/9da5639fccaa4ac6e1305ac63d79571e83475e23/src/helpers/tools.js#L115)
+
+___
+
+### comparePlainObjects
+
+▸ **comparePlainObjects**(`a`, `b`): `boolean`
+
+Checks if two plain objects are equal. If the objects do not have the same set of keys, then this function returns false.
+Otherwise, this function checks if each value of the two objects is equal, using the compareAny function.
+
+#### Parameters
+
+| Name | Type | Description |
+| :------ | :------ | :------ |
+| `a` | `any` | The first object to compare. |
+| `b` | `any` | The second object to compare. |
+
+#### Returns
+
+`boolean`
+
+True if the two objects are equal, false otherwise.
+
+#### Defined in
+
+[src/helpers/tools.js:77](https://github.com/supercat1337/store2/blob/9da5639fccaa4ac6e1305ac63d79571e83475e23/src/helpers/tools.js#L77)
 
 ___
 
@@ -299,7 +392,42 @@ a.value = 1;
 
 #### Defined in
 
-[src/api/api.js:584](https://github.com/supercat1337/store2/blob/e60081710ee7e24f7bcf3bcbc43ae5661fe35f53/src/api/api.js#L584)
+[src/api/api.js:584](https://github.com/supercat1337/store2/blob/9da5639fccaa4ac6e1305ac63d79571e83475e23/src/api/api.js#L584)
+
+___
+
+### debounce
+
+▸ **debounce**\<`T`\>(`func`, `wait`): `T`
+
+Debounce function that, as long as it continues to be invoked, will not be triggered.
+
+#### Type parameters
+
+| Name | Type |
+| :------ | :------ |
+| `T` | extends `Function` |
+
+#### Parameters
+
+| Name | Type | Description |
+| :------ | :------ | :------ |
+| `func` | `T` | Function to be debounced |
+| `wait` | `number` | Time in milliseconds to wait before the function gets called. |
+
+#### Returns
+
+`T`
+
+**`Example`**
+
+```ts
+window.addEventListener('resize', debounce((evt) => console.log(evt), 250));
+```
+
+#### Defined in
+
+[src/helpers/tools.js:147](https://github.com/supercat1337/store2/blob/9da5639fccaa4ac6e1305ac63d79571e83475e23/src/helpers/tools.js#L147)
 
 ___
 
@@ -362,7 +490,7 @@ console.log(foo); // 2
 
 #### Defined in
 
-[src/api/api.js:863](https://github.com/supercat1337/store2/blob/e60081710ee7e24f7bcf3bcbc43ae5661fe35f53/src/api/api.js#L863)
+[src/api/api.js:863](https://github.com/supercat1337/store2/blob/9da5639fccaa4ac6e1305ac63d79571e83475e23/src/api/api.js#L863)
 
 ___
 
@@ -423,7 +551,139 @@ await fromPromiseResult.case({
 
 #### Defined in
 
-[src/api/api.js:471](https://github.com/supercat1337/store2/blob/e60081710ee7e24f7bcf3bcbc43ae5661fe35f53/src/api/api.js#L471)
+[src/api/api.js:471](https://github.com/supercat1337/store2/blob/9da5639fccaa4ac6e1305ac63d79571e83475e23/src/api/api.js#L471)
+
+___
+
+### getAllPropertyDescriptors
+
+▸ **getAllPropertyDescriptors**(`obj`, `depth?`, `maxDepth?`): \{ `[x: string]`: [`TypedPropertyDescriptor`](interfaces/internal_.TypedPropertyDescriptor.md)\<`any`\>;  } & \{ `[x: string]`: [`PropertyDescriptor`](interfaces/internal_.PropertyDescriptor.md);  }
+
+Gets all property descriptors of an object, including its prototype and all its ancestors.
+The descriptors are returned as a plain object.
+
+#### Parameters
+
+| Name | Type | Default value | Description |
+| :------ | :------ | :------ | :------ |
+| `obj` | `any` | `undefined` | The object to get the property descriptors from. |
+| `depth?` | `number` | `0` |  |
+| `maxDepth?` | `number` | `100` |  |
+
+#### Returns
+
+\{ `[x: string]`: [`TypedPropertyDescriptor`](interfaces/internal_.TypedPropertyDescriptor.md)\<`any`\>;  } & \{ `[x: string]`: [`PropertyDescriptor`](interfaces/internal_.PropertyDescriptor.md);  }
+
+A plain object with all property descriptors of the object.
+
+#### Defined in
+
+[src/helpers/tools.js:202](https://github.com/supercat1337/store2/blob/9da5639fccaa4ac6e1305ac63d79571e83475e23/src/helpers/tools.js#L202)
+
+___
+
+### getError
+
+▸ **getError**(`e`): `Error`
+
+Converts any value to an Error object.
+
+If the given value is already an instance of Error, it is returned unchanged.
+Otherwise, a new Error object is created using the string representation of the value.
+
+#### Parameters
+
+| Name | Type | Description |
+| :------ | :------ | :------ |
+| `e` | `unknown` | The value to convert into an Error. |
+
+#### Returns
+
+`Error`
+
+An Error object derived from the input value.
+
+**`Example`**
+
+```ts
+// Returns the original Error
+const originalError = new Error('Something went wrong');
+getError(originalError) === originalError; // true
+```
+
+**`Example`**
+
+```ts
+// Converts a string to an Error
+const error = getError('Network failure');
+error.message; // 'Network failure'
+error instanceof Error; // true
+```
+
+**`Example`**
+
+```ts
+// Converts numbers or other types
+getError(42).message; // '42'
+getError(null).message; // 'null'
+getError(undefined).message; // 'undefined'
+```
+
+#### Defined in
+
+[src/helpers/tools.js:239](https://github.com/supercat1337/store2/blob/9da5639fccaa4ac6e1305ac63d79571e83475e23/src/helpers/tools.js#L239)
+
+___
+
+### getItemNamesFromSet
+
+▸ **getItemNamesFromSet**(`items`, `options?`): `string`[]
+
+Extracts names (and optionally ids) from a Set of reactive items.
+Returns an array of strings, one per item.
+
+#### Parameters
+
+| Name | Type | Description |
+| :------ | :------ | :------ |
+| `items` | `Set`\<[`ReactiveItem`](classes/ReactiveItem.md)\> \| [`Iterable`](interfaces/internal_.Iterable.md)\<[`ReactiveItem`](classes/ReactiveItem.md)\> | Collection of reactive items. |
+| `options?` | `Object` | Formatting options. |
+| `options.fallback` | `string` | - |
+| `options.includeId` | `boolean` | - |
+| `options.sorted` | `boolean` | - |
+
+#### Returns
+
+`string`[]
+
+Array of item representations.
+
+**`Example`**
+
+```ts
+const a = new Atom(0, { name: 'counter' });
+const b = new Computed(() => a.value * 2, { name: 'double' });
+const set = new Set([a, b]);
+getItemNamesFromSet(set);
+// ['counter', 'double']
+```
+
+**`Example`**
+
+```ts
+getItemNamesFromSet(set, { includeId: true });
+// ['counter:5', 'double:7']
+```
+
+**`Example`**
+
+```ts
+getItemNamesFromSet(set, { fallback: '?', sorted: false });
+```
+
+#### Defined in
+
+[src/helpers/tools.js:265](https://github.com/supercat1337/store2/blob/9da5639fccaa4ac6e1305ac63d79571e83475e23/src/helpers/tools.js#L265)
 
 ___
 
@@ -462,7 +722,57 @@ const unsubscribe = now.subscribe(() => {
 
 #### Defined in
 
-[src/api/api.js:413](https://github.com/supercat1337/store2/blob/e60081710ee7e24f7bcf3bcbc43ae5661fe35f53/src/api/api.js#L413)
+[src/api/api.js:413](https://github.com/supercat1337/store2/blob/9da5639fccaa4ac6e1305ac63d79571e83475e23/src/api/api.js#L413)
+
+___
+
+### getSortedReactiveItems
+
+▸ **getSortedReactiveItems**(`...items`): [`ReactiveItem`](classes/ReactiveItem.md)[]
+
+Combines multiple reactive items or sets of reactive items into a single set,
+ensuring that each item appears only once. The combined set is then converted
+to an array and sorted by the internal id of the reactive items.
+
+#### Parameters
+
+| Name | Type | Description |
+| :------ | :------ | :------ |
+| `...items` | ([`ReactiveItem`](classes/ReactiveItem.md) \| `Set`\<[`ReactiveItem`](classes/ReactiveItem.md)\>)[] | Reactive items or sets of reactive items to combine and sort. |
+
+#### Returns
+
+[`ReactiveItem`](classes/ReactiveItem.md)[]
+
+A sorted array of unique reactive items.
+
+#### Defined in
+
+[src/helpers/tools.js:27](https://github.com/supercat1337/store2/blob/9da5639fccaa4ac6e1305ac63d79571e83475e23/src/helpers/tools.js#L27)
+
+___
+
+### isPlainObject
+
+▸ **isPlainObject**(`obj`): `boolean`
+
+Checks if a given value is a plain object.
+
+#### Parameters
+
+| Name | Type | Description |
+| :------ | :------ | :------ |
+| `obj` | `any` | The value to check. |
+
+#### Returns
+
+`boolean`
+
+true if the value is a plain object, false otherwise.
+
+#### Defined in
+
+[src/helpers/tools.js:45](https://github.com/supercat1337/store2/blob/9da5639fccaa4ac6e1305ac63d79571e83475e23/src/helpers/tools.js#L45)
 
 ___
 
@@ -524,7 +834,7 @@ console.log(foo); // 3
 
 #### Defined in
 
-[src/api/api.js:907](https://github.com/supercat1337/store2/blob/e60081710ee7e24f7bcf3bcbc43ae5661fe35f53/src/api/api.js#L907)
+[src/api/api.js:907](https://github.com/supercat1337/store2/blob/9da5639fccaa4ac6e1305ac63d79571e83475e23/src/api/api.js#L907)
 
 ___
 
@@ -632,7 +942,7 @@ console.log(foo); // 3
 
 #### Defined in
 
-[src/api/api.js:742](https://github.com/supercat1337/store2/blob/e60081710ee7e24f7bcf3bcbc43ae5661fe35f53/src/api/api.js#L742)
+[src/api/api.js:742](https://github.com/supercat1337/store2/blob/9da5639fccaa4ac6e1305ac63d79571e83475e23/src/api/api.js#L742)
 
 ___
 
@@ -704,7 +1014,7 @@ console.log(a.value, b.value, foo); // 2 2 3
 
 #### Defined in
 
-[src/api/api.js:120](https://github.com/supercat1337/store2/blob/e60081710ee7e24f7bcf3bcbc43ae5661fe35f53/src/api/api.js#L120)
+[src/api/api.js:120](https://github.com/supercat1337/store2/blob/9da5639fccaa4ac6e1305ac63d79571e83475e23/src/api/api.js#L120)
 
 ___
 
@@ -747,7 +1057,7 @@ console.log(a.value, b.value, count); // 1 1 1
 
 #### Defined in
 
-[src/api/api.js:303](https://github.com/supercat1337/store2/blob/e60081710ee7e24f7bcf3bcbc43ae5661fe35f53/src/api/api.js#L303)
+[src/api/api.js:303](https://github.com/supercat1337/store2/blob/9da5639fccaa4ac6e1305ac63d79571e83475e23/src/api/api.js#L303)
 
 ___
 
@@ -800,7 +1110,56 @@ reactive.value.b = 5; // triggers subscriber
 
 #### Defined in
 
-[src/api/api.js:652](https://github.com/supercat1337/store2/blob/e60081710ee7e24f7bcf3bcbc43ae5661fe35f53/src/api/api.js#L652)
+[src/api/api.js:652](https://github.com/supercat1337/store2/blob/9da5639fccaa4ac6e1305ac63d79571e83475e23/src/api/api.js#L652)
+
+___
+
+### sleep
+
+▸ **sleep**(`ms`): `Promise`\<`void`\>
+
+A Promise-based sleep function.
+
+#### Parameters
+
+| Name | Type | Description |
+| :------ | :------ | :------ |
+| `ms` | `number` | The amount of milliseconds to sleep for. |
+
+#### Returns
+
+`Promise`\<`void`\>
+
+#### Defined in
+
+[src/helpers/tools.js:190](https://github.com/supercat1337/store2/blob/9da5639fccaa4ac6e1305ac63d79571e83475e23/src/helpers/tools.js#L190)
+
+___
+
+### sortReactiveItems
+
+▸ **sortReactiveItems**(`a`, `b`): `number`
+
+Sorts reactive items by their internal id. This is used to
+ensure that reactive items are processed in a consistent order
+when they are notified of changes.
+
+#### Parameters
+
+| Name | Type | Description |
+| :------ | :------ | :------ |
+| `a` | [`ReactiveItem`](classes/ReactiveItem.md) | The first item to compare |
+| `b` | [`ReactiveItem`](classes/ReactiveItem.md) | The second item to compare |
+
+#### Returns
+
+`number`
+
+-1 if a should come before b, 0 if a and b are equal, 1 if a should come after b
+
+#### Defined in
+
+[src/helpers/tools.js:14](https://github.com/supercat1337/store2/blob/9da5639fccaa4ac6e1305ac63d79571e83475e23/src/helpers/tools.js#L14)
 
 ___
 
@@ -855,7 +1214,7 @@ console.log(a.value, b.value, foo); // 1 1 2
 
 #### Defined in
 
-[src/api/api.js:380](https://github.com/supercat1337/store2/blob/e60081710ee7e24f7bcf3bcbc43ae5661fe35f53/src/api/api.js#L380)
+[src/api/api.js:380](https://github.com/supercat1337/store2/blob/9da5639fccaa4ac6e1305ac63d79571e83475e23/src/api/api.js#L380)
 
 ___
 
@@ -896,7 +1255,7 @@ a.value = 4; // foo = 1
 
 #### Defined in
 
-[src/api/api.js:247](https://github.com/supercat1337/store2/blob/e60081710ee7e24f7bcf3bcbc43ae5661fe35f53/src/api/api.js#L247)
+[src/api/api.js:247](https://github.com/supercat1337/store2/blob/9da5639fccaa4ac6e1305ac63d79571e83475e23/src/api/api.js#L247)
 
 ___
 
@@ -953,4 +1312,4 @@ a.value = 5; // foo = 2
 
 #### Defined in
 
-[src/api/api.js:195](https://github.com/supercat1337/store2/blob/e60081710ee7e24f7bcf3bcbc43ae5661fe35f53/src/api/api.js#L195)
+[src/api/api.js:195](https://github.com/supercat1337/store2/blob/9da5639fccaa4ac6e1305ac63d79571e83475e23/src/api/api.js#L195)

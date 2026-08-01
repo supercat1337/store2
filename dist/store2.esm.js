@@ -56,6 +56,28 @@ function sortReactiveItems(a, b) {
 }
 
 /**
+ * Combines multiple reactive items or sets of reactive items into a single set,
+ * ensuring that each item appears only once. The combined set is then converted
+ * to an array and sorted by the internal id of the reactive items.
+ *
+ * @param {...(ReactiveItem|Set<ReactiveItem>)} items - Reactive items or sets of reactive items to combine and sort.
+ * @returns {Array<ReactiveItem>} A sorted array of unique reactive items.
+ */
+
+function getSortedReactiveItems(...items) {
+    const all = new Set();
+    items.forEach(item => {
+        if (!(item instanceof Set)) {
+            all.add(item);
+        } else {
+            item.forEach(i => all.add(i));
+        }
+    });
+
+    return Array.from(all).sort(sortReactiveItems);
+}
+
+/**
  * Checks if a given value is a plain object.
  * @param {*} obj - The value to check.
  * @returns {boolean} true if the value is a plain object, false otherwise.
@@ -201,6 +223,15 @@ function clone(obj) {
 }
 
 /**
+ * A Promise-based sleep function.
+ * @param {number} ms - The amount of milliseconds to sleep for.
+ * @returns {Promise<void>}
+ */
+function sleep(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+/**
  * Gets all property descriptors of an object, including its prototype and all its ancestors.
  * The descriptors are returned as a plain object.
  * @param {object} obj - The object to get the property descriptors from.
@@ -247,6 +278,56 @@ function getAllPropertyDescriptors(obj, depth = 0, maxDepth = 100) {
  */
 function getError(e) {
     return e instanceof Error ? e : new Error(String(e));
+}
+
+/**
+ * Extracts names (and optionally ids) from a Set of reactive items.
+ * Returns an array of strings, one per item.
+ *
+ * @param {Set<ReactiveItem>|Iterable<ReactiveItem>} items - Collection of reactive items.
+ * @param {{includeId:boolean, fallback:string, sorted:boolean}} [options] - Formatting options.
+ * @returns {string[]} Array of item representations.
+ *
+ * @example
+ * const a = new Atom(0, { name: 'counter' });
+ * const b = new Computed(() => a.value * 2, { name: 'double' });
+ * const set = new Set([a, b]);
+ * getItemNamesFromSet(set);
+ * // ['counter', 'double']
+ *
+ * @example
+ * getItemNamesFromSet(set, { includeId: true });
+ * // ['counter:5', 'double:7']
+ *
+ * @example
+ * getItemNamesFromSet(set, { fallback: '?', sorted: false });
+ */
+function getItemNamesFromSet(
+    items,
+    options = { includeId: false, fallback: 'unnamed', sorted: true }
+) {
+    const { includeId = false, fallback = 'unnamed', sorted = true } = options;
+
+    const result = [];
+
+    for (const item of items) {
+        if (!(item instanceof ReactiveItem)) {
+            continue;
+        }
+
+        const namePart = item.name && item.name.trim() !== '' ? item.name : fallback;
+        if (includeId) {
+            result.push(`${namePart}:${item.engine.id}`);
+        } else {
+            result.push(namePart);
+        }
+    }
+
+    if (sorted) {
+        result.sort((a, b) => a.localeCompare(b));
+    }
+
+    return result;
 }
 
 // @ts-check
@@ -4387,4 +4468,4 @@ function makeAutoObservable(obj, overrides = {}, options, filter) {
     return makeObservable(obj, annotations, _options);
 }
 
-export { Atom, Collection, Computed, ReactiveItem, ReactiveList, ShallowReactive, Store, atom, autorun, batch, collection, computed, extendObservable, fromPromise, getNow, makeAutoObservable, makeObservable, reaction, runInAction, shallowReactive, untrack, waitUntil, when };
+export { Atom, Collection, Computed, ReactiveItem, ReactiveList, ShallowReactive, Store, atom, autorun, batch, clone, collection, compareAny, comparePlainObjects, computed, debounce, extendObservable, fromPromise, getAllPropertyDescriptors, getError, getItemNamesFromSet, getNow, getSortedReactiveItems, isPlainObject, makeAutoObservable, makeObservable, reaction, runInAction, shallowReactive, sleep, sortReactiveItems, untrack, waitUntil, when };

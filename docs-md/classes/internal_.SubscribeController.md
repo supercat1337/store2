@@ -41,7 +41,7 @@ Uses a single EventEmitter for all events: 'change' and 'destroy'.
 
 #### Defined in
 
-[src/core/subscribeController.js:18](https://github.com/supercat1337/store2/blob/e60081710ee7e24f7bcf3bcbc43ae5661fe35f53/src/core/subscribeController.js#L18)
+[src/core/subscribeController.js:18](https://github.com/supercat1337/store2/blob/9da5639fccaa4ac6e1305ac63d79571e83475e23/src/core/subscribeController.js#L18)
 
 ## Properties
 
@@ -51,7 +51,7 @@ Uses a single EventEmitter for all events: 'change' and 'destroy'.
 
 #### Defined in
 
-[src/core/subscribeController.js:16](https://github.com/supercat1337/store2/blob/e60081710ee7e24f7bcf3bcbc43ae5661fe35f53/src/core/subscribeController.js#L16)
+[src/core/subscribeController.js:16](https://github.com/supercat1337/store2/blob/9da5639fccaa4ac6e1305ac63d79571e83475e23/src/core/subscribeController.js#L16)
 
 ## Methods
 
@@ -67,7 +67,7 @@ Removes all subscribers, including internal listeners.
 
 #### Defined in
 
-[src/core/subscribeController.js:55](https://github.com/supercat1337/store2/blob/e60081710ee7e24f7bcf3bcbc43ae5661fe35f53/src/core/subscribeController.js#L55)
+[src/core/subscribeController.js:55](https://github.com/supercat1337/store2/blob/9da5639fccaa4ac6e1305ac63d79571e83475e23/src/core/subscribeController.js#L55)
 
 ___
 
@@ -84,7 +84,7 @@ Internal listeners (has/no subscribers) remain intact.
 
 #### Defined in
 
-[src/core/subscribeController.js:48](https://github.com/supercat1337/store2/blob/e60081710ee7e24f7bcf3bcbc43ae5661fe35f53/src/core/subscribeController.js#L48)
+[src/core/subscribeController.js:48](https://github.com/supercat1337/store2/blob/9da5639fccaa4ac6e1305ac63d79571e83475e23/src/core/subscribeController.js#L48)
 
 ___
 
@@ -100,7 +100,7 @@ Destroys the controller, emits 'destroy', and removes all listeners.
 
 #### Defined in
 
-[src/core/subscribeController.js:70](https://github.com/supercat1337/store2/blob/e60081710ee7e24f7bcf3bcbc43ae5661fe35f53/src/core/subscribeController.js#L70)
+[src/core/subscribeController.js:70](https://github.com/supercat1337/store2/blob/9da5639fccaa4ac6e1305ac63d79571e83475e23/src/core/subscribeController.js#L70)
 
 ___
 
@@ -116,7 +116,7 @@ Returns a copy of the current 'change' subscriber list.
 
 #### Defined in
 
-[src/core/subscribeController.js:26](https://github.com/supercat1337/store2/blob/e60081710ee7e24f7bcf3bcbc43ae5661fe35f53/src/core/subscribeController.js#L26)
+[src/core/subscribeController.js:26](https://github.com/supercat1337/store2/blob/9da5639fccaa4ac6e1305ac63d79571e83475e23/src/core/subscribeController.js#L26)
 
 ___
 
@@ -132,7 +132,7 @@ Returns whether there are any 'change' subscribers.
 
 #### Defined in
 
-[src/core/subscribeController.js:63](https://github.com/supercat1337/store2/blob/e60081710ee7e24f7bcf3bcbc43ae5661fe35f53/src/core/subscribeController.js#L63)
+[src/core/subscribeController.js:63](https://github.com/supercat1337/store2/blob/9da5639fccaa4ac6e1305ac63d79571e83475e23/src/core/subscribeController.js#L63)
 
 ___
 
@@ -154,7 +154,7 @@ Registers a callback that fires when the controller is destroyed.
 
 #### Defined in
 
-[src/core/subscribeController.js:98](https://github.com/supercat1337/store2/blob/e60081710ee7e24f7bcf3bcbc43ae5661fe35f53/src/core/subscribeController.js#L98)
+[src/core/subscribeController.js:98](https://github.com/supercat1337/store2/blob/9da5639fccaa4ac6e1305ac63d79571e83475e23/src/core/subscribeController.js#L98)
 
 ___
 
@@ -176,7 +176,7 @@ Registers a callback that fires when the first 'change' subscriber is added.
 
 #### Defined in
 
-[src/core/subscribeController.js:80](https://github.com/supercat1337/store2/blob/e60081710ee7e24f7bcf3bcbc43ae5661fe35f53/src/core/subscribeController.js#L80)
+[src/core/subscribeController.js:80](https://github.com/supercat1337/store2/blob/9da5639fccaa4ac6e1305ac63d79571e83475e23/src/core/subscribeController.js#L80)
 
 ___
 
@@ -198,7 +198,7 @@ Registers a callback that fires when the last 'change' subscriber is removed.
 
 #### Defined in
 
-[src/core/subscribeController.js:89](https://github.com/supercat1337/store2/blob/e60081710ee7e24f7bcf3bcbc43ae5661fe35f53/src/core/subscribeController.js#L89)
+[src/core/subscribeController.js:89](https://github.com/supercat1337/store2/blob/9da5639fccaa4ac6e1305ac63d79571e83475e23/src/core/subscribeController.js#L89)
 
 ___
 
@@ -223,4 +223,4 @@ Subscribes a callback to the 'change' event.
 
 #### Defined in
 
-[src/core/subscribeController.js:37](https://github.com/supercat1337/store2/blob/e60081710ee7e24f7bcf3bcbc43ae5661fe35f53/src/core/subscribeController.js#L37)
+[src/core/subscribeController.js:37](https://github.com/supercat1337/store2/blob/9da5639fccaa4ac6e1305ac63d79571e83475e23/src/core/subscribeController.js#L37)
