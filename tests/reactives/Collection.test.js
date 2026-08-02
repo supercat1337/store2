@@ -92,6 +92,32 @@ test('Collection: set new value', t => {
 
     a.value = [3, 2, 1];
     t.deepEqual(a.value, [3, 2, 1]);
+
+    a.value = [3, 2];
+    t.deepEqual(a.value, [3, 2]);
+
+    a.value = [];
+    t.deepEqual(a.value, []);
+
+    a.value.push(1);
+    t.deepEqual(a.value, [1]);
+
+    a.value.pop();
+    t.deepEqual(a.value, []);
+});
+
+test('Collection: set new value #2', t => {
+    const _collection = new Collection(['0'], { name: 'a' });
+    t.deepEqual(_collection.value, ['0']);
+
+    _collection.value = [];
+    t.deepEqual(_collection.value, []);
+
+    _collection.value = ['0', '2'];
+    t.deepEqual(_collection.value, ['0', '2']);
+
+    _collection.value = [];
+    t.deepEqual(_collection.value, []);
 });
 
 test('Collection: set new value in subscriber', t => {
