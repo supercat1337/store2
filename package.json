@@ -1,6 +1,6 @@
 {
     "name": "@supercat1337/store2",
-    "version": "2.0.3",
+    "version": "2.0.4",
     "description": "A lightweight, efficient, and easy-to-use reactive state management system for JavaScript applications.",
     "author": "Albert Bazaleev",
     "license": "MIT",
