@@ -85,9 +85,13 @@ test('Collection: destroy while destroyed', t => {
 
 test('Collection: set new value', t => {
     const a = new Collection([0, 1, 2], { name: 'a' });
+    t.deepEqual(a.value, [0, 1, 2]);
     a.value = [3, 4, 5, 6, 7];
     t.deepEqual(a.value, [3, 4, 5, 6, 7]);
     t.deepEqual(a.getValue(), [3, 4, 5, 6, 7]);
+
+    a.value = [3, 2, 1];
+    t.deepEqual(a.value, [3, 2, 1]);
 });
 
 test('Collection: set new value in subscriber', t => {

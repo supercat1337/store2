@@ -116,6 +116,7 @@ export function compareAny(a, b) {
     if (a === b) {
         return true;
     }
+
     if (typeof a !== typeof b) {
         return false;
     }

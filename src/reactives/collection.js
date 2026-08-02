@@ -70,15 +70,21 @@ class Collection extends ReactiveItem {
              */
             set: (target, key, value) => {
                 // Ignore symbol keys
-                if (typeof key === 'symbol') {return true;}
+                if (typeof key === 'symbol') {
+                    return true;
+                }
 
                 const engine = that.engine;
                 engine.prepareSetValue();
-                if (target[/** @type {any} */ (key)] === value) {return true;}
+                if (target[/** @type {any} */ (key)] === value) {
+                    return true;
+                }
 
                 if (key !== 'length') {
                     const oldValue = target[/** @type {any} */ (key)];
-                    if (that.equals(oldValue, value)) {return true;}
+                    if (that.equals(oldValue, value)) {
+                        return true;
+                    }
                     target[/** @type {any} */ (key)] = value;
                     if (that.#length !== target.length) {
                         const newLength = target.length;
@@ -90,7 +96,9 @@ class Collection extends ReactiveItem {
                 } else {
                     const newLength = /** @type {number} */ (value);
                     const oldLength = that.#length;
-                    if (newLength === oldLength) {return true;}
+                    if (newLength === oldLength) {
+                        return true;
+                    }
                     if (newLength < oldLength) {
                         for (let i = newLength; i < oldLength; i++) {
                             const itemValue = that.#target[i];
@@ -121,7 +129,9 @@ class Collection extends ReactiveItem {
             get: (target, key) => {
                 that.getValue();
                 // Ignore symbol keys
-                if (typeof key === 'symbol') {return undefined;}
+                if (typeof key === 'symbol') {
+                    return undefined;
+                }
                 if (typeof target[/** @type {any} */ (key)] === 'function') {
                     return target[/** @type {any} */ (key)];
                 }
@@ -135,7 +145,9 @@ class Collection extends ReactiveItem {
              * @returns {boolean} True if the operation succeeded.
              */
             deleteProperty: (target, key) => {
-                if (typeof key === 'symbol') {return true;}
+                if (typeof key === 'symbol') {
+                    return true;
+                }
                 if (modeController.subscribersMode) {
                     throw new Error(
                         `Collection${this.name ? ` (${this.name})` : ''}: Cannot delete property while subscribers are running`
@@ -165,7 +177,9 @@ class Collection extends ReactiveItem {
         }
         const current = this.getValue({ untracked: true });
         // Shallow compare to avoid unnecessary updates
-        if (this.equals(current, value)) {return;}
+        if (this.equals(current, value)) {
+            return;
+        }
         const engine = this.engine;
         engine.prepareSetValue();
         engine.suppressNotifications = true;
@@ -175,7 +189,6 @@ class Collection extends ReactiveItem {
         }
 
         engine.suppressNotifications = false;
-        this.#target = value;
         engine.valueChangedCallback();
     }
 
