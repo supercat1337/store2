@@ -2,29 +2,29 @@
 
 import test from 'ava';
 
-import { Atom } from '../../src/index.js';
 import {
+    atom,
     autorun,
     batch,
-    reaction,
-    when,
-    waitUntil,
-    getNow,
-    fromPromise,
-    untrack,
-    runInAction,
-    atom,
-    computed,
     collection,
-    shallowReactive,
-    makeObservable,
-    makeAutoObservable,
+    computed,
     extendObservable,
+    fromPromise,
+    getNow,
+    makeAutoObservable,
+    makeObservable,
+    reaction,
+    runInAction,
+    shallowReactive,
+    untrack,
+    waitUntil,
+    when,
 } from '../../src/api/api.js';
-import { modeController } from '../../src/services/modeController.js';
-import { sleep } from '../../src/helpers/tools.js';
-import { getArrayOfUsedReactiveItems } from '../../src/services/dependencyTracker.js';
 import { COMPUTED, SHALLOW_REACTIVE } from '../../src/core/Engine.js';
+import { sleep } from '../../src/helpers/tools.js';
+import { Atom, Collection, Computed } from '../../src/index.js';
+import { getArrayOfUsedReactiveItems } from '../../src/services/dependencyTracker.js';
+import { modeController } from '../../src/services/modeController.js';
 
 test('reaction should track dependencies', t => {
     const a = new Atom(0, { name: 'a' });
@@ -1272,8 +1272,8 @@ test('extendObservable with false override (ignored)', t => {
     let foo = 0;
     autorun(() => {
         foo++;
-        obj.a;   // реактивное
-        obj.b;   // не реактивно
+        obj.a; // реактивное
+        obj.b; // не реактивно
     });
     t.is(foo, 1);
     obj.a = 3;
@@ -1286,7 +1286,9 @@ test('makeAutoObservable with filter', t => {
     class Test {
         a = 1;
         b = 2;
-        get c() { return this.a + this.b; }
+        get c() {
+            return this.a + this.b;
+        }
     }
     const obj = new Test();
     // Передаём фильтр только для свойства a
@@ -1301,4 +1303,43 @@ test('makeAutoObservable with filter', t => {
     t.is(foo, 2);
     obj.b = 3;
     t.is(foo, 2); // b не отслеживается
+});
+
+test('filteredTodos', t => {
+    /** @typedef {Object} Todo @property {number} id @property {string} text @property {boolean} done */
+
+    /** @type {Collection<Todo>} */
+    const todos = collection([], { name: 'todos' });
+
+    /** @type {Atom<string>} */
+    const filter = atom('all', { name: 'filter' });
+
+    /** @type {Computed<Todo[]>} */
+    const filteredTodos = computed(() => {
+        const all = todos.value;
+        const f = filter.value;
+
+        // 💡 Возвращаем поверхностную копию массива
+        if (f === 'all') return [...all];
+        if (f === 'active') return all.filter(t => !t.done);
+        if (f === 'completed') return all.filter(t => t.done);
+        return [...all];
+    });
+
+    let foo = 0;
+
+    filteredTodos.subscribe(() => {
+        foo++;
+    });
+
+    batch(() => {
+        todos.value = [
+            { id: 1, text: 'Learn store2', done: true },
+            { id: 2, text: 'Build Todo App', done: false },
+            { id: 3, text: 'Write documentation', done: false },
+            { id: 4, text: 'Publish to npm', done: false },
+        ];
+    });
+
+    t.is(foo, 1);
 });

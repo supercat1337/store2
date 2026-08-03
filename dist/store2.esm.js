@@ -153,8 +153,12 @@ function comparePlainObjects(a, b) {
  * @returns {boolean}
  */
 function compareAny(a, b) {
+    // Для примитивов (и null) сравнение по ссылке достаточно
     if (a === b) {
-        return true;
+        if (a === null || typeof a !== 'object') {
+            return true;
+        }
+        // Для объектов и массивов продолжаем глубокое сравнение
     }
 
     if (typeof a !== typeof b) {
@@ -169,7 +173,6 @@ function compareAny(a, b) {
         if (!(Array.isArray(a) && Array.isArray(b))) {
             return false;
         }
-
         return compareArrays(a, b);
     }
 

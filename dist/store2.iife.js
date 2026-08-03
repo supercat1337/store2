@@ -707,7 +707,9 @@ var Store2 = (() => {
   }
   function compareAny(a, b) {
     if (a === b) {
-      return true;
+      if (a === null || typeof a !== "object") {
+        return true;
+      }
     }
     if (typeof a !== typeof b) {
       return false;

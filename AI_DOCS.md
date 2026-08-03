@@ -99,6 +99,79 @@ interface UpdateDataRecord {
     - if `smartRecompute` is true: compare the version string of dependencies; only recompute if changed.
 - Recalculation runs the user function inside a new dependency collection pass, updates the dependency graph, and compares the new value with the old. If different, an update record is created and subscribers are notified.
 
+### 3.3. Important Note: Computed + Collection Reference Stability
+
+When a `Computed` depends on a `Collection`, the dependency is established on the proxy object returned by `collection.value`. This proxy object **remains the same reference** even when the underlying array content changes. Because `Computed` uses `equals` to decide whether the value has changed (and thus whether to notify subscribers), by default it compares references (`a === b`). When the proxy reference stays the same, `equals` returns `true` even if the content changed, so the computed does not notify subscribers.
+
+**To ensure reactivity in such cases, you must either:**
+
+1. **Return a new array** (e.g., `[...all]` or `all.slice()`) to break reference equality:
+
+    ```js
+    const filteredTodos = computed(() => {
+        const all = todos.value;
+        if (filter.value === 'all') return [...all];
+        return all.filter(t => t.done);
+    });
+    ```
+
+2. **Provide a custom `compareFunction`** that performs deep content comparison:
+    ```js
+    const filteredTodos = computed(() => todos.value.filter(t => t.done), {
+        compareFunction: (a, b) => JSON.stringify(a) === JSON.stringify(b),
+    });
+    ```
+
+The first approach is preferred because it avoids extra comparison overhead and works with the default equality check.
+
+> **Note:** A future version of the library may improve the default `compareAny` to perform deep comparison for objects and arrays even when references are equal. However, for now, users must handle this case explicitly when deriving computed values from `Collection` or `ShallowReactive` where the proxy reference remains constant.
+
+### 3.4. Working with Deep Objects
+
+`store2` does **not** automatically track nested mutations (i.e., changes to properties of objects stored inside an `Atom` or `Collection`). This is a deliberate design choice to keep the library lightweight and predictable. Instead, it encourages **immutable updates** or explicit state decomposition.
+
+**Why nested mutations are not detected**:
+
+- `Atom` and `Collection` use reference equality (`===`) by default to detect changes (or a custom `compareFunction`).
+- Mutating a nested property (e.g., `user.value.profile.age = 26`) does **not** change the reference of the top-level object or array.
+- Therefore, `equals` returns `true` and no update is triggered.
+
+**Recommended patterns**:
+
+1. **Immutable updates** – Create a new object/array when updating nested fields:
+
+    ```js
+    const user = atom({ name: 'Alex', profile: { age: 25 } });
+    user.value = { ...user.value, profile: { ...user.value.profile, age: 26 } };
+    ```
+
+    For `Collection`, always return a new array (e.g., `[...all]`) in computed values to break reference equality.
+
+2. **Atomization** – Split deep state into multiple atoms, each responsible for a specific part:
+
+    ```js
+    const userName = atom('Alex');
+    const userAge = atom(25);
+    ```
+
+3. **`makeAutoObservable`** – For classes or deeply nested objects, use `makeAutoObservable` to make all properties reactive automatically (including nested objects and arrays):
+
+    ```js
+    class User {
+        name = 'Alex';
+        profile = { age: 25 };
+        constructor() {
+            makeAutoObservable(this);
+        }
+    }
+    const user = new User();
+    // Now `user.profile.age = 26` triggers reactivity
+    ```
+
+4. **Custom `compareFunction`** – As an escape hatch, provide a deep equality function to `Atom` or `Computed`. However, this can be expensive for large structures; use with caution.
+
+> **Performance note:** Immutable updates and atomization are preferred for predictability and performance. Avoid deep comparisons unless absolutely necessary.
+
 ---
 
 ## 4. Batching and Change Propagation

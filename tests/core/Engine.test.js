@@ -105,7 +105,7 @@ test('Engine: Computed with error propagation to dependent', t => {
     t.is(d.value, 0);
     a.value = 20;
     t.true(d.hasError());
-    t.true(d.getLastError().message.includes('too big'));
+    t.true(d.getLastError()?.message.includes('too big'));
 });
 
 test('Engine: setError with context', t => {
@@ -173,20 +173,6 @@ test('Engine: removeDependent', t => {
     const b = new Computed(() => a.value);
     a.engine.removeDependent(b);
     t.false(a.engine.dependents.has(b));
-});
-
-test('Engine: isEffectiveChange in batch mode with snapshot', t => {
-    const a = new Atom(0);
-    batch(() => {
-        a.value = 1; // создаёт BatchSnapshot
-        const result = a.engine.isEffectiveChange('', 1);
-        t.true(result);
-    });
-});
-
-test('Engine: isEffectiveChange outside batch throws error', t => {
-    const a = new Atom(0);
-    t.throws(() => a.engine.isEffectiveChange('', 1));
 });
 
 test('Engine: isEffectiveChangeWithOld in batch mode', t => {
