@@ -2228,54 +2228,36 @@ class Collection extends ReactiveItem {
              * @returns {boolean} True if the operation succeeded.
              */
             set: (target, key, value) => {
-                // Ignore symbol keys
                 if (typeof key === 'symbol') {
+                    // @ts-ignore
+                    target[key] = value;
                     return true;
                 }
 
                 const engine = that.engine;
                 engine.prepareSetValue();
-                if (target[/** @type {any} */ (key)] === value) {
+
+                // @ts-ignore
+                const oldValue = target[key];
+                if (that.equals(oldValue, value)) {
                     return true;
                 }
+                
+                // @ts-ignore
+                target[key] = value;
 
-                if (key !== 'length') {
-                    const oldValue = target[/** @type {any} */ (key)];
-                    if (that.equals(oldValue, value)) {
-                        return true;
-                    }
-                    target[/** @type {any} */ (key)] = value;
-                    if (that.#length !== target.length) {
-                        const newLength = target.length;
-                        const oldLength = that.#length;
-                        that.#length = newLength;
-                        engine.addUpdate('length', 'set', oldLength, newLength);
-                    }
-                    engine.addUpdate(key, 'set', oldValue, value);
-                } else {
-                    const newLength = /** @type {number} */ (value);
+                if (that.#length !== target.length) {
+                    const newLength = target.length;
                     const oldLength = that.#length;
-                    if (newLength === oldLength) {
-                        return true;
-                    }
-                    if (newLength < oldLength) {
-                        for (let i = newLength; i < oldLength; i++) {
-                            const itemValue = that.#target[i];
-                            engine.addUpdate(i.toString(), 'delete', itemValue, undefined);
-                        }
-                        that.#target.length = newLength;
-                    } else if (newLength > oldLength) {
-                        that.#target.length = newLength;
-                        for (let i = oldLength; i < newLength; i++) {
-                            engine.addUpdate(i.toString(), 'set', that.#target[i], undefined);
-                        }
-                    }
                     that.#length = newLength;
                     engine.addUpdate('length', 'set', oldLength, newLength);
                 }
 
-                engine.valueChangedCallback();
+                if (key !== 'length') {
+                    engine.addUpdate(key, 'set', oldValue, value);
+                }
 
+                engine.valueChangedCallback();
                 return true;
             },
             /**
@@ -2299,8 +2281,11 @@ class Collection extends ReactiveItem {
              */
             deleteProperty: (target, key) => {
                 if (typeof key === 'symbol') {
+                    // @ts-ignore
+                    delete target[key];
                     return true;
                 }
+
                 if (modeController.subscribersMode) {
                     throw new Error(
                         `Collection${this.name ? ` (${this.name})` : ''}: Cannot delete property while subscribers are running`
@@ -2486,6 +2471,12 @@ class ShallowReactive extends ReactiveItem {
              * @returns {boolean} true if the property was successfully set.
              */
             set: (target, key, value) => {
+                if (typeof key === 'symbol') {
+                    // @ts-ignore
+                    target[key] = value;
+                    return true;
+                }
+
                 const engine = that.engine;
                 engine.prepareSetValue();
 
@@ -2523,6 +2514,11 @@ class ShallowReactive extends ReactiveItem {
              * @returns {boolean} true if the property was deleted, false if it was not.
              */
             deleteProperty: (target, key) => {
+                if (typeof key === 'symbol') {
+                    delete target[key];
+                    return true;
+                }
+                
                 if (modeController.subscribersMode) {
                     throw new Error(
                         `ShallowReactive${

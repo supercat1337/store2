@@ -111,6 +111,12 @@ class ShallowReactive extends ReactiveItem {
              * @returns {boolean} true if the property was successfully set.
              */
             set: (target, key, value) => {
+                if (typeof key === 'symbol') {
+                    // @ts-ignore
+                    target[key] = value;
+                    return true;
+                }
+
                 const engine = that.engine;
                 engine.prepareSetValue();
 
@@ -148,6 +154,11 @@ class ShallowReactive extends ReactiveItem {
              * @returns {boolean} true if the property was deleted, false if it was not.
              */
             deleteProperty: (target, key) => {
+                if (typeof key === 'symbol') {
+                    delete target[key];
+                    return true;
+                }
+                
                 if (modeController.subscribersMode) {
                     throw new Error(
                         `ShallowReactive${
