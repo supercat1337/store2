@@ -2287,14 +2287,8 @@ class Collection extends ReactiveItem {
              */
             get: (target, key) => {
                 that.getValue();
-                // Ignore symbol keys
-                if (typeof key === 'symbol') {
-                    return undefined;
-                }
-                if (typeof target[/** @type {any} */ (key)] === 'function') {
-                    return target[/** @type {any} */ (key)];
-                }
-                return target[/** @type {any} */ (key)];
+                // @ts-ignore
+                return target[key];
             },
             /**
              * Intercepts property deletions on the array.
