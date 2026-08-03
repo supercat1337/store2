@@ -4,6 +4,36 @@ This document provides an in‑depth technical overview of the `store2` reactive
 
 ---
 
+## Table of Contents
+
+- [1. High‑Level Architecture](#1-highlevel-architecture)
+- [2. Core Classes](#2-core-classes)
+    - [2.1. ReactiveItem (abstract base)](#21-reactiveitem-abstract-base)
+    - [2.2. Engine](#22-engine)
+    - [2.3. SubscribeController](#23-subscribecontroller)
+    - [2.4. BatchSnapshot](#24-batchsnapshot)
+    - [2.5. UpdateDataRecord](#25-updatedatarecord)
+- [3. Dependency Tracking & Computed Recalculation](#3-dependency-tracking--computed-recalculation)
+    - [3.1. DependencyTracker (global service)](#31-dependencytracker-global-service)
+    - [3.2. Computed Recalculation](#32-computed-recalculation)
+    - [3.3. Important Note: Computed + Collection Reference Stability](#33-important-note-computed--collection-reference-stability)
+    - [3.4. Working with Deep Objects](#34-working-with-deep-objects)
+- [4. Batching and Change Propagation](#4-batching-and-change-propagation)
+    - [4.1. ModeController (global service)](#41-modecontroller-global-service)
+    - [4.2. ChangedItemsController (global service)](#42-changeditemscontroller-global-service)
+    - [4.3. Subscribers Mode](#43-subscribers-mode)
+- [5. Store and ReactiveList Implementation Details](#5-store-and-reactivelist-implementation-details)
+    - [5.1. Store](#51-store)
+    - [5.2. ReactiveList](#52-reactivelist)
+- [6. Error Handling](#6-error-handling)
+- [7. Asynchronous Helpers](#7-asynchronous-helpers)
+- [8. Performance Considerations](#8-performance-considerations)
+- [9. Testing Strategy](#9-testing-strategy)
+- [10. Core Architectural Invariants (Guards for AI)](#10-core-architectural-invariants-guards-for-ai)
+- [11. Common Pitfalls for AI-Generated Code](#11-common-pitfalls-for-ai-generated-code)
+
+---
+
 ## 1. High‑Level Architecture
 
 The library is built around the concept of **Reactive Items**. Every piece of reactive state (atom, computed, collection, shallow reactive) is an instance of `ReactiveItem` (or its subclasses). Each reactive item has an associated **Engine** that manages dependencies, subscribers, and updates.
@@ -213,12 +243,43 @@ The first approach is preferred because it avoids extra comparison overhead and 
 - When a child item changes, it notifies the Store, which collects the update and passes it to its own subscribers.
 - `muteUpdates()` and `unmuteUpdates()` temporarily suppress notifications.
 
+**Example:**
+
+```js
+import { Store, atom, computed } from '@supercat1337/store2';
+
+const store = new Store();
+const count = atom(0);
+const doubled = computed(() => count.value * 2);
+store.addItems({ count, doubled });
+
+store.subscribe(updates => {
+    console.log('Store changed:', Array.from(updates.keys()));
+});
+
+count.value = 5; // logs: Store changed: ['count', 'doubled']
+```
+
 ### 5.2. ReactiveList
 
 - Uses a `Store` internally to hold items indexed by string (e.g., `"0"`, `"1"`).
 - Maintains a separate `Atom` for `length`.
 - When items are added, they are wrapped in `Atom` (for primitives) or `ShallowReactive` (for objects/arrays).
 - Mutations (add, set, remove, splice) are batched using `muteUpdates()`/`unmuteUpdates()` on the internal Store to emit only one notification per operation.
+
+**Example:**
+
+```js
+import { ReactiveList } from '@supercat1337/store2';
+
+const list = new ReactiveList();
+list.subscribe(() => console.log('List changed'));
+
+list.add('a', 'b', 'c'); // internal store gets keys '0','1','2'
+list.setItem(1, 'x'); // updates value at index 1
+list.removeItem(0); // removes first item, reindexes
+console.log(list.toArray()); // ['x', 'c']
+```
 
 ---
 
@@ -244,6 +305,12 @@ The first approach is preferred because it avoids extra comparison overhead and 
 - `smartRecompute` avoids recomputing when dependencies change but the final value remains the same.
 - Proxies (for `Collection` and `ShallowReactive`) intercept only property access/set, with minimal overhead.
 
+**Additional guidance:**
+
+- For large collections (>10,000 items), prefer `Collection` over `ShallowReactive` for arrays to avoid proxy overhead on each element.
+- Avoid deep `compareFunction` in `computed` – use immutable updates instead.
+- Use `batch()` for bulk updates to reduce notification overhead.
+
 ---
 
 ## 9. Testing Strategy
@@ -261,6 +328,47 @@ When modifying code or writing complex workflows, ensure these core engine rules
 1. **No Mutations in Subscribers (State Lockdown):** Modifying any reactive state inside a `subscribe()` callback or during the notification phase is strictly forbidden. It will throw an error due to `subscribersMode` being active. Use `runInAction()` to defer side-effect mutations.
 2. **Zombie State Prevention:** Once `destroy()` is invoked on a `ReactiveItem`, its entire engine graph is torn down. Any subsequent operations (reads/writes) except `isDestroyed` must check for lifecycle validity and will throw errors if handled incorrectly.
 3. **Deterministic Graph Sorting:** The global `changedItemsController` relies on the deterministic, sequential numeric `id` generated by `idService` to sort elements before firing subscribers. Never bypass or manually mock item IDs in production tracks.
+
+---
+
+## 11. Common Pitfalls for AI-Generated Code
+
+When generating code that uses `store2`, be aware of these frequent mistakes to avoid bugs and unexpected behavior:
+
+1. **Mutating nested objects directly**  
+   ❌ `user.value.profile.age = 26` – does not trigger reactivity.  
+   ✅ Always use immutable updates: `user.value = { ...user.value, profile: { ...user.value.profile, age: 26 } }`  
+   Or use `makeAutoObservable` for deep reactivity.
+
+2. **Destructuring reactive values**  
+   ❌ `const { value } = atom` – breaks reactivity.  
+   ✅ Always use `atom.value` directly in tracked contexts (autorun, computed, reaction).
+
+3. **Forgetting to return a new array from `computed` that depends on `Collection`**  
+   ❌ `computed(() => collection.value.filter(...))` – won't update because the proxy reference stays the same.  
+   ✅ `computed(() => [...collection.value.filter(...)])` – returns a new array.
+
+4. **Modifying state inside `subscribe()`**  
+   ❌ `atom.subscribe(() => { anotherAtom.value = ... })` – throws because `subscribersMode` is active.  
+   ✅ Use `runInAction(() => { anotherAtom.value = ... })` to defer the mutation.
+
+5. **Using `autorun` with conditional dependencies**  
+   ❌ `autorun(() => { if (flag.value) { use(a.value) } })` – if `flag` is false on first run, `a` is never tracked.  
+   ✅ Use `computed` for conditional logic or ensure all dependencies are read unconditionally.
+
+6. **Not cleaning up subscriptions**  
+   ❌ Subscribing without storing the unsubscribe function can cause memory leaks.  
+   ✅ Store the returned unsubscribe function and call it when the component/effect is disposed.
+
+7. **Using `peekValue()` inside an `autorun`**  
+   ❌ `autorun(() => { console.log(atom.peekValue()) })` – this does NOT track the atom, so changes won't trigger the effect.  
+   ✅ Use `.value` to establish a dependency.
+
+8. **Assuming `batch()` automatically returns a promise**  
+   ❌ `await batch(() => { ... })` – `batch` is synchronous and does not return a promise.  
+   ✅ Use `batch` synchronously; for async workflows, call `batch` inside async functions.
+
+By following these guidelines, AI-generated code will work correctly and efficiently with `store2`.
 
 ---
 
