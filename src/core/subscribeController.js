@@ -4,10 +4,6 @@ import { EventEmitter } from '@supercat1337/event-emitter';
 import { debounce } from '../helpers/tools.js';
 
 /**
- * @typedef {() => void} Unsubscriber
- */
-
-/**
  * Manages change subscriptions and lifecycle hooks for a reactive item.
  * Uses a single EventEmitter for all events: 'change' and 'destroy'.
  */
@@ -30,9 +26,9 @@ class SubscribeController {
     /**
      * Subscribes a callback to the 'change' event.
      *
-     * @param {(updates: Map<string, import("./UpdateDataRecord.js").UpdateDataRecord>) => void} fn
+     * @param {(updates: Map<string, UpdateDataRecord>) => void} fn
      * @param {{ delay?: number, signal?: AbortSignal }} [options]
-     * @returns {Unsubscriber}
+     * @returns {() => void}
      */
     subscribe(fn, options) {
         const { delay = 0, signal } = options || {};
@@ -75,7 +71,7 @@ class SubscribeController {
     /**
      * Registers a callback that fires when the first 'change' subscriber is added.
      * @param {() => void} callback
-     * @returns {Unsubscriber}
+     * @returns {() => void}
      */
     onHasSubscribers(callback) {
         return this.#emitter.onHasEventListeners('change', () => callback());
@@ -84,7 +80,7 @@ class SubscribeController {
     /**
      * Registers a callback that fires when the last 'change' subscriber is removed.
      * @param {() => void} callback
-     * @returns {Unsubscriber}
+     * @returns {() => void}
      */
     onNoSubscribers(callback) {
         return this.#emitter.onNoEventListeners('change', () => callback());
@@ -93,7 +89,7 @@ class SubscribeController {
     /**
      * Registers a callback that fires when the controller is destroyed.
      * @param {() => void} callback
-     * @returns {Unsubscriber}
+     * @returns {() => void}
      */
     onDestroy(callback) {
         return this.#emitter.on('destroy', callback);

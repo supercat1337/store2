@@ -335,10 +335,6 @@ function getItemNamesFromSet(
 
 
 /**
- * @typedef {() => void} Unsubscriber
- */
-
-/**
  * Manages change subscriptions and lifecycle hooks for a reactive item.
  * Uses a single EventEmitter for all events: 'change' and 'destroy'.
  */
@@ -361,9 +357,9 @@ class SubscribeController {
     /**
      * Subscribes a callback to the 'change' event.
      *
-     * @param {(updates: Map<string, import("./UpdateDataRecord.js").UpdateDataRecord>) => void} fn
+     * @param {(updates: Map<string, UpdateDataRecord>) => void} fn
      * @param {{ delay?: number, signal?: AbortSignal }} [options]
-     * @returns {Unsubscriber}
+     * @returns {() => void}
      */
     subscribe(fn, options) {
         const { delay = 0, signal } = options || {};
@@ -406,7 +402,7 @@ class SubscribeController {
     /**
      * Registers a callback that fires when the first 'change' subscriber is added.
      * @param {() => void} callback
-     * @returns {Unsubscriber}
+     * @returns {() => void}
      */
     onHasSubscribers(callback) {
         return this.#emitter.onHasEventListeners('change', () => callback());
@@ -415,7 +411,7 @@ class SubscribeController {
     /**
      * Registers a callback that fires when the last 'change' subscriber is removed.
      * @param {() => void} callback
-     * @returns {Unsubscriber}
+     * @returns {() => void}
      */
     onNoSubscribers(callback) {
         return this.#emitter.onNoEventListeners('change', () => callback());
@@ -424,7 +420,7 @@ class SubscribeController {
     /**
      * Registers a callback that fires when the controller is destroyed.
      * @param {() => void} callback
-     * @returns {Unsubscriber}
+     * @returns {() => void}
      */
     onDestroy(callback) {
         return this.#emitter.on('destroy', callback);
@@ -979,28 +975,6 @@ class Engine {
     }
 
     /**
-     * Determines whether a change actually affects the final value (considering batch).
-     * @param {string} property - The property key.
-     * @param {any} newValue - The new value.
-     * @returns {boolean} True if the change is effective.
-     */
-    isEffectiveChange(property, newValue) {
-        let effectiveOld;
-        if (modeController.batchMode && this.#batchSnapshot?.has(property)) {
-            effectiveOld = this.#batchSnapshot.getOriginal(property);
-        } else {
-            // When not in batch or property not recorded, we treat oldValue as unknown.
-            // In practice, this method is called after recordChange, so oldValue is known.
-            // We'll rely on the caller passing the correct oldValue, but here we need a baseline.
-            // For simplicity, we assume that if no snapshot, the change is always effective?
-            // Better to have the caller pass oldValue. We'll change signature.
-            // But to keep compatibility with existing calls, we'll require oldValue parameter.
-            throw new Error('isEffectiveChange requires oldValue when not in batch mode');
-        }
-        return !this.reactiveItem.equals(effectiveOld, newValue);
-    }
-
-    /**
      * Alternative version that accepts explicit oldValue (preferred).
      * @param {string} property - The property key.
      * @param {any} oldValue - The previous value (immediate before this change).
@@ -1032,7 +1006,7 @@ class Engine {
             compareOld = original;
         }
 
-        // 1. Проверяем, произошла ли реальная мутация (изменение значения)
+        // 1. Check if the actual mutation (value change) occurred
         const hasMutation =
             property === '' ? !this.reactiveItem.equals(oldValue, newValue) : oldValue !== newValue;
 
@@ -1040,24 +1014,24 @@ class Engine {
             return false;
         }
 
-        // 2. Всегда уведомляем зависимых и добавляем элемент в changedItemsController
-        //    (даже если в batch и значение позже вернётся к исходному)
+        // 2. Always notify dependents and add item to changedItemsController
+        //    (even if in batch and value reverts later)
         this.notifyDependents(EngineMessages.DEPENDENCY_CHANGED);
         changedItemsController.addItem(this.reactiveItem);
 
-        // 3. Определяем, изменилось ли значение относительно стабильного (или старого вне batch)
+        // 3. Determine if the value changed relative to the stable (or old outside batch) value
         const isEffective =
             property === ''
                 ? !this.reactiveItem.equals(compareOld, newValue)
                 : compareOld !== newValue;
 
         if (!isEffective) {
-            // Значение вернулось к исходному – удаляем запись обновления
+            // Value reverted to original – remove the update record
             this.updates.delete(property);
             return false;
         }
 
-        // 4. Создаём или обновляем запись в updates
+        // 4. Create or update the record in updates
         const record = new UpdateDataRecord(type, reportedOld, newValue, this.reactiveItem);
         this.updates.set(property, record);
         this.version++;
@@ -1497,7 +1471,7 @@ class ReactiveItem {
 
     /**
      * Subscribes a function to be called whenever the value of this reactive item changes.
-     * @param {(updates: Map<string, import("../core/UpdateDataRecord.js").UpdateDataRecord>)=>void} fn - The function to be called whenever the value of this reactive item changes.
+     * @param {(updates: Map<string, UpdateDataRecord>)=>void} fn - The function to be called whenever the value of this reactive item changes.
      * @param {object} [options] - Optional options.
      * @param {number} [options.delay] - The delay in milliseconds before the function is called.
      * @param {AbortSignal} [options.signal] - The signal to abort the subscription.
@@ -2628,7 +2602,7 @@ class Store {
     /** @type {Map<string, Set<Function>>} */
     #unsubscribers = new Map();
 
-    /** @type {Map<string, import("../core/UpdateDataRecord.js").UpdateDataRecord>} */
+    /** @type {Map<string, UpdateDataRecord>} */
     #updates;
 
     /** @type {UpdateDataRecordManager} */
@@ -2653,7 +2627,7 @@ class Store {
         });
 
         this.#subscriber = (
-            /** @type {Map<string, import("../core/UpdateDataRecord.js").UpdateDataRecord>} */ updates,
+            /** @type {Map<string, UpdateDataRecord>} */ updates,
             /** @type {Store} */ store
         ) => {
             const storeName = that.#keys.get(store) || '';
@@ -3060,7 +3034,7 @@ class Store {
 
     /**
      * Subscribes a function to be called whenever the value of this Store changes.
-     * @param {(update: Map<string, import("../core/UpdateDataRecord.js").UpdateDataRecord>, store: Store)=>void} fn
+     * @param {(update: Map<string, UpdateDataRecord>, store: Store)=>void} fn
      * @returns {()=>void}
      */
     subscribe(fn) {
@@ -3149,7 +3123,7 @@ function isReactiveWrapper(item) {
  * The list supports adding, removing, updating, and splicing items while maintaining
  * full reactivity. Subscribers are notified only once per batch of changes.
  *
- * @template {{[key:string]:any}} T
+ * @template T
  *
  * @example
  * ```js
@@ -3482,7 +3456,7 @@ class ReactiveList {
      * Subscribes a callback to be invoked whenever the list changes.
      * The callback receives a Map of updates with details about changed items.
      *
-     * @param {(updates: Map<string, import("../core/UpdateDataRecord.js").UpdateDataRecord>) => void} fn - The callback function.
+     * @param {(updates: Map<string, UpdateDataRecord>) => void} fn - The callback function.
      * @returns {() => void} A function to unsubscribe the callback.
      */
     subscribe(fn) {
@@ -3501,7 +3475,7 @@ class ReactiveList {
  * This allows the function to be re-executed whenever any of its dependencies change, maintaining
  * up-to-date results.
  *
- * @param {(updates?:Map<string, import("./../core/UpdateDataRecord.js").UpdateDataRecord>)=>void} fn - The function to track and reactively execute.
+ * @param {(updates?:Map<string, UpdateDataRecord>)=>void} fn - The function to track and reactively execute.
  * @param {object} [options] - The options for the autorun function.
  * @param {string} [options.name] - An optional name for the autorun.
  * @param {number} [options.delay] - The number of milliseconds to delay the execution of the callback function.
@@ -3566,7 +3540,7 @@ function autorun(fn, options) {
  * change, allowing for reactive updates based on the data function.
  *
  * @param {()=>any} dataFunction - The function whose reactive dependencies are tracked.
- * @param {(updates?:Map<string, import("../core/UpdateDataRecord.js").UpdateDataRecord>)=>void} fn - The callback function to execute when tracked dependencies change.
+ * @param {(updates?:Map<string, UpdateDataRecord>)=>void} fn - The callback function to execute when tracked dependencies change.
  * @param {object} [options] - The options for the reaction function.
  * @param {string} [options.name] - An optional name for the reaction.
  * @param {number} [options.delay] - The number of milliseconds to delay the execution of the callback function.

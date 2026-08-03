@@ -29,7 +29,7 @@ class Store {
     /** @type {Map<string, Set<Function>>} */
     #unsubscribers = new Map();
 
-    /** @type {Map<string, import("../core/UpdateDataRecord.js").UpdateDataRecord>} */
+    /** @type {Map<string, UpdateDataRecord>} */
     #updates;
 
     /** @type {UpdateDataRecordManager} */
@@ -54,7 +54,7 @@ class Store {
         });
 
         this.#subscriber = (
-            /** @type {Map<string, import("../core/UpdateDataRecord.js").UpdateDataRecord>} */ updates,
+            /** @type {Map<string, UpdateDataRecord>} */ updates,
             /** @type {Store} */ store
         ) => {
             const storeName = that.#keys.get(store) || '';
@@ -461,7 +461,7 @@ class Store {
 
     /**
      * Subscribes a function to be called whenever the value of this Store changes.
-     * @param {(update: Map<string, import("../core/UpdateDataRecord.js").UpdateDataRecord>, store: Store)=>void} fn
+     * @param {(update: Map<string, UpdateDataRecord>, store: Store)=>void} fn
      * @returns {()=>void}
      */
     subscribe(fn) {

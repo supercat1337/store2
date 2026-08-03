@@ -92,7 +92,7 @@ count.value = 1;
 
 #### Defined in
 
-[src/api/api.js:558](https://github.com/supercat1337/store2/blob/9da5639fccaa4ac6e1305ac63d79571e83475e23/src/api/api.js#L558)
+[src/api/api.js:558](https://github.com/supercat1337/store2/blob/0a79678b73c0883858e42307757f633e90a127e5/src/api/api.js#L558)
 
 ___
 
@@ -158,7 +158,7 @@ console.log(a.value, b.value, foo); // 2 2 4
 
 #### Defined in
 
-[src/api/api.js:51](https://github.com/supercat1337/store2/blob/9da5639fccaa4ac6e1305ac63d79571e83475e23/src/api/api.js#L51)
+[src/api/api.js:51](https://github.com/supercat1337/store2/blob/0a79678b73c0883858e42307757f633e90a127e5/src/api/api.js#L51)
 
 ___
 
@@ -207,7 +207,7 @@ console.log(a.value, b.value, foo); // 1 1 2
 
 #### Defined in
 
-[src/api/api.js:342](https://github.com/supercat1337/store2/blob/9da5639fccaa4ac6e1305ac63d79571e83475e23/src/api/api.js#L342)
+[src/api/api.js:342](https://github.com/supercat1337/store2/blob/0a79678b73c0883858e42307757f633e90a127e5/src/api/api.js#L342)
 
 ___
 
@@ -239,7 +239,7 @@ A shallow copy of the object
 
 #### Defined in
 
-[src/helpers/tools.js:174](https://github.com/supercat1337/store2/blob/9da5639fccaa4ac6e1305ac63d79571e83475e23/src/helpers/tools.js#L174)
+[src/helpers/tools.js:175](https://github.com/supercat1337/store2/blob/0a79678b73c0883858e42307757f633e90a127e5/src/helpers/tools.js#L175)
 
 ___
 
@@ -294,7 +294,7 @@ coll.value[0] = 10; // triggers subscriber
 
 #### Defined in
 
-[src/api/api.js:619](https://github.com/supercat1337/store2/blob/9da5639fccaa4ac6e1305ac63d79571e83475e23/src/api/api.js#L619)
+[src/api/api.js:619](https://github.com/supercat1337/store2/blob/0a79678b73c0883858e42307757f633e90a127e5/src/api/api.js#L619)
 
 ___
 
@@ -318,7 +318,7 @@ If objects are not arrays, then check if sorted stringified versions of them are
 
 #### Defined in
 
-[src/helpers/tools.js:115](https://github.com/supercat1337/store2/blob/9da5639fccaa4ac6e1305ac63d79571e83475e23/src/helpers/tools.js#L115)
+[src/helpers/tools.js:115](https://github.com/supercat1337/store2/blob/0a79678b73c0883858e42307757f633e90a127e5/src/helpers/tools.js#L115)
 
 ___
 
@@ -344,7 +344,7 @@ True if the two objects are equal, false otherwise.
 
 #### Defined in
 
-[src/helpers/tools.js:77](https://github.com/supercat1337/store2/blob/9da5639fccaa4ac6e1305ac63d79571e83475e23/src/helpers/tools.js#L77)
+[src/helpers/tools.js:77](https://github.com/supercat1337/store2/blob/0a79678b73c0883858e42307757f633e90a127e5/src/helpers/tools.js#L77)
 
 ___
 
@@ -392,7 +392,7 @@ a.value = 1;
 
 #### Defined in
 
-[src/api/api.js:584](https://github.com/supercat1337/store2/blob/9da5639fccaa4ac6e1305ac63d79571e83475e23/src/api/api.js#L584)
+[src/api/api.js:584](https://github.com/supercat1337/store2/blob/0a79678b73c0883858e42307757f633e90a127e5/src/api/api.js#L584)
 
 ___
 
@@ -427,7 +427,7 @@ window.addEventListener('resize', debounce((evt) => console.log(evt), 250));
 
 #### Defined in
 
-[src/helpers/tools.js:147](https://github.com/supercat1337/store2/blob/9da5639fccaa4ac6e1305ac63d79571e83475e23/src/helpers/tools.js#L147)
+[src/helpers/tools.js:148](https://github.com/supercat1337/store2/blob/0a79678b73c0883858e42307757f633e90a127e5/src/helpers/tools.js#L148)
 
 ___
 
@@ -490,7 +490,7 @@ console.log(foo); // 2
 
 #### Defined in
 
-[src/api/api.js:863](https://github.com/supercat1337/store2/blob/9da5639fccaa4ac6e1305ac63d79571e83475e23/src/api/api.js#L863)
+[src/api/api.js:863](https://github.com/supercat1337/store2/blob/0a79678b73c0883858e42307757f633e90a127e5/src/api/api.js#L863)
 
 ___
 
@@ -551,7 +551,7 @@ await fromPromiseResult.case({
 
 #### Defined in
 
-[src/api/api.js:471](https://github.com/supercat1337/store2/blob/9da5639fccaa4ac6e1305ac63d79571e83475e23/src/api/api.js#L471)
+[src/api/api.js:471](https://github.com/supercat1337/store2/blob/0a79678b73c0883858e42307757f633e90a127e5/src/api/api.js#L471)
 
 ___
 
@@ -578,7 +578,7 @@ A plain object with all property descriptors of the object.
 
 #### Defined in
 
-[src/helpers/tools.js:202](https://github.com/supercat1337/store2/blob/9da5639fccaa4ac6e1305ac63d79571e83475e23/src/helpers/tools.js#L202)
+[src/helpers/tools.js:203](https://github.com/supercat1337/store2/blob/0a79678b73c0883858e42307757f633e90a127e5/src/helpers/tools.js#L203)
 
 ___
 
@@ -631,7 +631,7 @@ getError(undefined).message; // 'undefined'
 
 #### Defined in
 
-[src/helpers/tools.js:239](https://github.com/supercat1337/store2/blob/9da5639fccaa4ac6e1305ac63d79571e83475e23/src/helpers/tools.js#L239)
+[src/helpers/tools.js:240](https://github.com/supercat1337/store2/blob/0a79678b73c0883858e42307757f633e90a127e5/src/helpers/tools.js#L240)
 
 ___
 
@@ -683,7 +683,7 @@ getItemNamesFromSet(set, { fallback: '?', sorted: false });
 
 #### Defined in
 
-[src/helpers/tools.js:265](https://github.com/supercat1337/store2/blob/9da5639fccaa4ac6e1305ac63d79571e83475e23/src/helpers/tools.js#L265)
+[src/helpers/tools.js:266](https://github.com/supercat1337/store2/blob/0a79678b73c0883858e42307757f633e90a127e5/src/helpers/tools.js#L266)
 
 ___
 
@@ -722,7 +722,7 @@ const unsubscribe = now.subscribe(() => {
 
 #### Defined in
 
-[src/api/api.js:413](https://github.com/supercat1337/store2/blob/9da5639fccaa4ac6e1305ac63d79571e83475e23/src/api/api.js#L413)
+[src/api/api.js:413](https://github.com/supercat1337/store2/blob/0a79678b73c0883858e42307757f633e90a127e5/src/api/api.js#L413)
 
 ___
 
@@ -748,7 +748,7 @@ A sorted array of unique reactive items.
 
 #### Defined in
 
-[src/helpers/tools.js:27](https://github.com/supercat1337/store2/blob/9da5639fccaa4ac6e1305ac63d79571e83475e23/src/helpers/tools.js#L27)
+[src/helpers/tools.js:27](https://github.com/supercat1337/store2/blob/0a79678b73c0883858e42307757f633e90a127e5/src/helpers/tools.js#L27)
 
 ___
 
@@ -772,7 +772,7 @@ true if the value is a plain object, false otherwise.
 
 #### Defined in
 
-[src/helpers/tools.js:45](https://github.com/supercat1337/store2/blob/9da5639fccaa4ac6e1305ac63d79571e83475e23/src/helpers/tools.js#L45)
+[src/helpers/tools.js:45](https://github.com/supercat1337/store2/blob/0a79678b73c0883858e42307757f633e90a127e5/src/helpers/tools.js#L45)
 
 ___
 
@@ -834,7 +834,7 @@ console.log(foo); // 3
 
 #### Defined in
 
-[src/api/api.js:907](https://github.com/supercat1337/store2/blob/9da5639fccaa4ac6e1305ac63d79571e83475e23/src/api/api.js#L907)
+[src/api/api.js:907](https://github.com/supercat1337/store2/blob/0a79678b73c0883858e42307757f633e90a127e5/src/api/api.js#L907)
 
 ___
 
@@ -942,7 +942,7 @@ console.log(foo); // 3
 
 #### Defined in
 
-[src/api/api.js:742](https://github.com/supercat1337/store2/blob/9da5639fccaa4ac6e1305ac63d79571e83475e23/src/api/api.js#L742)
+[src/api/api.js:742](https://github.com/supercat1337/store2/blob/0a79678b73c0883858e42307757f633e90a127e5/src/api/api.js#L742)
 
 ___
 
@@ -1014,7 +1014,7 @@ console.log(a.value, b.value, foo); // 2 2 3
 
 #### Defined in
 
-[src/api/api.js:120](https://github.com/supercat1337/store2/blob/9da5639fccaa4ac6e1305ac63d79571e83475e23/src/api/api.js#L120)
+[src/api/api.js:120](https://github.com/supercat1337/store2/blob/0a79678b73c0883858e42307757f633e90a127e5/src/api/api.js#L120)
 
 ___
 
@@ -1057,7 +1057,7 @@ console.log(a.value, b.value, count); // 1 1 1
 
 #### Defined in
 
-[src/api/api.js:303](https://github.com/supercat1337/store2/blob/9da5639fccaa4ac6e1305ac63d79571e83475e23/src/api/api.js#L303)
+[src/api/api.js:303](https://github.com/supercat1337/store2/blob/0a79678b73c0883858e42307757f633e90a127e5/src/api/api.js#L303)
 
 ___
 
@@ -1110,7 +1110,7 @@ reactive.value.b = 5; // triggers subscriber
 
 #### Defined in
 
-[src/api/api.js:652](https://github.com/supercat1337/store2/blob/9da5639fccaa4ac6e1305ac63d79571e83475e23/src/api/api.js#L652)
+[src/api/api.js:652](https://github.com/supercat1337/store2/blob/0a79678b73c0883858e42307757f633e90a127e5/src/api/api.js#L652)
 
 ___
 
@@ -1132,7 +1132,7 @@ A Promise-based sleep function.
 
 #### Defined in
 
-[src/helpers/tools.js:190](https://github.com/supercat1337/store2/blob/9da5639fccaa4ac6e1305ac63d79571e83475e23/src/helpers/tools.js#L190)
+[src/helpers/tools.js:191](https://github.com/supercat1337/store2/blob/0a79678b73c0883858e42307757f633e90a127e5/src/helpers/tools.js#L191)
 
 ___
 
@@ -1159,7 +1159,7 @@ when they are notified of changes.
 
 #### Defined in
 
-[src/helpers/tools.js:14](https://github.com/supercat1337/store2/blob/9da5639fccaa4ac6e1305ac63d79571e83475e23/src/helpers/tools.js#L14)
+[src/helpers/tools.js:14](https://github.com/supercat1337/store2/blob/0a79678b73c0883858e42307757f633e90a127e5/src/helpers/tools.js#L14)
 
 ___
 
@@ -1214,7 +1214,7 @@ console.log(a.value, b.value, foo); // 1 1 2
 
 #### Defined in
 
-[src/api/api.js:380](https://github.com/supercat1337/store2/blob/9da5639fccaa4ac6e1305ac63d79571e83475e23/src/api/api.js#L380)
+[src/api/api.js:380](https://github.com/supercat1337/store2/blob/0a79678b73c0883858e42307757f633e90a127e5/src/api/api.js#L380)
 
 ___
 
@@ -1255,7 +1255,7 @@ a.value = 4; // foo = 1
 
 #### Defined in
 
-[src/api/api.js:247](https://github.com/supercat1337/store2/blob/9da5639fccaa4ac6e1305ac63d79571e83475e23/src/api/api.js#L247)
+[src/api/api.js:247](https://github.com/supercat1337/store2/blob/0a79678b73c0883858e42307757f633e90a127e5/src/api/api.js#L247)
 
 ___
 
@@ -1312,4 +1312,4 @@ a.value = 5; // foo = 2
 
 #### Defined in
 
-[src/api/api.js:195](https://github.com/supercat1337/store2/blob/9da5639fccaa4ac6e1305ac63d79571e83475e23/src/api/api.js#L195)
+[src/api/api.js:195](https://github.com/supercat1337/store2/blob/0a79678b73c0883858e42307757f633e90a127e5/src/api/api.js#L195)

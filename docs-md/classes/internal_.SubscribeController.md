@@ -41,7 +41,7 @@ Uses a single EventEmitter for all events: 'change' and 'destroy'.
 
 #### Defined in
 
-[src/core/subscribeController.js:18](https://github.com/supercat1337/store2/blob/9da5639fccaa4ac6e1305ac63d79571e83475e23/src/core/subscribeController.js#L18)
+[src/core/subscribeController.js:14](https://github.com/supercat1337/store2/blob/0a79678b73c0883858e42307757f633e90a127e5/src/core/subscribeController.js#L14)
 
 ## Properties
 
@@ -51,7 +51,7 @@ Uses a single EventEmitter for all events: 'change' and 'destroy'.
 
 #### Defined in
 
-[src/core/subscribeController.js:16](https://github.com/supercat1337/store2/blob/9da5639fccaa4ac6e1305ac63d79571e83475e23/src/core/subscribeController.js#L16)
+[src/core/subscribeController.js:12](https://github.com/supercat1337/store2/blob/0a79678b73c0883858e42307757f633e90a127e5/src/core/subscribeController.js#L12)
 
 ## Methods
 
@@ -67,7 +67,7 @@ Removes all subscribers, including internal listeners.
 
 #### Defined in
 
-[src/core/subscribeController.js:55](https://github.com/supercat1337/store2/blob/9da5639fccaa4ac6e1305ac63d79571e83475e23/src/core/subscribeController.js#L55)
+[src/core/subscribeController.js:51](https://github.com/supercat1337/store2/blob/0a79678b73c0883858e42307757f633e90a127e5/src/core/subscribeController.js#L51)
 
 ___
 
@@ -84,7 +84,7 @@ Internal listeners (has/no subscribers) remain intact.
 
 #### Defined in
 
-[src/core/subscribeController.js:48](https://github.com/supercat1337/store2/blob/9da5639fccaa4ac6e1305ac63d79571e83475e23/src/core/subscribeController.js#L48)
+[src/core/subscribeController.js:44](https://github.com/supercat1337/store2/blob/0a79678b73c0883858e42307757f633e90a127e5/src/core/subscribeController.js#L44)
 
 ___
 
@@ -100,7 +100,7 @@ Destroys the controller, emits 'destroy', and removes all listeners.
 
 #### Defined in
 
-[src/core/subscribeController.js:70](https://github.com/supercat1337/store2/blob/9da5639fccaa4ac6e1305ac63d79571e83475e23/src/core/subscribeController.js#L70)
+[src/core/subscribeController.js:66](https://github.com/supercat1337/store2/blob/0a79678b73c0883858e42307757f633e90a127e5/src/core/subscribeController.js#L66)
 
 ___
 
@@ -116,7 +116,7 @@ Returns a copy of the current 'change' subscriber list.
 
 #### Defined in
 
-[src/core/subscribeController.js:26](https://github.com/supercat1337/store2/blob/9da5639fccaa4ac6e1305ac63d79571e83475e23/src/core/subscribeController.js#L26)
+[src/core/subscribeController.js:22](https://github.com/supercat1337/store2/blob/0a79678b73c0883858e42307757f633e90a127e5/src/core/subscribeController.js#L22)
 
 ___
 
@@ -132,13 +132,13 @@ Returns whether there are any 'change' subscribers.
 
 #### Defined in
 
-[src/core/subscribeController.js:63](https://github.com/supercat1337/store2/blob/9da5639fccaa4ac6e1305ac63d79571e83475e23/src/core/subscribeController.js#L63)
+[src/core/subscribeController.js:59](https://github.com/supercat1337/store2/blob/0a79678b73c0883858e42307757f633e90a127e5/src/core/subscribeController.js#L59)
 
 ___
 
 ### onDestroy
 
-▸ **onDestroy**(`callback`): [`Unsubscriber`](../modules/internal_.md#unsubscriber)
+▸ **onDestroy**(`callback`): () => `void`
 
 Registers a callback that fires when the controller is destroyed.
 
@@ -150,17 +150,23 @@ Registers a callback that fires when the controller is destroyed.
 
 #### Returns
 
-[`Unsubscriber`](../modules/internal_.md#unsubscriber)
+`fn`
+
+▸ (): `void`
+
+##### Returns
+
+`void`
 
 #### Defined in
 
-[src/core/subscribeController.js:98](https://github.com/supercat1337/store2/blob/9da5639fccaa4ac6e1305ac63d79571e83475e23/src/core/subscribeController.js#L98)
+[src/core/subscribeController.js:94](https://github.com/supercat1337/store2/blob/0a79678b73c0883858e42307757f633e90a127e5/src/core/subscribeController.js#L94)
 
 ___
 
 ### onHasSubscribers
 
-▸ **onHasSubscribers**(`callback`): [`Unsubscriber`](../modules/internal_.md#unsubscriber)
+▸ **onHasSubscribers**(`callback`): () => `void`
 
 Registers a callback that fires when the first 'change' subscriber is added.
 
@@ -172,17 +178,23 @@ Registers a callback that fires when the first 'change' subscriber is added.
 
 #### Returns
 
-[`Unsubscriber`](../modules/internal_.md#unsubscriber)
+`fn`
+
+▸ (): `void`
+
+##### Returns
+
+`void`
 
 #### Defined in
 
-[src/core/subscribeController.js:80](https://github.com/supercat1337/store2/blob/9da5639fccaa4ac6e1305ac63d79571e83475e23/src/core/subscribeController.js#L80)
+[src/core/subscribeController.js:76](https://github.com/supercat1337/store2/blob/0a79678b73c0883858e42307757f633e90a127e5/src/core/subscribeController.js#L76)
 
 ___
 
 ### onNoSubscribers
 
-▸ **onNoSubscribers**(`callback`): [`Unsubscriber`](../modules/internal_.md#unsubscriber)
+▸ **onNoSubscribers**(`callback`): () => `void`
 
 Registers a callback that fires when the last 'change' subscriber is removed.
 
@@ -194,17 +206,23 @@ Registers a callback that fires when the last 'change' subscriber is removed.
 
 #### Returns
 
-[`Unsubscriber`](../modules/internal_.md#unsubscriber)
+`fn`
+
+▸ (): `void`
+
+##### Returns
+
+`void`
 
 #### Defined in
 
-[src/core/subscribeController.js:89](https://github.com/supercat1337/store2/blob/9da5639fccaa4ac6e1305ac63d79571e83475e23/src/core/subscribeController.js#L89)
+[src/core/subscribeController.js:85](https://github.com/supercat1337/store2/blob/0a79678b73c0883858e42307757f633e90a127e5/src/core/subscribeController.js#L85)
 
 ___
 
 ### subscribe
 
-▸ **subscribe**(`fn`, `options?`): [`Unsubscriber`](../modules/internal_.md#unsubscriber)
+▸ **subscribe**(`fn`, `options?`): () => `void`
 
 Subscribes a callback to the 'change' event.
 
@@ -219,8 +237,14 @@ Subscribes a callback to the 'change' event.
 
 #### Returns
 
-[`Unsubscriber`](../modules/internal_.md#unsubscriber)
+`fn`
+
+▸ (): `void`
+
+##### Returns
+
+`void`
 
 #### Defined in
 
-[src/core/subscribeController.js:37](https://github.com/supercat1337/store2/blob/9da5639fccaa4ac6e1305ac63d79571e83475e23/src/core/subscribeController.js#L37)
+[src/core/subscribeController.js:33](https://github.com/supercat1337/store2/blob/0a79678b73c0883858e42307757f633e90a127e5/src/core/subscribeController.js#L33)

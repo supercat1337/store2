@@ -30,7 +30,6 @@
 - [CompareFunction](internal_.md#comparefunction)
 - [IteratorResult](internal_.md#iteratorresult)
 - [Record](internal_.md#record)
-- [Unsubscriber](internal_.md#unsubscriber)
 - [WeakKey](internal_.md#weakkey)
 
 ## Type Aliases
@@ -56,7 +55,7 @@
 
 #### Defined in
 
-[src/types.d.ts:2](https://github.com/supercat1337/store2/blob/9da5639fccaa4ac6e1305ac63d79571e83475e23/src/types.d.ts#L2)
+[src/types.d.ts:3](https://github.com/supercat1337/store2/blob/0a79678b73c0883858e42307757f633e90a127e5/src/types.d.ts#L3)
 
 ___
 
@@ -93,24 +92,6 @@ Construct a type with a set of properties K of type T
 #### Defined in
 
 node_modules/typescript/lib/lib.es5.d.ts:1606
-
-___
-
-### Unsubscriber
-
-Ƭ **Unsubscriber**\<\>: () => `void`
-
-#### Type declaration
-
-▸ (): `void`
-
-##### Returns
-
-`void`
-
-#### Defined in
-
-[src/core/subscribeController.js:7](https://github.com/supercat1337/store2/blob/9da5639fccaa4ac6e1305ac63d79571e83475e23/src/core/subscribeController.js#L7)
 
 ___
 

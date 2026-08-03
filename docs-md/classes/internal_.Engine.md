@@ -47,7 +47,6 @@
 - [getDeepDependentsArray](internal_.Engine.md#getdeepdependentsarray)
 - [getMessage](internal_.Engine.md#getmessage)
 - [hasUpdates](internal_.Engine.md#hasupdates)
-- [isEffectiveChange](internal_.Engine.md#iseffectivechange)
 - [isEffectiveChangeWithOld](internal_.Engine.md#iseffectivechangewithold)
 - [notifyDependencies](internal_.Engine.md#notifydependencies)
 - [notifyDependents](internal_.Engine.md#notifydependents)
@@ -78,7 +77,7 @@ Creates an Engine instance.
 
 #### Defined in
 
-[src/core/Engine.js:109](https://github.com/supercat1337/store2/blob/9da5639fccaa4ac6e1305ac63d79571e83475e23/src/core/Engine.js#L109)
+[src/core/Engine.js:109](https://github.com/supercat1337/store2/blob/0a79678b73c0883858e42307757f633e90a127e5/src/core/Engine.js#L109)
 
 ## Properties
 
@@ -90,7 +89,7 @@ Snapshot of original values when inside a batch.
 
 #### Defined in
 
-[src/core/Engine.js:90](https://github.com/supercat1337/store2/blob/9da5639fccaa4ac6e1305ac63d79571e83475e23/src/core/Engine.js#L90)
+[src/core/Engine.js:90](https://github.com/supercat1337/store2/blob/0a79678b73c0883858e42307757f633e90a127e5/src/core/Engine.js#L90)
 
 ___
 
@@ -100,7 +99,7 @@ ___
 
 #### Defined in
 
-[src/core/Engine.js:70](https://github.com/supercat1337/store2/blob/9da5639fccaa4ac6e1305ac63d79571e83475e23/src/core/Engine.js#L70)
+[src/core/Engine.js:70](https://github.com/supercat1337/store2/blob/0a79678b73c0883858e42307757f633e90a127e5/src/core/Engine.js#L70)
 
 ___
 
@@ -112,7 +111,7 @@ Comparison function for equality.
 
 #### Defined in
 
-[src/core/Engine.js:96](https://github.com/supercat1337/store2/blob/9da5639fccaa4ac6e1305ac63d79571e83475e23/src/core/Engine.js#L96)
+[src/core/Engine.js:96](https://github.com/supercat1337/store2/blob/0a79678b73c0883858e42307757f633e90a127e5/src/core/Engine.js#L96)
 
 ___
 
@@ -124,7 +123,7 @@ The set of dependencies of the engine.
 
 #### Defined in
 
-[src/core/Engine.js:29](https://github.com/supercat1337/store2/blob/9da5639fccaa4ac6e1305ac63d79571e83475e23/src/core/Engine.js#L29)
+[src/core/Engine.js:29](https://github.com/supercat1337/store2/blob/0a79678b73c0883858e42307757f633e90a127e5/src/core/Engine.js#L29)
 
 ___
 
@@ -136,7 +135,7 @@ The set of dependents of the engine.
 
 #### Defined in
 
-[src/core/Engine.js:35](https://github.com/supercat1337/store2/blob/9da5639fccaa4ac6e1305ac63d79571e83475e23/src/core/Engine.js#L35)
+[src/core/Engine.js:35](https://github.com/supercat1337/store2/blob/0a79678b73c0883858e42307757f633e90a127e5/src/core/Engine.js#L35)
 
 ___
 
@@ -148,7 +147,7 @@ Unique identifier for ordering.
 
 #### Defined in
 
-[src/core/Engine.js:41](https://github.com/supercat1337/store2/blob/9da5639fccaa4ac6e1305ac63d79571e83475e23/src/core/Engine.js#L41)
+[src/core/Engine.js:41](https://github.com/supercat1337/store2/blob/0a79678b73c0883858e42307757f633e90a127e5/src/core/Engine.js#L41)
 
 ___
 
@@ -160,7 +159,7 @@ Indicates whether the engine has been destroyed.
 
 #### Defined in
 
-[src/core/Engine.js:65](https://github.com/supercat1337/store2/blob/9da5639fccaa4ac6e1305ac63d79571e83475e23/src/core/Engine.js#L65)
+[src/core/Engine.js:65](https://github.com/supercat1337/store2/blob/0a79678b73c0883858e42307757f633e90a127e5/src/core/Engine.js#L65)
 
 ___
 
@@ -172,7 +171,7 @@ Reference to the reactive item.
 
 #### Defined in
 
-[src/core/Engine.js:53](https://github.com/supercat1337/store2/blob/9da5639fccaa4ac6e1305ac63d79571e83475e23/src/core/Engine.js#L53)
+[src/core/Engine.js:53](https://github.com/supercat1337/store2/blob/0a79678b73c0883858e42307757f633e90a127e5/src/core/Engine.js#L53)
 
 ___
 
@@ -184,7 +183,7 @@ Flag indicating that the value should be recalculated.
 
 #### Defined in
 
-[src/core/Engine.js:59](https://github.com/supercat1337/store2/blob/9da5639fccaa4ac6e1305ac63d79571e83475e23/src/core/Engine.js#L59)
+[src/core/Engine.js:59](https://github.com/supercat1337/store2/blob/0a79678b73c0883858e42307757f633e90a127e5/src/core/Engine.js#L59)
 
 ___
 
@@ -194,7 +193,7 @@ ___
 
 #### Defined in
 
-[src/core/Engine.js:72](https://github.com/supercat1337/store2/blob/9da5639fccaa4ac6e1305ac63d79571e83475e23/src/core/Engine.js#L72)
+[src/core/Engine.js:72](https://github.com/supercat1337/store2/blob/0a79678b73c0883858e42307757f633e90a127e5/src/core/Engine.js#L72)
 
 ___
 
@@ -206,7 +205,7 @@ Prevents updates from being propagated (used during mass updates).
 
 #### Defined in
 
-[src/core/Engine.js:102](https://github.com/supercat1337/store2/blob/9da5639fccaa4ac6e1305ac63d79571e83475e23/src/core/Engine.js#L102)
+[src/core/Engine.js:102](https://github.com/supercat1337/store2/blob/0a79678b73c0883858e42307757f633e90a127e5/src/core/Engine.js#L102)
 
 ___
 
@@ -218,7 +217,7 @@ The type of the reactive item.
 
 #### Defined in
 
-[src/core/Engine.js:78](https://github.com/supercat1337/store2/blob/9da5639fccaa4ac6e1305ac63d79571e83475e23/src/core/Engine.js#L78)
+[src/core/Engine.js:78](https://github.com/supercat1337/store2/blob/0a79678b73c0883858e42307757f633e90a127e5/src/core/Engine.js#L78)
 
 ___
 
@@ -230,7 +229,7 @@ Map of pending updates (property -> UpdateDataRecord).
 
 #### Defined in
 
-[src/core/Engine.js:84](https://github.com/supercat1337/store2/blob/9da5639fccaa4ac6e1305ac63d79571e83475e23/src/core/Engine.js#L84)
+[src/core/Engine.js:84](https://github.com/supercat1337/store2/blob/0a79678b73c0883858e42307757f633e90a127e5/src/core/Engine.js#L84)
 
 ___
 
@@ -242,7 +241,7 @@ Version number (currently unused, kept for potential future use).
 
 #### Defined in
 
-[src/core/Engine.js:47](https://github.com/supercat1337/store2/blob/9da5639fccaa4ac6e1305ac63d79571e83475e23/src/core/Engine.js#L47)
+[src/core/Engine.js:47](https://github.com/supercat1337/store2/blob/0a79678b73c0883858e42307757f633e90a127e5/src/core/Engine.js#L47)
 
 ## Accessors
 
@@ -256,7 +255,7 @@ Version number (currently unused, kept for potential future use).
 
 #### Defined in
 
-[src/core/Engine.js:115](https://github.com/supercat1337/store2/blob/9da5639fccaa4ac6e1305ac63d79571e83475e23/src/core/Engine.js#L115)
+[src/core/Engine.js:115](https://github.com/supercat1337/store2/blob/0a79678b73c0883858e42307757f633e90a127e5/src/core/Engine.js#L115)
 
 ## Methods
 
@@ -283,7 +282,7 @@ True if committed (i.e., value actually changed).
 
 #### Defined in
 
-[src/core/Engine.js:178](https://github.com/supercat1337/store2/blob/9da5639fccaa4ac6e1305ac63d79571e83475e23/src/core/Engine.js#L178)
+[src/core/Engine.js:156](https://github.com/supercat1337/store2/blob/0a79678b73c0883858e42307757f633e90a127e5/src/core/Engine.js#L156)
 
 ___
 
@@ -306,7 +305,7 @@ Records a change attempt. In batch mode, stores the original value.
 
 #### Defined in
 
-[src/core/Engine.js:124](https://github.com/supercat1337/store2/blob/9da5639fccaa4ac6e1305ac63d79571e83475e23/src/core/Engine.js#L124)
+[src/core/Engine.js:124](https://github.com/supercat1337/store2/blob/0a79678b73c0883858e42307757f633e90a127e5/src/core/Engine.js#L124)
 
 ___
 
@@ -328,7 +327,7 @@ Adds dependencies to this engine.
 
 #### Defined in
 
-[src/core/Engine.js:236](https://github.com/supercat1337/store2/blob/9da5639fccaa4ac6e1305ac63d79571e83475e23/src/core/Engine.js#L236)
+[src/core/Engine.js:214](https://github.com/supercat1337/store2/blob/0a79678b73c0883858e42307757f633e90a127e5/src/core/Engine.js#L214)
 
 ___
 
@@ -350,7 +349,7 @@ Adds a single dependency.
 
 #### Defined in
 
-[src/core/Engine.js:254](https://github.com/supercat1337/store2/blob/9da5639fccaa4ac6e1305ac63d79571e83475e23/src/core/Engine.js#L254)
+[src/core/Engine.js:232](https://github.com/supercat1337/store2/blob/0a79678b73c0883858e42307757f633e90a127e5/src/core/Engine.js#L232)
 
 ___
 
@@ -372,7 +371,7 @@ Adds a dependent.
 
 #### Defined in
 
-[src/core/Engine.js:265](https://github.com/supercat1337/store2/blob/9da5639fccaa4ac6e1305ac63d79571e83475e23/src/core/Engine.js#L265)
+[src/core/Engine.js:243](https://github.com/supercat1337/store2/blob/0a79678b73c0883858e42307757f633e90a127e5/src/core/Engine.js#L243)
 
 ___
 
@@ -399,7 +398,7 @@ True if an update was added.
 
 #### Defined in
 
-[src/core/Engine.js:227](https://github.com/supercat1337/store2/blob/9da5639fccaa4ac6e1305ac63d79571e83475e23/src/core/Engine.js#L227)
+[src/core/Engine.js:205](https://github.com/supercat1337/store2/blob/0a79678b73c0883858e42307757f633e90a127e5/src/core/Engine.js#L205)
 
 ___
 
@@ -418,7 +417,7 @@ True if any changes remain.
 
 #### Defined in
 
-[src/core/Engine.js:439](https://github.com/supercat1337/store2/blob/9da5639fccaa4ac6e1305ac63d79571e83475e23/src/core/Engine.js#L439)
+[src/core/Engine.js:417](https://github.com/supercat1337/store2/blob/0a79678b73c0883858e42307757f633e90a127e5/src/core/Engine.js#L417)
 
 ___
 
@@ -434,7 +433,7 @@ Clears the current error.
 
 #### Defined in
 
-[src/core/Engine.js:390](https://github.com/supercat1337/store2/blob/9da5639fccaa4ac6e1305ac63d79571e83475e23/src/core/Engine.js#L390)
+[src/core/Engine.js:368](https://github.com/supercat1337/store2/blob/0a79678b73c0883858e42307757f633e90a127e5/src/core/Engine.js#L368)
 
 ___
 
@@ -450,7 +449,7 @@ Clears all pending updates.
 
 #### Defined in
 
-[src/core/Engine.js:422](https://github.com/supercat1337/store2/blob/9da5639fccaa4ac6e1305ac63d79571e83475e23/src/core/Engine.js#L422)
+[src/core/Engine.js:400](https://github.com/supercat1337/store2/blob/0a79678b73c0883858e42307757f633e90a127e5/src/core/Engine.js#L400)
 
 ___
 
@@ -474,7 +473,7 @@ Destroys the engine.
 
 #### Defined in
 
-[src/core/Engine.js:398](https://github.com/supercat1337/store2/blob/9da5639fccaa4ac6e1305ac63d79571e83475e23/src/core/Engine.js#L398)
+[src/core/Engine.js:376](https://github.com/supercat1337/store2/blob/0a79678b73c0883858e42307757f633e90a127e5/src/core/Engine.js#L376)
 
 ___
 
@@ -490,7 +489,7 @@ Returns all dependents recursively.
 
 #### Defined in
 
-[src/core/Engine.js:287](https://github.com/supercat1337/store2/blob/9da5639fccaa4ac6e1305ac63d79571e83475e23/src/core/Engine.js#L287)
+[src/core/Engine.js:265](https://github.com/supercat1337/store2/blob/0a79678b73c0883858e42307757f633e90a127e5/src/core/Engine.js#L265)
 
 ___
 
@@ -506,7 +505,7 @@ Returns sorted array of deep dependents.
 
 #### Defined in
 
-[src/core/Engine.js:311](https://github.com/supercat1337/store2/blob/9da5639fccaa4ac6e1305ac63d79571e83475e23/src/core/Engine.js#L311)
+[src/core/Engine.js:289](https://github.com/supercat1337/store2/blob/0a79678b73c0883858e42307757f633e90a127e5/src/core/Engine.js#L289)
 
 ___
 
@@ -531,7 +530,7 @@ Handles incoming messages.
 
 #### Defined in
 
-[src/core/Engine.js:349](https://github.com/supercat1337/store2/blob/9da5639fccaa4ac6e1305ac63d79571e83475e23/src/core/Engine.js#L349)
+[src/core/Engine.js:327](https://github.com/supercat1337/store2/blob/0a79678b73c0883858e42307757f633e90a127e5/src/core/Engine.js#L327)
 
 ___
 
@@ -547,32 +546,7 @@ Checks if there are any pending updates.
 
 #### Defined in
 
-[src/core/Engine.js:430](https://github.com/supercat1337/store2/blob/9da5639fccaa4ac6e1305ac63d79571e83475e23/src/core/Engine.js#L430)
-
-___
-
-### isEffectiveChange
-
-▸ **isEffectiveChange**(`property`, `newValue`): `boolean`
-
-Determines whether a change actually affects the final value (considering batch).
-
-#### Parameters
-
-| Name | Type | Description |
-| :------ | :------ | :------ |
-| `property` | `string` | The property key. |
-| `newValue` | `any` | The new value. |
-
-#### Returns
-
-`boolean`
-
-True if the change is effective.
-
-#### Defined in
-
-[src/core/Engine.js:139](https://github.com/supercat1337/store2/blob/9da5639fccaa4ac6e1305ac63d79571e83475e23/src/core/Engine.js#L139)
+[src/core/Engine.js:408](https://github.com/supercat1337/store2/blob/0a79678b73c0883858e42307757f633e90a127e5/src/core/Engine.js#L408)
 
 ___
 
@@ -596,7 +570,7 @@ Alternative version that accepts explicit oldValue (preferred).
 
 #### Defined in
 
-[src/core/Engine.js:162](https://github.com/supercat1337/store2/blob/9da5639fccaa4ac6e1305ac63d79571e83475e23/src/core/Engine.js#L162)
+[src/core/Engine.js:140](https://github.com/supercat1337/store2/blob/0a79678b73c0883858e42307757f633e90a127e5/src/core/Engine.js#L140)
 
 ___
 
@@ -621,7 +595,7 @@ Notifies dependencies (reverse direction).
 
 #### Defined in
 
-[src/core/Engine.js:337](https://github.com/supercat1337/store2/blob/9da5639fccaa4ac6e1305ac63d79571e83475e23/src/core/Engine.js#L337)
+[src/core/Engine.js:315](https://github.com/supercat1337/store2/blob/0a79678b73c0883858e42307757f633e90a127e5/src/core/Engine.js#L315)
 
 ___
 
@@ -646,7 +620,7 @@ Notifies dependents of a message.
 
 #### Defined in
 
-[src/core/Engine.js:322](https://github.com/supercat1337/store2/blob/9da5639fccaa4ac6e1305ac63d79571e83475e23/src/core/Engine.js#L322)
+[src/core/Engine.js:300](https://github.com/supercat1337/store2/blob/0a79678b73c0883858e42307757f633e90a127e5/src/core/Engine.js#L300)
 
 ___
 
@@ -666,7 +640,7 @@ If destroyed or in subscribers mode.
 
 #### Defined in
 
-[src/core/Engine.js:486](https://github.com/supercat1337/store2/blob/9da5639fccaa4ac6e1305ac63d79571e83475e23/src/core/Engine.js#L486)
+[src/core/Engine.js:464](https://github.com/supercat1337/store2/blob/0a79678b73c0883858e42307757f633e90a127e5/src/core/Engine.js#L464)
 
 ___
 
@@ -688,7 +662,7 @@ Removes a dependent.
 
 #### Defined in
 
-[src/core/Engine.js:279](https://github.com/supercat1337/store2/blob/9da5639fccaa4ac6e1305ac63d79571e83475e23/src/core/Engine.js#L279)
+[src/core/Engine.js:257](https://github.com/supercat1337/store2/blob/0a79678b73c0883858e42307757f633e90a127e5/src/core/Engine.js#L257)
 
 ___
 
@@ -713,7 +687,7 @@ Sets an error and notifies dependents.
 
 #### Defined in
 
-[src/core/Engine.js:374](https://github.com/supercat1337/store2/blob/9da5639fccaa4ac6e1305ac63d79571e83475e23/src/core/Engine.js#L374)
+[src/core/Engine.js:352](https://github.com/supercat1337/store2/blob/0a79678b73c0883858e42307757f633e90a127e5/src/core/Engine.js#L352)
 
 ___
 
@@ -735,7 +709,7 @@ Updates dependencies to a new set.
 
 #### Defined in
 
-[src/core/Engine.js:499](https://github.com/supercat1337/store2/blob/9da5639fccaa4ac6e1305ac63d79571e83475e23/src/core/Engine.js#L499)
+[src/core/Engine.js:477](https://github.com/supercat1337/store2/blob/0a79678b73c0883858e42307757f633e90a127e5/src/core/Engine.js#L477)
 
 ___
 
@@ -751,4 +725,4 @@ Called after a value change to schedule notifications.
 
 #### Defined in
 
-[src/core/Engine.js:475](https://github.com/supercat1337/store2/blob/9da5639fccaa4ac6e1305ac63d79571e83475e23/src/core/Engine.js#L475)
+[src/core/Engine.js:453](https://github.com/supercat1337/store2/blob/0a79678b73c0883858e42307757f633e90a127e5/src/core/Engine.js#L453)

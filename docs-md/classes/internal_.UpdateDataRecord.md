@@ -40,7 +40,7 @@ Initializes an instance of UpdateDataRecord with the provided type, old value, a
 
 #### Defined in
 
-[src/core/UpdateDataRecord.js:23](https://github.com/supercat1337/store2/blob/9da5639fccaa4ac6e1305ac63d79571e83475e23/src/core/UpdateDataRecord.js#L23)
+[src/core/UpdateDataRecord.js:23](https://github.com/supercat1337/store2/blob/0a79678b73c0883858e42307757f633e90a127e5/src/core/UpdateDataRecord.js#L23)
 
 ## Properties
 
@@ -50,7 +50,7 @@ Initializes an instance of UpdateDataRecord with the provided type, old value, a
 
 #### Defined in
 
-[src/core/UpdateDataRecord.js:11](https://github.com/supercat1337/store2/blob/9da5639fccaa4ac6e1305ac63d79571e83475e23/src/core/UpdateDataRecord.js#L11)
+[src/core/UpdateDataRecord.js:11](https://github.com/supercat1337/store2/blob/0a79678b73c0883858e42307757f633e90a127e5/src/core/UpdateDataRecord.js#L11)
 
 ___
 
@@ -60,7 +60,7 @@ ___
 
 #### Defined in
 
-[src/core/UpdateDataRecord.js:14](https://github.com/supercat1337/store2/blob/9da5639fccaa4ac6e1305ac63d79571e83475e23/src/core/UpdateDataRecord.js#L14)
+[src/core/UpdateDataRecord.js:14](https://github.com/supercat1337/store2/blob/0a79678b73c0883858e42307757f633e90a127e5/src/core/UpdateDataRecord.js#L14)
 
 ___
 
@@ -70,7 +70,7 @@ ___
 
 #### Defined in
 
-[src/core/UpdateDataRecord.js:5](https://github.com/supercat1337/store2/blob/9da5639fccaa4ac6e1305ac63d79571e83475e23/src/core/UpdateDataRecord.js#L5)
+[src/core/UpdateDataRecord.js:5](https://github.com/supercat1337/store2/blob/0a79678b73c0883858e42307757f633e90a127e5/src/core/UpdateDataRecord.js#L5)
 
 ___
 
@@ -80,4 +80,4 @@ ___
 
 #### Defined in
 
-[src/core/UpdateDataRecord.js:8](https://github.com/supercat1337/store2/blob/9da5639fccaa4ac6e1305ac63d79571e83475e23/src/core/UpdateDataRecord.js#L8)
+[src/core/UpdateDataRecord.js:8](https://github.com/supercat1337/store2/blob/0a79678b73c0883858e42307757f633e90a127e5/src/core/UpdateDataRecord.js#L8)

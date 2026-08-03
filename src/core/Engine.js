@@ -131,28 +131,6 @@ export class Engine {
     }
 
     /**
-     * Determines whether a change actually affects the final value (considering batch).
-     * @param {string} property - The property key.
-     * @param {any} newValue - The new value.
-     * @returns {boolean} True if the change is effective.
-     */
-    isEffectiveChange(property, newValue) {
-        let effectiveOld;
-        if (modeController.batchMode && this.#batchSnapshot?.has(property)) {
-            effectiveOld = this.#batchSnapshot.getOriginal(property);
-        } else {
-            // When not in batch or property not recorded, we treat oldValue as unknown.
-            // In practice, this method is called after recordChange, so oldValue is known.
-            // We'll rely on the caller passing the correct oldValue, but here we need a baseline.
-            // For simplicity, we assume that if no snapshot, the change is always effective?
-            // Better to have the caller pass oldValue. We'll change signature.
-            // But to keep compatibility with existing calls, we'll require oldValue parameter.
-            throw new Error('isEffectiveChange requires oldValue when not in batch mode');
-        }
-        return !this.reactiveItem.equals(effectiveOld, newValue);
-    }
-
-    /**
      * Alternative version that accepts explicit oldValue (preferred).
      * @param {string} property - The property key.
      * @param {any} oldValue - The previous value (immediate before this change).
@@ -184,7 +162,7 @@ export class Engine {
             compareOld = original;
         }
 
-        // 1. Проверяем, произошла ли реальная мутация (изменение значения)
+        // 1. Check if the actual mutation (value change) occurred
         const hasMutation =
             property === '' ? !this.reactiveItem.equals(oldValue, newValue) : oldValue !== newValue;
 
@@ -192,24 +170,24 @@ export class Engine {
             return false;
         }
 
-        // 2. Всегда уведомляем зависимых и добавляем элемент в changedItemsController
-        //    (даже если в batch и значение позже вернётся к исходному)
+        // 2. Always notify dependents and add item to changedItemsController
+        //    (even if in batch and value reverts later)
         this.notifyDependents(EngineMessages.DEPENDENCY_CHANGED);
         changedItemsController.addItem(this.reactiveItem);
 
-        // 3. Определяем, изменилось ли значение относительно стабильного (или старого вне batch)
+        // 3. Determine if the value changed relative to the stable (or old outside batch) value
         const isEffective =
             property === ''
                 ? !this.reactiveItem.equals(compareOld, newValue)
                 : compareOld !== newValue;
 
         if (!isEffective) {
-            // Значение вернулось к исходному – удаляем запись обновления
+            // Value reverted to original – remove the update record
             this.updates.delete(property);
             return false;
         }
 
-        // 4. Создаём или обновляем запись в updates
+        // 4. Create or update the record in updates
         const record = new UpdateDataRecord(type, reportedOld, newValue, this.reactiveItem);
         this.updates.set(property, record);
         this.version++;

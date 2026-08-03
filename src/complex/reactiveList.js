@@ -28,7 +28,7 @@ function isReactiveWrapper(item) {
  * The list supports adding, removing, updating, and splicing items while maintaining
  * full reactivity. Subscribers are notified only once per batch of changes.
  *
- * @template {{[key:string]:any}} T
+ * @template T
  *
  * @example
  * ```js
@@ -361,7 +361,7 @@ export class ReactiveList {
      * Subscribes a callback to be invoked whenever the list changes.
      * The callback receives a Map of updates with details about changed items.
      *
-     * @param {(updates: Map<string, import("../core/UpdateDataRecord.js").UpdateDataRecord>) => void} fn - The callback function.
+     * @param {(updates: Map<string, UpdateDataRecord>) => void} fn - The callback function.
      * @returns {() => void} A function to unsubscribe the callback.
      */
     subscribe(fn) {

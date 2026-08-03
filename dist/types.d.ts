@@ -1,6 +1,6 @@
-type ReactiveItem = import('./reactives/ReactiveItem.js').ReactiveItem;
-type CompareFunction = (a: any, b: any) => boolean;
 
+
+type CompareFunction = (a: any, b: any) => boolean;
 /* From api\api.d.ts */
 /**
  * Creates a new Atom instance. An Atom is a reactive item that holds a value. Same as `atom` but
@@ -610,7 +610,7 @@ export function extendObservable<T, R extends {
  * The list supports adding, removing, updating, and splicing items while maintaining
  * full reactivity. Subscribers are notified only once per batch of changes.
  *
- * @template {{[key:string]:any}} T
+ * @template T
  *
  * @example
  * ```js
@@ -626,9 +626,7 @@ export function extendObservable<T, R extends {
  * list.setItems([{ a: 1 }, { b: 2 }]); // objects -> stored as ShallowReactive
  * ```
  */
-export class ReactiveList<T extends {
-    [key: string]: any;
-}> {
+export class ReactiveList<T> {
     /**
      * Adds one or more items to the end of the list.
      *
@@ -819,7 +817,7 @@ export class Store {
  * It allows detecting which properties have actually changed after a series of mutations
  * inside a batch, and whether they have reverted to their original values.
  */
-export class BatchSnapshot {
+class BatchSnapshot {
     /**
      * Creates a new BatchSnapshot instance.
      * @param {ReactiveItem} reactiveItem - The reactive item to snapshot.
@@ -863,18 +861,18 @@ export class BatchSnapshot {
 }
 
 /* From core\Engine.d.ts */
-export type EngineMessages = number;
-export namespace EngineMessages {
+type EngineMessages = number;
+namespace EngineMessages {
     let DEPENDENCY_CHANGED: number;
     let DEPENDENCY_DESTROYED: number;
     let HAS_ERROR: number;
     let DEPENDENT_DESTROYED: number;
 }
-export const ATOM: 1;
-export const COMPUTED: 2;
-export const COLLECTION: 3;
-export const SHALLOW_REACTIVE: 4;
-export class Engine {
+const ATOM: 1;
+const COMPUTED: 2;
+const COLLECTION: 3;
+const SHALLOW_REACTIVE: 4;
+class Engine {
     /**
      * Creates an Engine instance.
      * @param {ReactiveItem} reactiveItem - The reactive item.
@@ -939,13 +937,6 @@ export class Engine {
     suppressNotifications: boolean;
     /** @type {Error|null} */
     get error(): Error;
-    /**
-     * Determines whether a change actually affects the final value (considering batch).
-     * @param {string} property - The property key.
-     * @param {any} newValue - The new value.
-     * @returns {boolean} True if the change is effective.
-     */
-    isEffectiveChange(property: string, newValue: any): boolean;
     /**
      * Alternative version that accepts explicit oldValue (preferred).
      * @param {string} property - The property key.
@@ -1075,15 +1066,11 @@ export class Engine {
 }
 
 /* From core\subscribeController.d.ts */
-export type Unsubscriber = () => void;
-/**
- * @typedef {() => void} Unsubscriber
- */
 /**
  * Manages change subscriptions and lifecycle hooks for a reactive item.
  * Uses a single EventEmitter for all events: 'change' and 'destroy'.
  */
-export class SubscribeController {
+class SubscribeController {
     /**
      * Returns a copy of the current 'change' subscriber list.
      * @returns {Function[]}
@@ -1094,12 +1081,12 @@ export class SubscribeController {
      *
      * @param {(updates: Map<string, UpdateDataRecord>) => void} fn
      * @param {{ delay?: number, signal?: AbortSignal }} [options]
-     * @returns {Unsubscriber}
+     * @returns {() => void}
      */
     subscribe(fn: (updates: Map<string, UpdateDataRecord>) => void, options?: {
         delay?: number;
         signal?: AbortSignal;
-    }): Unsubscriber;
+    }): () => void;
     /**
      * Removes all 'change' subscribers.
      * Internal listeners (has/no subscribers) remain intact.
@@ -1121,21 +1108,21 @@ export class SubscribeController {
     /**
      * Registers a callback that fires when the first 'change' subscriber is added.
      * @param {() => void} callback
-     * @returns {Unsubscriber}
+     * @returns {() => void}
      */
-    onHasSubscribers(callback: () => void): Unsubscriber;
+    onHasSubscribers(callback: () => void): () => void;
     /**
      * Registers a callback that fires when the last 'change' subscriber is removed.
      * @param {() => void} callback
-     * @returns {Unsubscriber}
+     * @returns {() => void}
      */
-    onNoSubscribers(callback: () => void): Unsubscriber;
+    onNoSubscribers(callback: () => void): () => void;
     /**
      * Registers a callback that fires when the controller is destroyed.
      * @param {() => void} callback
-     * @returns {Unsubscriber}
+     * @returns {() => void}
      */
-    onDestroy(callback: () => void): Unsubscriber;
+    onDestroy(callback: () => void): () => void;
     #private;
 }
 
@@ -1158,7 +1145,7 @@ export class UpdateDataRecord {
     /** @type {ReactiveItem|undefined} */
     reactiveItem: ReactiveItem | undefined;
 }
-export class UpdateDataRecordManager {
+class UpdateDataRecordManager {
     /**
      * Initializes an instance of UpdateDataRecordManager with the given data.
      * @param {Map<string, UpdateDataRecord>} data - The data to be managed.
@@ -1838,7 +1825,7 @@ export class ShallowReactive<T extends {
 }
 
 /* From services\changedItemsController.d.ts */
-export const changedItemsController: ChangedItemsController;
+const changedItemsController: ChangedItemsController;
 /**
  * Controller that manages changed reactive items and coordinates subscriber notifications.
  * Handles batching, dependency recalculation, and error aggregation.
@@ -1878,7 +1865,7 @@ export {};
  * @param {...any} args - Arguments to pass to the function.
  * @returns {Array<ReactiveItem>} Sorted array of reactive items accessed.
  */
-export function getArrayOfUsedReactiveItems(fn: Function, ...args: any[]): Array<ReactiveItem>;
+function getArrayOfUsedReactiveItems(fn: Function, ...args: any[]): Array<ReactiveItem>;
 /**
  * Executes the specified function and tracks reactive items.
  * Returns a Set of used reactive items.
@@ -1886,12 +1873,12 @@ export function getArrayOfUsedReactiveItems(fn: Function, ...args: any[]): Array
  * @param {...any} args - Arguments to pass to the function.
  * @returns {Set<ReactiveItem>} Set of reactive items accessed.
  */
-export function getSetOfUsedReactiveItems(fn: Function, ...args: any[]): Set<ReactiveItem>;
+function getSetOfUsedReactiveItems(fn: Function, ...args: any[]): Set<ReactiveItem>;
 /**
  * The dependencyTracker is a utility instance that monitors reactive items that are used when a computed item is created. It is used
  * to track the dependencies of a computed item, so that it can be recalculated when any of the dependencies change.
  */
-export const dependencyTracker: Tracker;
+const dependencyTracker: Tracker;
 declare class Tracker {
     /** @type {object} */
     ctx: object;
@@ -1942,7 +1929,7 @@ declare class Tracker {
 export {};
 
 /* From services\idService.d.ts */
-export const idService: IdService;
+const idService: IdService;
 /**
  * A service that generates unique numeric identifiers for reactive items.
  * Ensures deterministic ordering based on creation time.
@@ -1969,7 +1956,7 @@ declare class IdService {
 export {};
 
 /* From services\modeController.d.ts */
-export const modeController: ModeControllerService;
+const modeController: ModeControllerService;
 declare class ModeControllerService {
     isComputing: boolean;
     untrackMode: boolean;

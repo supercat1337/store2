@@ -74,9 +74,9 @@ Creates a new empty ReactiveList.
 
 #### Type parameters
 
-| Name | Type |
-| :------ | :------ |
-| `T` | extends `Object` |
+| Name |
+| :------ |
+| `T` |
 
 #### Returns
 

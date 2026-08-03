@@ -13,7 +13,7 @@ import { ShallowReactive } from '../reactives/ShallowReactive.js';
  * This allows the function to be re-executed whenever any of its dependencies change, maintaining
  * up-to-date results.
  *
- * @param {(updates?:Map<string, import("./../core/UpdateDataRecord.js").UpdateDataRecord>)=>void} fn - The function to track and reactively execute.
+ * @param {(updates?:Map<string, UpdateDataRecord>)=>void} fn - The function to track and reactively execute.
  * @param {object} [options] - The options for the autorun function.
  * @param {string} [options.name] - An optional name for the autorun.
  * @param {number} [options.delay] - The number of milliseconds to delay the execution of the callback function.
@@ -78,7 +78,7 @@ function autorun(fn, options) {
  * change, allowing for reactive updates based on the data function.
  *
  * @param {()=>any} dataFunction - The function whose reactive dependencies are tracked.
- * @param {(updates?:Map<string, import("../core/UpdateDataRecord.js").UpdateDataRecord>)=>void} fn - The callback function to execute when tracked dependencies change.
+ * @param {(updates?:Map<string, UpdateDataRecord>)=>void} fn - The callback function to execute when tracked dependencies change.
  * @param {object} [options] - The options for the reaction function.
  * @param {string} [options.name] - An optional name for the reaction.
  * @param {number} [options.delay] - The number of milliseconds to delay the execution of the callback function.
