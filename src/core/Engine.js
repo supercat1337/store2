@@ -24,13 +24,13 @@ export const SHALLOW_REACTIVE = 4;
 export class Engine {
     /**
      * The set of dependencies of the engine.
-     * @type {Set<ReactiveItem>}
+     * @type {Set<import('../types.d.ts').ReactiveItem>}
      */
     dependencies = new Set();
 
     /**
      * The set of dependents of the engine.
-     * @type {Set<ReactiveItem>}
+     * @type {Set<import('../types.d.ts').ReactiveItem>}
      */
     dependents = new Set();
 
@@ -48,7 +48,7 @@ export class Engine {
 
     /**
      * Reference to the reactive item.
-     * @type {ReactiveItem}
+     * @type {import('../types.d.ts').ReactiveItem}
      */
     reactiveItem;
 
@@ -91,7 +91,7 @@ export class Engine {
 
     /**
      * Comparison function for equality.
-     * @type {CompareFunction|null}
+     * @type {import('../types.d.ts').CompareFunction|null}
      */
     compareFn = null;
 
@@ -103,7 +103,7 @@ export class Engine {
 
     /**
      * Creates an Engine instance.
-     * @param {ReactiveItem} reactiveItem - The reactive item.
+     * @param {import('../types.d.ts').ReactiveItem} reactiveItem - The reactive item.
      * @param {ATOM|COMPUTED|COLLECTION|SHALLOW_REACTIVE} type - The type.
      */
     constructor(reactiveItem, type) {
@@ -209,7 +209,7 @@ export class Engine {
 
     /**
      * Adds dependencies to this engine.
-     * @param {Set<ReactiveItem>} dependencies
+     * @param {Set<import('../types.d.ts').ReactiveItem>} dependencies
      */
     addDependencies(dependencies) {
         const array = [];
@@ -227,7 +227,7 @@ export class Engine {
 
     /**
      * Adds a single dependency.
-     * @param {ReactiveItem} dependency
+     * @param {import('../types.d.ts').ReactiveItem} dependency
      */
     addDependency(dependency) {
         if (!this.dependencies.has(dependency)) {
@@ -237,7 +237,7 @@ export class Engine {
 
     /**
      * Adds a dependent.
-     * @param {ReactiveItem} dependent
+     * @param {import('../types.d.ts').ReactiveItem} dependent
      * @returns {boolean}
      */
     addDependent(dependent) {
@@ -252,7 +252,7 @@ export class Engine {
 
     /**
      * Removes a dependent.
-     * @param {ReactiveItem} dependent
+     * @param {import('../types.d.ts').ReactiveItem} dependent
      */
     removeDependent(dependent) {
         this.dependents.delete(dependent);
@@ -260,7 +260,7 @@ export class Engine {
 
     /**
      * Returns all dependents recursively.
-     * @returns {Set<ReactiveItem>}
+     * @returns {Set<import('../types.d.ts').ReactiveItem>}
      */
     getDeepDependents() {
         const result = new Set();
@@ -284,7 +284,7 @@ export class Engine {
 
     /**
      * Returns sorted array of deep dependents.
-     * @returns {Array<ReactiveItem>}
+     * @returns {Array<import('../types.d.ts').ReactiveItem>}
      */
     getDeepDependentsArray() {
         const array = Array.from(this.getDeepDependents());
@@ -295,7 +295,7 @@ export class Engine {
     /**
      * Notifies dependents of a message.
      * @param {EngineMessages} message
-     * @param {{sender: ReactiveItem, recipients: Set<ReactiveItem>}} [ctx]
+     * @param {{sender: import('../types.d.ts').ReactiveItem, recipients: Set<import('../types.d.ts').ReactiveItem>}} [ctx]
      */
     notifyDependents(message, ctx) {
         if (ctx === undefined) {
@@ -310,7 +310,7 @@ export class Engine {
     /**
      * Notifies dependencies (reverse direction).
      * @param {EngineMessages} message
-     * @param {{sender: ReactiveItem, recipients: Set<ReactiveItem>}} ctx
+     * @param {{sender: import('../types.d.ts').ReactiveItem, recipients: Set<import('../types.d.ts').ReactiveItem>}} ctx
      */
     notifyDependencies(message, ctx) {
         for (const dependency of this.dependencies) {
@@ -322,7 +322,7 @@ export class Engine {
     /**
      * Handles incoming messages.
      * @param {EngineMessages} message
-     * @param {{sender: ReactiveItem, recipients: Set<ReactiveItem>}} ctx
+     * @param {{sender: import('../types.d.ts').ReactiveItem, recipients: Set<import('../types.d.ts').ReactiveItem>}} ctx
      */
     getMessage(message, ctx) {
         switch (message) {
@@ -347,7 +347,7 @@ export class Engine {
     /**
      * Sets an error and notifies dependents.
      * @param {Error|null} error
-     * @param {{sender: ReactiveItem, recipients: Set<ReactiveItem>}} [ctx]
+     * @param {{sender: import('../types.d.ts').ReactiveItem, recipients: Set<import('../types.d.ts').ReactiveItem>}} [ctx]
      */
     setError(error, ctx) {
         if (error === null) {
@@ -371,7 +371,7 @@ export class Engine {
 
     /**
      * Destroys the engine.
-     * @param {{sender: ReactiveItem, recipients: Set<ReactiveItem>}} [ctx]
+     * @param {{sender: import('../types.d.ts').ReactiveItem, recipients: Set<import('../types.d.ts').ReactiveItem>}} [ctx]
      */
     destroy(ctx) {
         if (this.isDestroyed) {
@@ -472,7 +472,7 @@ export class Engine {
 
     /**
      * Updates dependencies to a new set.
-     * @param {Set<ReactiveItem>} newDeps
+     * @param {Set<import('../types.d.ts').ReactiveItem>} newDeps
      */
     updateDependencies(newDeps) {
         // Remove old dependencies no longer needed

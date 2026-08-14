@@ -802,7 +802,7 @@ var Store2 = (() => {
     /**
      * Subscribes a callback to the 'change' event.
      *
-     * @param {(updates: Map<string, UpdateDataRecord>) => void} fn
+     * @param {(updates: Map<string, import('./types.d.ts').UpdateDataRecord>) => void} fn
      * @param {{ delay?: number, signal?: AbortSignal }} [options]
      * @returns {() => void}
      */
@@ -958,12 +958,12 @@ var Store2 = (() => {
 
   // src/services/changedItemsController.js
   var ChangedItemsController = class {
-    /** @type {Set<ReactiveItem>} */
+    /** @type {Set<import('./types.d.ts').ReactiveItem>} */
     items = /* @__PURE__ */ new Set();
     /**
      * Adds a reactive item to the set of changed items.
      * If not in batch mode, immediately runs subscribers and clears the set.
-     * @param {ReactiveItem} item - The reactive item that changed.
+     * @param {import('./types.d.ts').ReactiveItem} item - The reactive item that changed.
      */
     addItem(item) {
       this.items.add(item);
@@ -973,7 +973,7 @@ var Store2 = (() => {
       }
     }
     /**
-     * @param {ReactiveItem} item
+     * @param {import('./types.d.ts').ReactiveItem} item
      */
     removeItem(item) {
       this.items.delete(item);
@@ -989,79 +989,88 @@ var Store2 = (() => {
      * Processes dependency trees, recalculates stale computed values,
      * and invokes subscriber callbacks with update records.
      * Handles errors and aggregates them if multiple occur.
+     *
+     * The while-loop ensures that any new changes that are added
+     * (via changedItemsController.addItem) during subscriber execution
+     * are processed in the next iteration, preventing lost updates.
      */
     runSubscribers() {
       const changedItemsWithUpdates = /* @__PURE__ */ new Set();
-      this.items.forEach((item) => {
+      while (this.items.size > 0) {
+        const itemsToProcess = new Set(this.items);
+        this.items.clear();
+        itemsToProcess.forEach((item) => {
+          if (modeController.batchMode === true) {
+            if (item.engine.checkChangesTemporary()) {
+              changedItemsWithUpdates.add(item);
+            }
+          } else {
+            if (item.engine.hasUpdates()) {
+              changedItemsWithUpdates.add(item);
+            }
+          }
+        });
+        const itemsToRecalc = /* @__PURE__ */ new Set();
+        changedItemsWithUpdates.forEach((item) => {
+          item.engine.getDeepDependents().forEach((dep) => {
+            if (dep.hasSubscribers()) {
+              itemsToRecalc.add(dep);
+            }
+          });
+        });
+        Array.from(itemsToRecalc).sort(sortReactiveItems).forEach((item) => {
+          item.getValue();
+        });
+        itemsToRecalc.clear();
+        changedItemsWithUpdates.clear();
         if (modeController.batchMode === true) {
-          if (item.engine.checkChangesTemporary()) {
-            changedItemsWithUpdates.add(item);
-          }
+          itemsToProcess.forEach((item) => {
+            if (item.engine.checkChangesTemporary()) {
+              changedItemsWithUpdates.add(item);
+            }
+          });
         } else {
-          if (item.engine.hasUpdates()) {
-            changedItemsWithUpdates.add(item);
-          }
+          itemsToProcess.forEach((item) => {
+            if (item.engine.hasUpdates()) {
+              changedItemsWithUpdates.add(item);
+            }
+          });
         }
-      });
-      const itemsToRecalc = /* @__PURE__ */ new Set();
-      changedItemsWithUpdates.forEach((item) => {
-        item.engine.getDeepDependents().forEach((dep) => {
-          if (dep.hasSubscribers()) {
-            itemsToRecalc.add(dep);
+        const changedItemsWithUpdatesSorted = Array.from(changedItemsWithUpdates).filter((item) => item.hasSubscribers()).sort(sortReactiveItems);
+        modeController.startSubscribersMode();
+        const usedSubscribers = /* @__PURE__ */ new Set();
+        const errors = [];
+        for (let i = 0; i < changedItemsWithUpdatesSorted.length; i++) {
+          const item = changedItemsWithUpdatesSorted[i];
+          const itemSubscribers = item.engine.subscribeController.getSubscribers();
+          for (const subscriber of itemSubscribers) {
+            if (usedSubscribers.has(subscriber)) {
+              continue;
+            }
+            usedSubscribers.add(subscriber);
+            try {
+              subscriber(item.engine.updates);
+            } catch (e) {
+              const err = getError(e);
+              const error = new Error(`Error in ${item.name}: ${err.message}`, {
+                cause: item
+              });
+              error.stack = err.stack;
+              errors.push(error);
+            }
           }
-        });
-      });
-      Array.from(itemsToRecalc).sort(sortReactiveItems).forEach((item) => {
-        item.getValue();
-      });
-      itemsToRecalc.clear();
-      changedItemsWithUpdates.clear();
-      if (modeController.batchMode === true) {
-        this.items.forEach((item) => {
-          if (item.engine.checkChangesTemporary()) {
-            changedItemsWithUpdates.add(item);
-          }
-        });
-      } else {
-        this.items.forEach((item) => {
-          if (item.engine.hasUpdates()) {
-            changedItemsWithUpdates.add(item);
-          }
-        });
-      }
-      const changedItemsWithUpdatesSorted = Array.from(changedItemsWithUpdates).filter((item) => item.hasSubscribers()).sort(sortReactiveItems);
-      modeController.startSubscribersMode();
-      const usedSubscribers = /* @__PURE__ */ new Set();
-      const errors = [];
-      for (let i = 0; i < changedItemsWithUpdatesSorted.length; i++) {
-        const item = changedItemsWithUpdatesSorted[i];
-        const itemSubscribers = item.engine.subscribeController.getSubscribers();
-        for (const subscriber of itemSubscribers) {
-          if (usedSubscribers.has(subscriber)) {
-            continue;
-          }
-          usedSubscribers.add(subscriber);
-          try {
-            subscriber(item.engine.updates);
-          } catch (e) {
-            const err = getError(e);
-            const error = new Error(`Error in ${item.name}: ${err.message}`, { cause: item });
-            error.stack = err.stack;
-            errors.push(error);
-          }
+          item.engine.clearUpdates();
         }
-        item.engine.clearUpdates();
-      }
-      this.items.forEach((item) => {
-        item.engine.clearUpdates();
-      });
-      usedSubscribers.clear();
-      this.items.clear();
-      modeController.endSubscribersMode();
-      if (modeController.throwErrorInSubscribers) {
-        for (let i = 0; i < errors.length; i++) {
-          const error = errors[i];
-          throw error;
+        itemsToProcess.forEach((item) => {
+          item.engine.clearUpdates();
+        });
+        usedSubscribers.clear();
+        modeController.endSubscribersMode();
+        if (modeController.throwErrorInSubscribers) {
+          for (let i = 0; i < errors.length; i++) {
+            const error = errors[i];
+            throw error;
+          }
         }
       }
     }
@@ -1080,14 +1089,14 @@ var Store2 = (() => {
     value;
     /** @type {any} */
     oldValue;
-    /** @type {ReactiveItem|undefined} */
+    /** @type {import('./types.d.ts').ReactiveItem|undefined} */
     reactiveItem;
     /**
      * Initializes an instance of UpdateDataRecord with the provided type, old value, and new value.
      * @param {"set"|"delete"} type - The action performed, either "set" or "delete".
      * @param {any} oldValue - The previous value before the update.
      * @param {any} value - The new value after the update.
-     * @param {ReactiveItem} [reactiveItem] - The reactive item that triggered the update.
+     * @param {import('./types.d.ts').ReactiveItem} [reactiveItem] - The reactive item that triggered the update.
      */
     constructor(type, oldValue, value, reactiveItem) {
       this.type = type;
@@ -1136,12 +1145,12 @@ var Store2 = (() => {
     /**
      * Reference to the reactive item this snapshot belongs to.
      * Used to access the equality comparison function.
-     * @type {ReactiveItem}
+     * @type {import('./types.d.ts').ReactiveItem}
      */
     #reactiveItem;
     /**
      * Creates a new BatchSnapshot instance.
-     * @param {ReactiveItem} reactiveItem - The reactive item to snapshot.
+     * @param {import('./types.d.ts').ReactiveItem} reactiveItem - The reactive item to snapshot.
      */
     constructor(reactiveItem) {
       this.#reactiveItem = reactiveItem;
@@ -1217,12 +1226,12 @@ var Store2 = (() => {
   var Engine = class {
     /**
      * The set of dependencies of the engine.
-     * @type {Set<ReactiveItem>}
+     * @type {Set<import('./types.d.ts').ReactiveItem>}
      */
     dependencies = /* @__PURE__ */ new Set();
     /**
      * The set of dependents of the engine.
-     * @type {Set<ReactiveItem>}
+     * @type {Set<import('./types.d.ts').ReactiveItem>}
      */
     dependents = /* @__PURE__ */ new Set();
     /**
@@ -1237,7 +1246,7 @@ var Store2 = (() => {
     version = 0;
     /**
      * Reference to the reactive item.
-     * @type {ReactiveItem}
+     * @type {import('./types.d.ts').ReactiveItem}
      */
     reactiveItem;
     /**
@@ -1272,7 +1281,7 @@ var Store2 = (() => {
     #batchSnapshot = null;
     /**
      * Comparison function for equality.
-     * @type {CompareFunction|null}
+     * @type {import('./types.d.ts').CompareFunction|null}
      */
     compareFn = null;
     /**
@@ -1282,7 +1291,7 @@ var Store2 = (() => {
     suppressNotifications = false;
     /**
      * Creates an Engine instance.
-     * @param {ReactiveItem} reactiveItem - The reactive item.
+     * @param {import('./types.d.ts').ReactiveItem} reactiveItem - The reactive item.
      * @param {ATOM|COMPUTED|COLLECTION|SHALLOW_REACTIVE} type - The type.
      */
     constructor(reactiveItem, type) {
@@ -1366,7 +1375,7 @@ var Store2 = (() => {
     }
     /**
      * Adds dependencies to this engine.
-     * @param {Set<ReactiveItem>} dependencies
+     * @param {Set<import('./types.d.ts').ReactiveItem>} dependencies
      */
     addDependencies(dependencies) {
       const array = [];
@@ -1383,7 +1392,7 @@ var Store2 = (() => {
     }
     /**
      * Adds a single dependency.
-     * @param {ReactiveItem} dependency
+     * @param {import('./types.d.ts').ReactiveItem} dependency
      */
     addDependency(dependency) {
       if (!this.dependencies.has(dependency)) {
@@ -1392,7 +1401,7 @@ var Store2 = (() => {
     }
     /**
      * Adds a dependent.
-     * @param {ReactiveItem} dependent
+     * @param {import('./types.d.ts').ReactiveItem} dependent
      * @returns {boolean}
      */
     addDependent(dependent) {
@@ -1406,14 +1415,14 @@ var Store2 = (() => {
     }
     /**
      * Removes a dependent.
-     * @param {ReactiveItem} dependent
+     * @param {import('./types.d.ts').ReactiveItem} dependent
      */
     removeDependent(dependent) {
       this.dependents.delete(dependent);
     }
     /**
      * Returns all dependents recursively.
-     * @returns {Set<ReactiveItem>}
+     * @returns {Set<import('./types.d.ts').ReactiveItem>}
      */
     getDeepDependents() {
       const result = /* @__PURE__ */ new Set();
@@ -1436,7 +1445,7 @@ var Store2 = (() => {
     }
     /**
      * Returns sorted array of deep dependents.
-     * @returns {Array<ReactiveItem>}
+     * @returns {Array<import('./types.d.ts').ReactiveItem>}
      */
     getDeepDependentsArray() {
       const array = Array.from(this.getDeepDependents());
@@ -1446,7 +1455,7 @@ var Store2 = (() => {
     /**
      * Notifies dependents of a message.
      * @param {EngineMessages} message
-     * @param {{sender: ReactiveItem, recipients: Set<ReactiveItem>}} [ctx]
+     * @param {{sender: import('./types.d.ts').ReactiveItem, recipients: Set<import('./types.d.ts').ReactiveItem>}} [ctx]
      */
     notifyDependents(message, ctx) {
       if (ctx === void 0) {
@@ -1460,7 +1469,7 @@ var Store2 = (() => {
     /**
      * Notifies dependencies (reverse direction).
      * @param {EngineMessages} message
-     * @param {{sender: ReactiveItem, recipients: Set<ReactiveItem>}} ctx
+     * @param {{sender: import('./types.d.ts').ReactiveItem, recipients: Set<import('./types.d.ts').ReactiveItem>}} ctx
      */
     notifyDependencies(message, ctx) {
       for (const dependency of this.dependencies) {
@@ -1471,7 +1480,7 @@ var Store2 = (() => {
     /**
      * Handles incoming messages.
      * @param {EngineMessages} message
-     * @param {{sender: ReactiveItem, recipients: Set<ReactiveItem>}} ctx
+     * @param {{sender: import('./types.d.ts').ReactiveItem, recipients: Set<import('./types.d.ts').ReactiveItem>}} ctx
      */
     getMessage(message, ctx) {
       switch (message) {
@@ -1495,7 +1504,7 @@ var Store2 = (() => {
     /**
      * Sets an error and notifies dependents.
      * @param {Error|null} error
-     * @param {{sender: ReactiveItem, recipients: Set<ReactiveItem>}} [ctx]
+     * @param {{sender: import('./types.d.ts').ReactiveItem, recipients: Set<import('./types.d.ts').ReactiveItem>}} [ctx]
      */
     setError(error, ctx) {
       if (error === null) {
@@ -1517,7 +1526,7 @@ var Store2 = (() => {
     }
     /**
      * Destroys the engine.
-     * @param {{sender: ReactiveItem, recipients: Set<ReactiveItem>}} [ctx]
+     * @param {{sender: import('./types.d.ts').ReactiveItem, recipients: Set<import('./types.d.ts').ReactiveItem>}} [ctx]
      */
     destroy(ctx) {
       if (this.isDestroyed) {
@@ -1602,7 +1611,7 @@ var Store2 = (() => {
     }
     /**
      * Updates dependencies to a new set.
-     * @param {Set<ReactiveItem>} newDeps
+     * @param {Set<import('./types.d.ts').ReactiveItem>} newDeps
      */
     updateDependencies(newDeps) {
       for (const oldDep of this.dependencies) {
@@ -1623,7 +1632,7 @@ var Store2 = (() => {
   // src/services/dependencyTracker.js
   var Tracker = class {
     #isActive = false;
-    /** @type {Set<ReactiveItem>} */
+    /** @type {Set<import('./types.d.ts').ReactiveItem>} */
     #store = /* @__PURE__ */ new Set();
     #eventEmitter = new EventEmitterLite();
     /** @type {object} */
@@ -1631,7 +1640,7 @@ var Store2 = (() => {
     /**
      * Returns the current contents of the tracker's store, which is a set of all reactive items that have been
      * accessed since the tracker was last turned on. This is useful for debugging and testing purposes.
-     * @returns {Set<ReactiveItem>} The current contents of the tracker's store.
+     * @returns {Set<import('./types.d.ts').ReactiveItem>} The current contents of the tracker's store.
      */
     get data() {
       return /* @__PURE__ */ new Set([...this.#store]);
@@ -1639,7 +1648,7 @@ var Store2 = (() => {
     /**
      * Returns a sorted array of all reactive items in the tracker's store. The items are sorted by their internal id,
      * ensuring consistent processing order when notified of changes.
-     * @returns {Array<ReactiveItem>} A sorted array of reactive items.
+     * @returns {Array<import('./types.d.ts').ReactiveItem>} A sorted array of reactive items.
      */
     getAsSortedArray() {
       return Array.from(this.#store).sort(sortReactiveItems);
@@ -1647,7 +1656,7 @@ var Store2 = (() => {
     /**
      * Adds a reactive item to the tracker's store if the tracker is turned on. If the tracker is not turned on, this
      * method does nothing.
-     * @param {ReactiveItem} item - The reactive item to add to the tracker's store.
+     * @param {import('./types.d.ts').ReactiveItem} item - The reactive item to add to the tracker's store.
      * @param {string} [_key=""]
      */
     add(item, _key = "") {
@@ -1661,7 +1670,7 @@ var Store2 = (() => {
     }
     /**
      *
-     * @param {(reactiveItem:ReactiveItem)=>void} callback
+     * @param {(reactiveItem:import('./types.d.ts').ReactiveItem)=>void} callback
      * @returns {()=>void}
      */
     onAdd(callback) {
@@ -1709,6 +1718,7 @@ var Store2 = (() => {
 
   // src/reactives/ReactiveItem.js
   var ReactiveItem = class {
+    /** @type {Engine} */
     engine;
     name = "";
     /**
@@ -1720,7 +1730,7 @@ var Store2 = (() => {
     }
     /**
      * Subscribes a function to be called whenever the value of this reactive item changes.
-     * @param {(updates: Map<string, UpdateDataRecord>)=>void} fn - The function to be called whenever the value of this reactive item changes.
+     * @param {(updates: Map<string, import('./types.d.ts').UpdateDataRecord>)=>void} fn - The function to be called whenever the value of this reactive item changes.
      * @param {object} [options] - Optional options.
      * @param {number} [options.delay] - The delay in milliseconds before the function is called.
      * @param {AbortSignal} [options.signal] - The signal to abort the subscription.
@@ -2207,7 +2217,7 @@ var Store2 = (() => {
      * @param {T[]} value - The initial array value.
      * @param {object} [options] - Configuration options.
      * @param {string} [options.name] - The name of the Collection (for debugging).
-     * @param {CompareFunction|null} [options.compareFunction] - Custom equality function for values.
+     * @param {import('./types.d.ts').CompareFunction|null} [options.compareFunction] - Custom equality function for values.
      */
     constructor(value, options = { name: "", compareFunction: null }) {
       super(COLLECTION);
@@ -2518,7 +2528,7 @@ var Store2 = (() => {
     #isDestroyed = false;
     /** @type {Map<string, Set<Function>>} */
     #unsubscribers = /* @__PURE__ */ new Map();
-    /** @type {Map<string, UpdateDataRecord>} */
+    /** @type {Map<string, import('./types.d.ts').UpdateDataRecord>} */
     #updates;
     /** @type {UpdateDataRecordManager} */
     #updatesManager;
@@ -2873,7 +2883,7 @@ var Store2 = (() => {
     }
     /**
      * Subscribes a function to be called whenever the value of this Store changes.
-     * @param {(update: Map<string, UpdateDataRecord>, store: Store)=>void} fn
+     * @param {(update: Map<string, import('./types.d.ts').UpdateDataRecord>, store: Store)=>void} fn
      * @returns {()=>void}
      */
     subscribe(fn) {
@@ -3207,7 +3217,7 @@ var Store2 = (() => {
      * Subscribes a callback to be invoked whenever the list changes.
      * The callback receives a Map of updates with details about changed items.
      *
-     * @param {(updates: Map<string, UpdateDataRecord>) => void} fn - The callback function.
+     * @param {(updates: Map<string, import('./types.d.ts').UpdateDataRecord>) => void} fn - The callback function.
      * @returns {() => void} A function to unsubscribe the callback.
      */
     subscribe(fn) {
@@ -3320,9 +3330,11 @@ var Store2 = (() => {
   }
   function runInAction(fn) {
     if (modeController.subscribersMode) {
-      modeController.runAfterSubscribers(fn);
+      modeController.runAfterSubscribers(() => {
+        batch(fn);
+      });
     } else {
-      fn();
+      batch(fn);
     }
   }
   function batch(fn) {

@@ -1,4 +1,4 @@
-
+import { EventEmitter } from '@supercat1337/event-emitter';
 
 type CompareFunction = (a: any, b: any) => boolean;
 /* From api\api.d.ts */
@@ -711,7 +711,7 @@ export class ReactiveList<T> {
      * @returns {() => void} A function to unsubscribe the callback.
      */
     subscribe(fn: (updates: Map<string, UpdateDataRecord>) => void): () => void;
-    #private;
+
 }
 export type ReactiveWrapper<T> = T extends object ? ShallowReactive<T> : Atom<T>;
 
@@ -808,7 +808,7 @@ export class Store {
      * @returns {boolean}
      */
     isMuted(): boolean;
-    #private;
+
 }
 
 /* From core\BatchSnapshot.d.ts */
@@ -857,7 +857,7 @@ class BatchSnapshot {
      * @returns {number}
      */
     get size(): number;
-    #private;
+
 }
 
 /* From core\Engine.d.ts */
@@ -1062,7 +1062,7 @@ class Engine {
      * @param {Set<ReactiveItem>} newDeps
      */
     updateDependencies(newDeps: Set<ReactiveItem>): void;
-    #private;
+
 }
 
 /* From core\subscribeController.d.ts */
@@ -1123,7 +1123,7 @@ class SubscribeController {
      * @returns {() => void}
      */
     onDestroy(callback: () => void): () => void;
-    #private;
+
 }
 
 /* From core\UpdateDataRecord.d.ts */
@@ -1399,7 +1399,7 @@ export class Atom<T> extends ReactiveItem {
      * ```
      */
     get valueUntracked(): T;
-    #private;
+
 }
 
 /* From reactives\Collection.d.ts */
@@ -1462,7 +1462,7 @@ export class Collection<T> extends ReactiveItem {
      * @returns {T[]} The raw array.
      */
     getRawValue(): T[];
-    #private;
+
 }
 
 /* From reactives\Computed.d.ts */
@@ -1609,7 +1609,7 @@ export class Computed<T extends unknown> extends ReactiveItem {
      * ```
      */
     get valueUntracked(): T;
-    #private;
+
 }
 
 /* From reactives\ReactiveItem.d.ts */
@@ -1624,6 +1624,7 @@ export class ReactiveItem {
      * @param {1|2|3|4} type
      */
     constructor(type: 1 | 2 | 3 | 4);
+    /** @type {Engine} */
     engine: Engine;
     name: string;
     /**
@@ -1821,7 +1822,7 @@ export class ShallowReactive<T extends {
      * @returns {T} The raw, unproxied value of the ShallowReactive.
      */
     getRawValue(): T;
-    #private;
+
 }
 
 /* From services\changedItemsController.d.ts */
@@ -1852,6 +1853,10 @@ declare class ChangedItemsController {
      * Processes dependency trees, recalculates stale computed values,
      * and invokes subscriber callbacks with update records.
      * Handles errors and aggregates them if multiple occur.
+     *
+     * The while-loop ensures that any new changes that are added
+     * (via changedItemsController.addItem) during subscriber execution
+     * are processed in the next iteration, preventing lost updates.
      */
     runSubscribers(): void;
 }
@@ -1924,7 +1929,7 @@ declare class Tracker {
      * anything to any registered listeners. The tracker is off by default.
      */
     disable(): void;
-    #private;
+
 }
 export {};
 
@@ -1951,7 +1956,7 @@ declare class IdService {
      * Resets the counter to zero (useful for testing).
      */
     reset(): void;
-    #private;
+
 }
 export {};
 
@@ -2005,7 +2010,7 @@ declare class ModeControllerService {
      * @param {Function} callback
      */
     runAfterSubscribers(callback: Function): void;
-    #private;
+
 }
 
 export {};

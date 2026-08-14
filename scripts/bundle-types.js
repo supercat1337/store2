@@ -4,6 +4,13 @@ import path from 'path';
 const tempDir = './dist/types-temp/src';
 const outputFile = './dist/types.d.ts';
 const headerFile = './src/types.d.ts';
+const esmFiles = [
+    './dist/store2.esm.bundle.js',
+    './dist/store2.esm.bundle.min.js',
+    './dist/store2.esm.js',
+    './dist/store2.iife.js',
+    './dist/store2.iife.min.js',
+];
 
 function fix(content) {
     return (
@@ -25,7 +32,8 @@ function bundleTypes() {
         finalContent += fs.readFileSync(headerFile, 'utf8') + '\n';
     }
 
-    finalContent = fix(finalContent);
+    finalContent =
+        `import { EventEmitter } from '@supercat1337/event-emitter';\n` + fix(finalContent);
 
     // Удаляем самоссылающиеся типы (type X = X;)
     finalContent = finalContent.replace(/^type\s+(\w+)\s*=\s*\1\s*;?\s*$/gm, '');
@@ -87,10 +95,19 @@ function bundleTypes() {
     // -------------------------------------------------
 
     // 4. Финальная чистка: убираем множественные пустые строки
+    finalContent = finalContent.replace(/^\s*#private;/gm, '');
     finalContent = finalContent.replace(/\n{3,}/g, '\n\n');
 
     fs.writeFileSync(outputFile, finalContent);
     console.log(`Bundle created: ${outputFile}`);
 }
 
+function fixEsm(esmFile) {
+    let content = fs.readFileSync(esmFile, { encoding: 'utf8' });
+    content = content.replace(/(\.\.\/)+types\.d\.ts/g, './types.d.ts');
+    fs.writeFileSync(esmFile, content);
+}
+
 bundleTypes();
+
+for (let i = 0; i < esmFiles.length; i++) fixEsm(esmFiles[i]);

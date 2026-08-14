@@ -10,7 +10,7 @@ export class UpdateDataRecord {
     /** @type {any} */
     oldValue;
 
-    /** @type {ReactiveItem|undefined} */
+    /** @type {import('../types.d.ts').ReactiveItem|undefined} */
     reactiveItem;
 
     /**
@@ -18,7 +18,7 @@ export class UpdateDataRecord {
      * @param {"set"|"delete"} type - The action performed, either "set" or "delete".
      * @param {any} oldValue - The previous value before the update.
      * @param {any} value - The new value after the update.
-     * @param {ReactiveItem} [reactiveItem] - The reactive item that triggered the update.
+     * @param {import('../types.d.ts').ReactiveItem} [reactiveItem] - The reactive item that triggered the update.
      */
     constructor(type, oldValue, value, reactiveItem) {
         this.type = type;

@@ -361,7 +361,7 @@ export class ReactiveList {
      * Subscribes a callback to be invoked whenever the list changes.
      * The callback receives a Map of updates with details about changed items.
      *
-     * @param {(updates: Map<string, UpdateDataRecord>) => void} fn - The callback function.
+     * @param {(updates: Map<string, import('../types.d.ts').UpdateDataRecord>) => void} fn - The callback function.
      * @returns {() => void} A function to unsubscribe the callback.
      */
     subscribe(fn) {

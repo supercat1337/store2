@@ -36,7 +36,7 @@ class Collection extends ReactiveItem {
      * @param {T[]} value - The initial array value.
      * @param {object} [options] - Configuration options.
      * @param {string} [options.name] - The name of the Collection (for debugging).
-     * @param {CompareFunction|null} [options.compareFunction] - Custom equality function for values.
+     * @param {import('../types.d.ts').CompareFunction|null} [options.compareFunction] - Custom equality function for values.
      */
     constructor(value, options = { name: '', compareFunction: null }) {
         super(COLLECTION);

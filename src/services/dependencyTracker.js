@@ -6,7 +6,7 @@ import { modeController } from './modeController.js';
 
 class Tracker {
     #isActive = false;
-    /** @type {Set<ReactiveItem>} */
+    /** @type {Set<import('../types.d.ts').ReactiveItem>} */
     #store = new Set();
     #eventEmitter = new EventEmitterLite();
 
@@ -16,7 +16,7 @@ class Tracker {
     /**
      * Returns the current contents of the tracker's store, which is a set of all reactive items that have been
      * accessed since the tracker was last turned on. This is useful for debugging and testing purposes.
-     * @returns {Set<ReactiveItem>} The current contents of the tracker's store.
+     * @returns {Set<import('../types.d.ts').ReactiveItem>} The current contents of the tracker's store.
      */
     get data() {
         return new Set([...this.#store]);
@@ -25,7 +25,7 @@ class Tracker {
     /**
      * Returns a sorted array of all reactive items in the tracker's store. The items are sorted by their internal id,
      * ensuring consistent processing order when notified of changes.
-     * @returns {Array<ReactiveItem>} A sorted array of reactive items.
+     * @returns {Array<import('../types.d.ts').ReactiveItem>} A sorted array of reactive items.
      */
     getAsSortedArray() {
         return Array.from(this.#store).sort(sortReactiveItems);
@@ -34,7 +34,7 @@ class Tracker {
     /**
      * Adds a reactive item to the tracker's store if the tracker is turned on. If the tracker is not turned on, this
      * method does nothing.
-     * @param {ReactiveItem} item - The reactive item to add to the tracker's store.
+     * @param {import('../types.d.ts').ReactiveItem} item - The reactive item to add to the tracker's store.
      * @param {string} [_key=""]
      */
     add(item, _key = '') {
@@ -50,7 +50,7 @@ class Tracker {
 
     /**
      *
-     * @param {(reactiveItem:ReactiveItem)=>void} callback
+     * @param {(reactiveItem:import('../types.d.ts').ReactiveItem)=>void} callback
      * @returns {()=>void}
      */
     onAdd(callback) {
@@ -101,7 +101,7 @@ export const dependencyTracker = new Tracker();
  * Returns a sorted array of used reactive items.
  * @param {Function} fn - The function to execute and track.
  * @param {...any} args - Arguments to pass to the function.
- * @returns {Array<ReactiveItem>} Sorted array of reactive items accessed.
+ * @returns {Array<import('../types.d.ts').ReactiveItem>} Sorted array of reactive items accessed.
  */
 export function getArrayOfUsedReactiveItems(fn, ...args) {
     dependencyTracker.enable();
@@ -118,7 +118,7 @@ export function getArrayOfUsedReactiveItems(fn, ...args) {
  * Returns a Set of used reactive items.
  * @param {Function} fn - The function to execute and track.
  * @param {...any} args - Arguments to pass to the function.
- * @returns {Set<ReactiveItem>} Set of reactive items accessed.
+ * @returns {Set<import('../types.d.ts').ReactiveItem>} Set of reactive items accessed.
  */
 export function getSetOfUsedReactiveItems(fn, ...args) {
     dependencyTracker.enable();

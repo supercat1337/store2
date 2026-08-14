@@ -10,6 +10,7 @@ import { dependencyTracker } from '../services/dependencyTracker.js';
  * @private
  */
 class ReactiveItem {
+    /** @type {Engine} */
     engine;
 
     name = '';
@@ -24,7 +25,7 @@ class ReactiveItem {
 
     /**
      * Subscribes a function to be called whenever the value of this reactive item changes.
-     * @param {(updates: Map<string, UpdateDataRecord>)=>void} fn - The function to be called whenever the value of this reactive item changes.
+     * @param {(updates: Map<string, import('../types.d.ts').UpdateDataRecord>)=>void} fn - The function to be called whenever the value of this reactive item changes.
      * @param {object} [options] - Optional options.
      * @param {number} [options.delay] - The delay in milliseconds before the function is called.
      * @param {AbortSignal} [options.signal] - The signal to abort the subscription.
