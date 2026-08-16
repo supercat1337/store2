@@ -92,7 +92,7 @@ count.value = 1;
 
 #### Defined in
 
-[src/api/api.js:558](https://github.com/supercat1337/store2/blob/0a79678b73c0883858e42307757f633e90a127e5/src/api/api.js#L558)
+[src/api/api.js:621](https://github.com/supercat1337/store2/blob/c65c4382ec22e2f61bbc31b786846fc524db2820/src/api/api.js#L621)
 
 ___
 
@@ -100,26 +100,27 @@ ___
 
 ▸ **autorun**(`fn`, `options?`): () => `void`
 
-Automatically tracks and subscribes to changes in reactive items used by the specified function.
-This allows the function to be re-executed whenever any of its dependencies change, maintaining
-up-to-date results.
+Autorun – runs the effect immediately (during initial dependency collection)
+and re‑runs it on any dependency change.
+Dependencies are re‑collected on every run by default.
 
 #### Parameters
 
 | Name | Type | Description |
 | :------ | :------ | :------ |
-| `fn` | (`updates?`: `Map`\<`string`, [`UpdateDataRecord`](classes/internal_.UpdateDataRecord.md)\>) => `void` | The function to track and reactively execute. |
-| `options?` | `Object` | The options for the autorun function. |
-| `options.delay` | `number` | The number of milliseconds to delay the execution of the callback function. |
-| `options.name` | `string` | An optional name for the autorun. |
-| `options.onError` | `Function` | An optional function to handle errors. |
-| `options.signal` | `AbortSignal` | An optional AbortSignal to cancel the autorun. |
+| `fn` | () => `void` | The effect function. |
+| `options?` | `Object` | Options. |
+| `options.delay` | `number` | Debounce delay (ms). |
+| `options.name` | `string` | Debug name. |
+| `options.onError` | `Function` | Error handler. |
+| `options.recomputeDependencies` | `boolean` | Re‑collect dependencies each run. |
+| `options.signal` | `AbortSignal` | AbortSignal. |
 
 #### Returns
 
 `fn`
 
-A function that can be called to unsubscribe the callback function from changes in the tracked dependencies.
+Unsubscribe function.
 
 ▸ (): `void`
 
@@ -127,38 +128,9 @@ A function that can be called to unsubscribe the callback function from changes 
 
 `void`
 
-**`Example`**
-
-```js
-const a = atom(0, { name: "a" });
-const b = atom(0, { name: "b" });
-let foo = 0;
-
-autorun(() => {
-    a.value;
-    b.value;
-    foo++;
-});
-
-console.log(a.value, b.value, foo); // 0 0 1
-
-a.value++;
-console.log(a.value, b.value, foo); // 1 0 2
-
-b.value++;
-console.log(a.value, b.value, foo); // 1 1 3
-
-batch(() => {
-    a.value++;
-    b.value++;
-});
-
-console.log(a.value, b.value, foo); // 2 2 4
-```
-
 #### Defined in
 
-[src/api/api.js:51](https://github.com/supercat1337/store2/blob/0a79678b73c0883858e42307757f633e90a127e5/src/api/api.js#L51)
+[src/api/api.js:194](https://github.com/supercat1337/store2/blob/c65c4382ec22e2f61bbc31b786846fc524db2820/src/api/api.js#L194)
 
 ___
 
@@ -207,7 +179,7 @@ console.log(a.value, b.value, foo); // 1 1 2
 
 #### Defined in
 
-[src/api/api.js:342](https://github.com/supercat1337/store2/blob/0a79678b73c0883858e42307757f633e90a127e5/src/api/api.js#L342)
+[src/api/api.js:405](https://github.com/supercat1337/store2/blob/c65c4382ec22e2f61bbc31b786846fc524db2820/src/api/api.js#L405)
 
 ___
 
@@ -239,7 +211,7 @@ A shallow copy of the object
 
 #### Defined in
 
-[src/helpers/tools.js:175](https://github.com/supercat1337/store2/blob/0a79678b73c0883858e42307757f633e90a127e5/src/helpers/tools.js#L175)
+[src/helpers/tools.js:175](https://github.com/supercat1337/store2/blob/c65c4382ec22e2f61bbc31b786846fc524db2820/src/helpers/tools.js#L175)
 
 ___
 
@@ -294,7 +266,7 @@ coll.value[0] = 10; // triggers subscriber
 
 #### Defined in
 
-[src/api/api.js:619](https://github.com/supercat1337/store2/blob/0a79678b73c0883858e42307757f633e90a127e5/src/api/api.js#L619)
+[src/api/api.js:682](https://github.com/supercat1337/store2/blob/c65c4382ec22e2f61bbc31b786846fc524db2820/src/api/api.js#L682)
 
 ___
 
@@ -318,7 +290,7 @@ If objects are not arrays, then check if sorted stringified versions of them are
 
 #### Defined in
 
-[src/helpers/tools.js:115](https://github.com/supercat1337/store2/blob/0a79678b73c0883858e42307757f633e90a127e5/src/helpers/tools.js#L115)
+[src/helpers/tools.js:115](https://github.com/supercat1337/store2/blob/c65c4382ec22e2f61bbc31b786846fc524db2820/src/helpers/tools.js#L115)
 
 ___
 
@@ -344,7 +316,7 @@ True if the two objects are equal, false otherwise.
 
 #### Defined in
 
-[src/helpers/tools.js:77](https://github.com/supercat1337/store2/blob/0a79678b73c0883858e42307757f633e90a127e5/src/helpers/tools.js#L77)
+[src/helpers/tools.js:77](https://github.com/supercat1337/store2/blob/c65c4382ec22e2f61bbc31b786846fc524db2820/src/helpers/tools.js#L77)
 
 ___
 
@@ -392,7 +364,7 @@ a.value = 1;
 
 #### Defined in
 
-[src/api/api.js:584](https://github.com/supercat1337/store2/blob/0a79678b73c0883858e42307757f633e90a127e5/src/api/api.js#L584)
+[src/api/api.js:647](https://github.com/supercat1337/store2/blob/c65c4382ec22e2f61bbc31b786846fc524db2820/src/api/api.js#L647)
 
 ___
 
@@ -427,7 +399,7 @@ window.addEventListener('resize', debounce((evt) => console.log(evt), 250));
 
 #### Defined in
 
-[src/helpers/tools.js:148](https://github.com/supercat1337/store2/blob/0a79678b73c0883858e42307757f633e90a127e5/src/helpers/tools.js#L148)
+[src/helpers/tools.js:148](https://github.com/supercat1337/store2/blob/c65c4382ec22e2f61bbc31b786846fc524db2820/src/helpers/tools.js#L148)
 
 ___
 
@@ -490,7 +462,7 @@ console.log(foo); // 2
 
 #### Defined in
 
-[src/api/api.js:863](https://github.com/supercat1337/store2/blob/0a79678b73c0883858e42307757f633e90a127e5/src/api/api.js#L863)
+[src/api/api.js:926](https://github.com/supercat1337/store2/blob/c65c4382ec22e2f61bbc31b786846fc524db2820/src/api/api.js#L926)
 
 ___
 
@@ -551,7 +523,7 @@ await fromPromiseResult.case({
 
 #### Defined in
 
-[src/api/api.js:471](https://github.com/supercat1337/store2/blob/0a79678b73c0883858e42307757f633e90a127e5/src/api/api.js#L471)
+[src/api/api.js:534](https://github.com/supercat1337/store2/blob/c65c4382ec22e2f61bbc31b786846fc524db2820/src/api/api.js#L534)
 
 ___
 
@@ -578,7 +550,7 @@ A plain object with all property descriptors of the object.
 
 #### Defined in
 
-[src/helpers/tools.js:203](https://github.com/supercat1337/store2/blob/0a79678b73c0883858e42307757f633e90a127e5/src/helpers/tools.js#L203)
+[src/helpers/tools.js:203](https://github.com/supercat1337/store2/blob/c65c4382ec22e2f61bbc31b786846fc524db2820/src/helpers/tools.js#L203)
 
 ___
 
@@ -631,7 +603,7 @@ getError(undefined).message; // 'undefined'
 
 #### Defined in
 
-[src/helpers/tools.js:240](https://github.com/supercat1337/store2/blob/0a79678b73c0883858e42307757f633e90a127e5/src/helpers/tools.js#L240)
+[src/helpers/tools.js:240](https://github.com/supercat1337/store2/blob/c65c4382ec22e2f61bbc31b786846fc524db2820/src/helpers/tools.js#L240)
 
 ___
 
@@ -683,7 +655,7 @@ getItemNamesFromSet(set, { fallback: '?', sorted: false });
 
 #### Defined in
 
-[src/helpers/tools.js:266](https://github.com/supercat1337/store2/blob/0a79678b73c0883858e42307757f633e90a127e5/src/helpers/tools.js#L266)
+[src/helpers/tools.js:266](https://github.com/supercat1337/store2/blob/c65c4382ec22e2f61bbc31b786846fc524db2820/src/helpers/tools.js#L266)
 
 ___
 
@@ -722,7 +694,7 @@ const unsubscribe = now.subscribe(() => {
 
 #### Defined in
 
-[src/api/api.js:413](https://github.com/supercat1337/store2/blob/0a79678b73c0883858e42307757f633e90a127e5/src/api/api.js#L413)
+[src/api/api.js:476](https://github.com/supercat1337/store2/blob/c65c4382ec22e2f61bbc31b786846fc524db2820/src/api/api.js#L476)
 
 ___
 
@@ -748,7 +720,7 @@ A sorted array of unique reactive items.
 
 #### Defined in
 
-[src/helpers/tools.js:27](https://github.com/supercat1337/store2/blob/0a79678b73c0883858e42307757f633e90a127e5/src/helpers/tools.js#L27)
+[src/helpers/tools.js:27](https://github.com/supercat1337/store2/blob/c65c4382ec22e2f61bbc31b786846fc524db2820/src/helpers/tools.js#L27)
 
 ___
 
@@ -772,7 +744,7 @@ true if the value is a plain object, false otherwise.
 
 #### Defined in
 
-[src/helpers/tools.js:45](https://github.com/supercat1337/store2/blob/0a79678b73c0883858e42307757f633e90a127e5/src/helpers/tools.js#L45)
+[src/helpers/tools.js:45](https://github.com/supercat1337/store2/blob/c65c4382ec22e2f61bbc31b786846fc524db2820/src/helpers/tools.js#L45)
 
 ___
 
@@ -834,7 +806,7 @@ console.log(foo); // 3
 
 #### Defined in
 
-[src/api/api.js:907](https://github.com/supercat1337/store2/blob/0a79678b73c0883858e42307757f633e90a127e5/src/api/api.js#L907)
+[src/api/api.js:970](https://github.com/supercat1337/store2/blob/c65c4382ec22e2f61bbc31b786846fc524db2820/src/api/api.js#L970)
 
 ___
 
@@ -942,36 +914,37 @@ console.log(foo); // 3
 
 #### Defined in
 
-[src/api/api.js:742](https://github.com/supercat1337/store2/blob/0a79678b73c0883858e42307757f633e90a127e5/src/api/api.js#L742)
+[src/api/api.js:805](https://github.com/supercat1337/store2/blob/c65c4382ec22e2f61bbc31b786846fc524db2820/src/api/api.js#L805)
 
 ___
 
 ### reaction
 
-▸ **reaction**(`dataFunction`, `fn`, `options?`): () => `void`
+▸ **reaction**(`dataFn`, `effectFn`, `options?`): () => `void`
 
-Tracks reactive items used by the specified data function and subscribes
-the provided callback function to changes in these items. This ensures
-that the callback is executed whenever any of the tracked dependencies
-change, allowing for reactive updates based on the data function.
+Reaction – tracks dependencies via dataFn and runs effectFn when they change.
+The effect is NOT run immediately; it only runs after the first change.
+Dependencies are re‑collected on every run by default.
 
 #### Parameters
 
 | Name | Type | Description |
 | :------ | :------ | :------ |
-| `dataFunction` | () => `any` | The function whose reactive dependencies are tracked. |
-| `fn` | (`updates?`: `Map`\<`string`, [`UpdateDataRecord`](classes/internal_.UpdateDataRecord.md)\>) => `void` | The callback function to execute when tracked dependencies change. |
-| `options?` | `Object` | The options for the reaction function. |
-| `options.delay` | `number` | The number of milliseconds to delay the execution of the callback function. |
-| `options.name` | `string` | An optional name for the reaction. |
-| `options.signal` | `AbortSignal` | An optional signal to abort the reaction. |
-| `options.type` | `string` | An optional type for the reaction. Defaults to "reaction". |
+| `dataFn` | () => `any` | Function whose dependencies are tracked. |
+| `effectFn` | (`updates?`: `Map`\<`string`, [`UpdateDataRecord`](classes/internal_.UpdateDataRecord.md)\>) => `void` | Effect to run. |
+| `options?` | `Object` | Options. |
+| `options.delay` | `number` | Debounce delay (ms). |
+| `options.name` | `string` | Debug name. |
+| `options.onError` | `Function` | Error handler. |
+| `options.passUpdates` | `boolean` | Pass collected updates to effectFn. |
+| `options.recomputeDependencies` | `boolean` | Re‑collect dependencies each run. |
+| `options.signal` | `AbortSignal` | AbortSignal. |
 
 #### Returns
 
 `fn`
 
-A function that can be called to unsubscribe the callback function from changes in the tracked dependencies.
+Unsubscribe function.
 
 ▸ (): `void`
 
@@ -979,42 +952,9 @@ A function that can be called to unsubscribe the callback function from changes 
 
 `void`
 
-**`Example`**
-
-```js
-const a = atom(0);
-const b = atom(0);
-
-let foo = 0;
-
-// runs only data-function to get dependencies
-// and then subscribes to changes in a and b
-reaction(
-    () => [a.value, b.value],
-    () => {
-        foo++;
-    }
-);
-
-console.log(a.value, b.value, foo); // 0 0 0
-
-a.value++;
-console.log(a.value, b.value, foo); // 1 0 1
-
-b.value++;
-console.log(a.value, b.value, foo); // 1 1 2
-
-batch(() => {
-    a.value++;
-    b.value++;
-});
-
-console.log(a.value, b.value, foo); // 2 2 3
-```
-
 #### Defined in
 
-[src/api/api.js:120](https://github.com/supercat1337/store2/blob/0a79678b73c0883858e42307757f633e90a127e5/src/api/api.js#L120)
+[src/api/api.js:218](https://github.com/supercat1337/store2/blob/c65c4382ec22e2f61bbc31b786846fc524db2820/src/api/api.js#L218)
 
 ___
 
@@ -1057,7 +997,7 @@ console.log(a.value, b.value, count); // 1 1 1
 
 #### Defined in
 
-[src/api/api.js:303](https://github.com/supercat1337/store2/blob/0a79678b73c0883858e42307757f633e90a127e5/src/api/api.js#L303)
+[src/api/api.js:364](https://github.com/supercat1337/store2/blob/c65c4382ec22e2f61bbc31b786846fc524db2820/src/api/api.js#L364)
 
 ___
 
@@ -1110,7 +1050,7 @@ reactive.value.b = 5; // triggers subscriber
 
 #### Defined in
 
-[src/api/api.js:652](https://github.com/supercat1337/store2/blob/0a79678b73c0883858e42307757f633e90a127e5/src/api/api.js#L652)
+[src/api/api.js:715](https://github.com/supercat1337/store2/blob/c65c4382ec22e2f61bbc31b786846fc524db2820/src/api/api.js#L715)
 
 ___
 
@@ -1132,7 +1072,7 @@ A Promise-based sleep function.
 
 #### Defined in
 
-[src/helpers/tools.js:191](https://github.com/supercat1337/store2/blob/0a79678b73c0883858e42307757f633e90a127e5/src/helpers/tools.js#L191)
+[src/helpers/tools.js:191](https://github.com/supercat1337/store2/blob/c65c4382ec22e2f61bbc31b786846fc524db2820/src/helpers/tools.js#L191)
 
 ___
 
@@ -1159,7 +1099,7 @@ when they are notified of changes.
 
 #### Defined in
 
-[src/helpers/tools.js:14](https://github.com/supercat1337/store2/blob/0a79678b73c0883858e42307757f633e90a127e5/src/helpers/tools.js#L14)
+[src/helpers/tools.js:14](https://github.com/supercat1337/store2/blob/c65c4382ec22e2f61bbc31b786846fc524db2820/src/helpers/tools.js#L14)
 
 ___
 
@@ -1214,7 +1154,7 @@ console.log(a.value, b.value, foo); // 1 1 2
 
 #### Defined in
 
-[src/api/api.js:380](https://github.com/supercat1337/store2/blob/0a79678b73c0883858e42307757f633e90a127e5/src/api/api.js#L380)
+[src/api/api.js:443](https://github.com/supercat1337/store2/blob/c65c4382ec22e2f61bbc31b786846fc524db2820/src/api/api.js#L443)
 
 ___
 
@@ -1255,7 +1195,7 @@ a.value = 4; // foo = 1
 
 #### Defined in
 
-[src/api/api.js:247](https://github.com/supercat1337/store2/blob/0a79678b73c0883858e42307757f633e90a127e5/src/api/api.js#L247)
+[src/api/api.js:308](https://github.com/supercat1337/store2/blob/c65c4382ec22e2f61bbc31b786846fc524db2820/src/api/api.js#L308)
 
 ___
 
@@ -1312,4 +1252,4 @@ a.value = 5; // foo = 2
 
 #### Defined in
 
-[src/api/api.js:195](https://github.com/supercat1337/store2/blob/0a79678b73c0883858e42307757f633e90a127e5/src/api/api.js#L195)
+[src/api/api.js:256](https://github.com/supercat1337/store2/blob/c65c4382ec22e2f61bbc31b786846fc524db2820/src/api/api.js#L256)

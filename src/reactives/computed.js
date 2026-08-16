@@ -341,7 +341,9 @@ class Computed extends ReactiveItem {
         this.#currentValue = clone(value);
 
         const newValue = this.#currentValue;
-        //this.engine.version++;
+
+        //console.log(`[Computed] ${this.name} calc: old=${this.#currentValue}, new=${value}`);
+
         if (engine.addUpdate('', 'set', oldValue, newValue)) {
             engine.valueChangedCallback();
         }

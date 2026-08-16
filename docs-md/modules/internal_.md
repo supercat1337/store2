@@ -7,12 +7,15 @@
 ### Classes
 
 - [BatchSnapshot](../classes/internal_.BatchSnapshot.md)
+- [DependencyGraph](../classes/internal_.DependencyGraph.md)
 - [Engine](../classes/internal_.Engine.md)
 - [EventEmitter](../classes/internal_.EventEmitter.md)
 - [EventEmitterLite](../classes/internal_.EventEmitterLite.md)
+- [MessageHandler](../classes/internal_.MessageHandler.md)
 - [SubscribeController](../classes/internal_.SubscribeController.md)
 - [UpdateDataRecord](../classes/internal_.UpdateDataRecord.md)
 - [UpdateDataRecordManager](../classes/internal_.UpdateDataRecordManager.md)
+- [UpdateTracker](../classes/internal_.UpdateTracker.md)
 
 ### Interfaces
 
@@ -55,7 +58,7 @@
 
 #### Defined in
 
-[src/types.d.ts:3](https://github.com/supercat1337/store2/blob/0a79678b73c0883858e42307757f633e90a127e5/src/types.d.ts#L3)
+[src/types.d.ts:4](https://github.com/supercat1337/store2/blob/c65c4382ec22e2f61bbc31b786846fc524db2820/src/types.d.ts#L4)
 
 ___
 

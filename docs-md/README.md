@@ -6,6 +6,17 @@ A lightweight, efficient, and fully reactive state management library for JavaSc
 
 [![npm version](https://badge.fury.io/js/%40supercat1337%2Fstore2.svg)](https://www.npmjs.com/package/@supercat1337/store2)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Bundle Size](https://img.shields.io/bundlephobia/minzip/@supercat1337/store2)](https://bundlephobia.com/package/@supercat1337/store2)
+
+---
+
+## Why store2?
+
+- **Lightweight** — Zero runtime dependencies (only `@supercat1337/event-emitter` under the hood)
+- **MobX‑inspired DX** — Transparent reactive graph, but with a smaller footprint
+- **Framework‑agnostic** — Works with vanilla JS, React, Vue, Svelte, or any DOM environment
+- **Predictable batching** — Updates are batched by default, no subtle race conditions
+- **Full TypeScript support** — Typed via JSDoc, no separate `@types` package needed
 
 ---
 
@@ -65,9 +76,10 @@ batch(() => {
 ```js
 const count = atom(0);
 const btn = document.getElementById('counter-btn');
+const display = document.getElementById('display');
 
 autorun(() => {
-    btn.textContent = `Clicks: ${count.value}`;
+    display.textContent = `Clicks: ${count.value}`;
 });
 
 btn.addEventListener('click', () => count.value++);
@@ -75,7 +87,27 @@ btn.addEventListener('click', () => count.value++);
 
 ---
 
+## Examples
+
+Check out the [`examples/`](./examples) folder for runnable demos covering all features:
+
+- **Basics** – atoms, computed, batch, untrack
+- **Reactions** – autorun, reaction, when, waitUntil
+- **Collections** – collection, shallowReactive, ReactiveList
+- **Stores** – Store, nested stores
+- **Classes** – makeObservable, makeAutoObservable, extendObservable
+- **Async** – fromPromise, getNow
+
+---
+
 ## Core Concepts
+
+| Primitive           | Purpose                   | Example                                           |
+| ------------------- | ------------------------- | ------------------------------------------------- |
+| `atom()`            | Single mutable value      | `const count = atom(0)`                           |
+| `computed()`        | Derived value (cached)    | `const double = computed(() => count.value * 2)`  |
+| `collection()`      | Reactive array            | `const items = collection([1, 2, 3])`             |
+| `shallowReactive()` | Reactive object (shallow) | `const state = shallowReactive({ name: 'Alex' })` |
 
 ### Atoms
 
@@ -132,6 +164,45 @@ state.age = 31; // triggers notification
 ```
 
 📖 Full documentation: [`ShallowReactive`](docs-md/classes/ShallowReactive.md)
+
+---
+
+## ⚠️ Important: Nested Mutations Are Not Tracked
+
+`store2` uses reference equality (`===`) by default to detect changes. This means:
+
+```js
+const user = atom({ name: 'Alex', age: 25 });
+user.value.age = 26; // ❌ Does NOT trigger reactivity
+```
+
+**Always use immutable updates:**
+
+```js
+user.value = { ...user.value, age: 26 }; // ✅ Triggers reactivity
+```
+
+For deeply nested structures, consider:
+
+- **Atomization** – split state into multiple atoms:
+    ```js
+    const userName = atom('Alex');
+    const userAge = atom(25);
+    ```
+- **`makeAutoObservable`** – for classes with nested objects:
+    ```js
+    class User {
+        name = 'Alex';
+        profile = { age: 25 };
+        constructor() {
+            makeAutoObservable(this);
+        }
+    }
+    const user = new User();
+    user.profile.age = 26; // ✅ Works!
+    ```
+
+📖 See the [full documentation on deep objects](docs-md/README.md#working-with-deep-objects) for more details.
 
 ---
 
@@ -193,7 +264,9 @@ console.log(list.toArray()); // [42, 3]
 
 ### `autorun(fn, options)`
 
-Runs `fn` immediately and re‑runs it whenever any reactive value used inside changes. Dependencies are collected **only during the first run**.
+Runs `fn` immediately and re‑runs it whenever any reactive value used inside changes.  
+Dependencies are re‑collected on every run by default (unless `recomputeDependencies: false` is set).  
+Unlike `reaction`, `autorun` does **not** receive a `updates` map – it simply re‑executes the whole function.
 
 ```js
 const a = atom(1);
@@ -207,14 +280,33 @@ a.value = 5; // Output: 7
 
 ### `reaction(dataFn, effectFn, options)`
 
-Tracks dependencies inside `dataFn` and runs `effectFn` whenever those dependencies change.
+Tracks dependencies inside `dataFn` and runs `effectFn` whenever those dependencies change.  
+By default, `effectFn` receives a `Map` containing the exact updates (property paths → `UpdateDataRecord`) that triggered the reaction. This is useful for fine-grained DOM updates, logging, or optimising expensive operations.
 
 ```js
+import { reaction, atom } from '@supercat1337/store2';
+
+const a = atom(1);
+const b = atom(2);
+
 reaction(
     () => [a.value, b.value],
-    () => console.log('a or b changed')
+    updates => {
+        console.log('Changed keys:', Array.from(updates.keys()));
+        // updates contains: oldValue, newValue, type for each changed key
+    }
 );
+
+a.value = 10; // triggers reaction with updates
 ```
+
+**Options:**
+
+- `passUpdates` (boolean, default `true`) – if `true`, passes a `Map` of updates to `effectFn`. Set to `false` to disable.
+- `recomputeDependencies` (boolean, default `true`) – re‑collect dependencies on each run.
+- `delay` (number) – debounce delay in milliseconds.
+- `signal` (AbortSignal) – cancellation signal.
+- `onError` (function) – error handler.
 
 ### `batch(fn)`
 
@@ -295,25 +387,43 @@ counter.increment(); // logs "Double: 2"
 
 ---
 
+## Migration from MobX (Quick Reference)
+
+| MobX                       | store2                     |
+| -------------------------- | -------------------------- |
+| `observable({ ... })`      | `shallowReactive({ ... })` |
+| `computed(() => ...)`      | `computed(() => ...)`      |
+| `autorun(() => ...)`       | `autorun(() => ...)`       |
+| `action(() => ...)`        | `batch(() => ...)`         |
+| `makeAutoObservable(this)` | `makeAutoObservable(this)` |
+| `observable([])`           | `collection([])`           |
+| `observable.map()`         | `Store`                    |
+
+---
+
 ## Important Notes / Known Limitations
 
-- **Static dependency collection in `autorun` and `reaction`**
-  Dependencies are captured **only once** – during the first execution of the tracked function. If your function conditionally uses different reactive items, changes to items not used in the first run **will not** trigger the effect. Use `computed` or restructure to ensure all possible dependencies are touched.
+- **Static dependency collection in `autorun` and `reaction`**  
+  Dependencies are captured **only once** – during the first execution of the tracked function. If your function conditionally uses different reactive items (e.g., inside an `if` statement), changes to items not used in the first run **will not** trigger the effect.  
+  **Workaround:** Use `computed` to pre‑compute conditional values, or restructure your effect so that all possible dependencies are accessed during the first run (e.g., by reading them unconditionally).
 
-- **`Atom` clones objects shallowly**
+- **`Atom` clones objects shallowly**  
   When you assign an object/array to an `Atom`, it is shallow‑cloned (`Object.assign` or `slice`). Mutating nested properties **will not** trigger reactivity. Use `Collection` or `ShallowReactive` for nested structures.
 
-- **`Collection` and `ShallowReactive` return Proxies**
+- **`Collection` and `ShallowReactive` return Proxies**  
   The `.value` property of a `Collection` and the result of `shallowReactive()` are reactive Proxies. Direct mutations via the proxy are tracked; using the raw underlying value (via `.getRawValue()`) breaks reactivity.
 
-- **Destructuring breaks reactivity**
+- **Destructuring breaks reactivity**  
   When using `shallowReactive` or accessing properties of a `Collection`, destructuring fields (e.g., `const { name, age } = state`) breaks reactivity for those variables. Always access properties directly through the reactive object (e.g., `state.age`) to ensure dependencies are tracked correctly.
 
-- **Error handling in Computed**
+- **Error handling in Computed**  
   If a `Computed` function throws an error, the error is caught and stored. The computed will re‑throw the same error until its dependencies change, at which point it will try to recompute.
 
-- **Destroyed items**
+- **Destroyed items**  
   Calling `destroy()` on a reactive item cleans up all subscriptions and dependencies. Further operations (except checking `isDestroyed`) will throw an error.
+
+- **`autorun` vs `reaction` for updates**  
+  `autorun` does **not** receive `updates` – it re‑runs the entire effect. If you need fine‑grained change information (e.g., for selective DOM updates), use `reaction` with `passUpdates: true` (the default).
 
 ---
 
@@ -326,13 +436,14 @@ This library is written in plain JavaScript with JSDoc annotations. Type definit
 ## Documentation & Examples
 
 - **Full API Documentation**: [`docs-md/README.md`](docs-md/README.md)
-- **Examples**: Check out the [`examples/`](examples/) folder for runnable code snippets covering all features.
+- **Examples**: Check out the [`examples/`](./examples) folder for runnable code snippets covering all features.
+- **Architecture Overview**: For a deep dive into the internal architecture, dependency graph, batching, and core engine mechanics, see [`AGENTS.md`](./AGENTS.md) — this file is also intended for AI assistants and advanced developers.
 
 ---
 
 ## License
 
-MIT © 2025 Albert Bazaleev
+MIT © 2025–2026 Albert Bazaleev
 
 ---
 

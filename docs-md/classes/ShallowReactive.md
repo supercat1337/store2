@@ -140,7 +140,7 @@ Initializes a ShallowReactive instance with a given value.
 
 #### Defined in
 
-[src/reactives/ShallowReactive.js:80](https://github.com/supercat1337/store2/blob/0a79678b73c0883858e42307757f633e90a127e5/src/reactives/ShallowReactive.js#L80)
+[src/reactives/ShallowReactive.js:80](https://github.com/supercat1337/store2/blob/c65c4382ec22e2f61bbc31b786846fc524db2820/src/reactives/ShallowReactive.js#L80)
 
 ## Properties
 
@@ -150,7 +150,7 @@ Initializes a ShallowReactive instance with a given value.
 
 #### Defined in
 
-[src/reactives/ShallowReactive.js:72](https://github.com/supercat1337/store2/blob/0a79678b73c0883858e42307757f633e90a127e5/src/reactives/ShallowReactive.js#L72)
+[src/reactives/ShallowReactive.js:72](https://github.com/supercat1337/store2/blob/c65c4382ec22e2f61bbc31b786846fc524db2820/src/reactives/ShallowReactive.js#L72)
 
 ___
 
@@ -160,7 +160,7 @@ ___
 
 #### Defined in
 
-[src/reactives/ShallowReactive.js:69](https://github.com/supercat1337/store2/blob/0a79678b73c0883858e42307757f633e90a127e5/src/reactives/ShallowReactive.js#L69)
+[src/reactives/ShallowReactive.js:69](https://github.com/supercat1337/store2/blob/c65c4382ec22e2f61bbc31b786846fc524db2820/src/reactives/ShallowReactive.js#L69)
 
 ___
 
@@ -170,7 +170,7 @@ ___
 
 #### Defined in
 
-[src/reactives/ShallowReactive.js:66](https://github.com/supercat1337/store2/blob/0a79678b73c0883858e42307757f633e90a127e5/src/reactives/ShallowReactive.js#L66)
+[src/reactives/ShallowReactive.js:66](https://github.com/supercat1337/store2/blob/c65c4382ec22e2f61bbc31b786846fc524db2820/src/reactives/ShallowReactive.js#L66)
 
 ___
 
@@ -184,7 +184,7 @@ ___
 
 #### Defined in
 
-[src/reactives/ReactiveItem.js:13](https://github.com/supercat1337/store2/blob/0a79678b73c0883858e42307757f633e90a127e5/src/reactives/ReactiveItem.js#L13)
+[src/reactives/ReactiveItem.js:14](https://github.com/supercat1337/store2/blob/c65c4382ec22e2f61bbc31b786846fc524db2820/src/reactives/ReactiveItem.js#L14)
 
 ___
 
@@ -198,7 +198,7 @@ ___
 
 #### Defined in
 
-[src/reactives/ShallowReactive.js:88](https://github.com/supercat1337/store2/blob/0a79678b73c0883858e42307757f633e90a127e5/src/reactives/ShallowReactive.js#L88)
+[src/reactives/ShallowReactive.js:88](https://github.com/supercat1337/store2/blob/c65c4382ec22e2f61bbc31b786846fc524db2820/src/reactives/ShallowReactive.js#L88)
 
 ## Accessors
 
@@ -218,7 +218,7 @@ ReactiveItem.isDestroyed
 
 #### Defined in
 
-[src/reactives/ReactiveItem.js:180](https://github.com/supercat1337/store2/blob/0a79678b73c0883858e42307757f633e90a127e5/src/reactives/ReactiveItem.js#L180)
+[src/reactives/ReactiveItem.js:181](https://github.com/supercat1337/store2/blob/c65c4382ec22e2f61bbc31b786846fc524db2820/src/reactives/ReactiveItem.js#L181)
 
 ___
 
@@ -237,7 +237,7 @@ The proxied value of the ShallowReactive.
 
 #### Defined in
 
-[src/reactives/ShallowReactive.js:230](https://github.com/supercat1337/store2/blob/0a79678b73c0883858e42307757f633e90a127e5/src/reactives/ShallowReactive.js#L230)
+[src/reactives/ShallowReactive.js:230](https://github.com/supercat1337/store2/blob/c65c4382ec22e2f61bbc31b786846fc524db2820/src/reactives/ShallowReactive.js#L230)
 
 • `set` **value**(`value`): `void`
 
@@ -255,7 +255,7 @@ Sets the value of the ShallowReactive. If the value is an object, it will be pro
 
 #### Defined in
 
-[src/reactives/ShallowReactive.js:221](https://github.com/supercat1337/store2/blob/0a79678b73c0883858e42307757f633e90a127e5/src/reactives/ShallowReactive.js#L221)
+[src/reactives/ShallowReactive.js:221](https://github.com/supercat1337/store2/blob/c65c4382ec22e2f61bbc31b786846fc524db2820/src/reactives/ShallowReactive.js#L221)
 
 ## Methods
 
@@ -275,7 +275,7 @@ Sets the value of the ShallowReactive. If the value is an object, it will be pro
 
 #### Defined in
 
-[src/reactives/ShallowReactive.js:101](https://github.com/supercat1337/store2/blob/0a79678b73c0883858e42307757f633e90a127e5/src/reactives/ShallowReactive.js#L101)
+[src/reactives/ShallowReactive.js:101](https://github.com/supercat1337/store2/blob/c65c4382ec22e2f61bbc31b786846fc524db2820/src/reactives/ShallowReactive.js#L101)
 
 ___
 
@@ -295,7 +295,7 @@ Removes all subscribers, including listeners for "#has-subscribers" and "#no-sub
 
 #### Defined in
 
-[src/reactives/ReactiveItem.js:47](https://github.com/supercat1337/store2/blob/0a79678b73c0883858e42307757f633e90a127e5/src/reactives/ReactiveItem.js#L47)
+[src/reactives/ReactiveItem.js:48](https://github.com/supercat1337/store2/blob/c65c4382ec22e2f61bbc31b786846fc524db2820/src/reactives/ReactiveItem.js#L48)
 
 ___
 
@@ -315,7 +315,7 @@ Removes all "change" subscribers. Listeners for "#has-subscribers" and "#no-subs
 
 #### Defined in
 
-[src/reactives/ReactiveItem.js:40](https://github.com/supercat1337/store2/blob/0a79678b73c0883858e42307757f633e90a127e5/src/reactives/ReactiveItem.js#L40)
+[src/reactives/ReactiveItem.js:41](https://github.com/supercat1337/store2/blob/c65c4382ec22e2f61bbc31b786846fc524db2820/src/reactives/ReactiveItem.js#L41)
 
 ___
 
@@ -337,7 +337,7 @@ removes all dependencies, dependents and subscribers, and marks the engine as de
 
 #### Defined in
 
-[src/reactives/ReactiveItem.js:153](https://github.com/supercat1337/store2/blob/0a79678b73c0883858e42307757f633e90a127e5/src/reactives/ReactiveItem.js#L153)
+[src/reactives/ReactiveItem.js:154](https://github.com/supercat1337/store2/blob/c65c4382ec22e2f61bbc31b786846fc524db2820/src/reactives/ReactiveItem.js#L154)
 
 ___
 
@@ -368,7 +368,7 @@ True if the two values are equal, false otherwise.
 
 #### Defined in
 
-[src/reactives/ReactiveItem.js:165](https://github.com/supercat1337/store2/blob/0a79678b73c0883858e42307757f633e90a127e5/src/reactives/ReactiveItem.js#L165)
+[src/reactives/ReactiveItem.js:166](https://github.com/supercat1337/store2/blob/c65c4382ec22e2f61bbc31b786846fc524db2820/src/reactives/ReactiveItem.js#L166)
 
 ___
 
@@ -391,7 +391,7 @@ The last error that occurred, or null if there is no error.
 
 #### Defined in
 
-[src/reactives/ReactiveItem.js:90](https://github.com/supercat1337/store2/blob/0a79678b73c0883858e42307757f633e90a127e5/src/reactives/ReactiveItem.js#L90)
+[src/reactives/ReactiveItem.js:91](https://github.com/supercat1337/store2/blob/c65c4382ec22e2f61bbc31b786846fc524db2820/src/reactives/ReactiveItem.js#L91)
 
 ___
 
@@ -409,7 +409,7 @@ The raw, unproxied value of the ShallowReactive.
 
 #### Defined in
 
-[src/reactives/ShallowReactive.js:238](https://github.com/supercat1337/store2/blob/0a79678b73c0883858e42307757f633e90a127e5/src/reactives/ShallowReactive.js#L238)
+[src/reactives/ShallowReactive.js:238](https://github.com/supercat1337/store2/blob/c65c4382ec22e2f61bbc31b786846fc524db2820/src/reactives/ShallowReactive.js#L238)
 
 ___
 
@@ -439,7 +439,7 @@ The proxied value of the ShallowReactive.
 
 #### Defined in
 
-[src/reactives/ShallowReactive.js:188](https://github.com/supercat1337/store2/blob/0a79678b73c0883858e42307757f633e90a127e5/src/reactives/ShallowReactive.js#L188)
+[src/reactives/ShallowReactive.js:188](https://github.com/supercat1337/store2/blob/c65c4382ec22e2f61bbc31b786846fc524db2820/src/reactives/ShallowReactive.js#L188)
 
 ___
 
@@ -465,7 +465,7 @@ reactive item.
 
 #### Defined in
 
-[src/reactives/ReactiveItem.js:102](https://github.com/supercat1337/store2/blob/0a79678b73c0883858e42307757f633e90a127e5/src/reactives/ReactiveItem.js#L102)
+[src/reactives/ReactiveItem.js:103](https://github.com/supercat1337/store2/blob/c65c4382ec22e2f61bbc31b786846fc524db2820/src/reactives/ReactiveItem.js#L103)
 
 ___
 
@@ -487,7 +487,7 @@ Whether there are any subscribers.
 
 #### Defined in
 
-[src/reactives/ReactiveItem.js:55](https://github.com/supercat1337/store2/blob/0a79678b73c0883858e42307757f633e90a127e5/src/reactives/ReactiveItem.js#L55)
+[src/reactives/ReactiveItem.js:56](https://github.com/supercat1337/store2/blob/c65c4382ec22e2f61bbc31b786846fc524db2820/src/reactives/ReactiveItem.js#L56)
 
 ___
 
@@ -522,7 +522,7 @@ A function that unsubscribes the given function.
 
 #### Defined in
 
-[src/reactives/ReactiveItem.js:138](https://github.com/supercat1337/store2/blob/0a79678b73c0883858e42307757f633e90a127e5/src/reactives/ReactiveItem.js#L138)
+[src/reactives/ReactiveItem.js:139](https://github.com/supercat1337/store2/blob/c65c4382ec22e2f61bbc31b786846fc524db2820/src/reactives/ReactiveItem.js#L139)
 
 ___
 
@@ -557,7 +557,7 @@ A function that unsubscribes the given function.
 
 #### Defined in
 
-[src/reactives/ReactiveItem.js:118](https://github.com/supercat1337/store2/blob/0a79678b73c0883858e42307757f633e90a127e5/src/reactives/ReactiveItem.js#L118)
+[src/reactives/ReactiveItem.js:119](https://github.com/supercat1337/store2/blob/c65c4382ec22e2f61bbc31b786846fc524db2820/src/reactives/ReactiveItem.js#L119)
 
 ___
 
@@ -592,7 +592,7 @@ A function that unsubscribes the given function.
 
 #### Defined in
 
-[src/reactives/ReactiveItem.js:128](https://github.com/supercat1337/store2/blob/0a79678b73c0883858e42307757f633e90a127e5/src/reactives/ReactiveItem.js#L128)
+[src/reactives/ReactiveItem.js:129](https://github.com/supercat1337/store2/blob/c65c4382ec22e2f61bbc31b786846fc524db2820/src/reactives/ReactiveItem.js#L129)
 
 ___
 
@@ -614,7 +614,7 @@ The current value of the reactive item.
 
 #### Defined in
 
-[src/reactives/ReactiveItem.js:81](https://github.com/supercat1337/store2/blob/0a79678b73c0883858e42307757f633e90a127e5/src/reactives/ReactiveItem.js#L81)
+[src/reactives/ReactiveItem.js:82](https://github.com/supercat1337/store2/blob/c65c4382ec22e2f61bbc31b786846fc524db2820/src/reactives/ReactiveItem.js#L82)
 
 ___
 
@@ -636,7 +636,7 @@ Sets the value of the ShallowReactive. If the value is an object, it will be pro
 
 #### Defined in
 
-[src/reactives/ShallowReactive.js:197](https://github.com/supercat1337/store2/blob/0a79678b73c0883858e42307757f633e90a127e5/src/reactives/ShallowReactive.js#L197)
+[src/reactives/ShallowReactive.js:197](https://github.com/supercat1337/store2/blob/c65c4382ec22e2f61bbc31b786846fc524db2820/src/reactives/ShallowReactive.js#L197)
 
 ___
 
@@ -671,4 +671,4 @@ Subscribes a function to be called whenever the value of this reactive item chan
 
 #### Defined in
 
-[src/reactives/ReactiveItem.js:33](https://github.com/supercat1337/store2/blob/0a79678b73c0883858e42307757f633e90a127e5/src/reactives/ReactiveItem.js#L33)
+[src/reactives/ReactiveItem.js:34](https://github.com/supercat1337/store2/blob/c65c4382ec22e2f61bbc31b786846fc524db2820/src/reactives/ReactiveItem.js#L34)

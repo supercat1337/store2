@@ -341,9 +341,14 @@ function getItemNamesFromSet(
 class SubscribeController {
     /** @type {EventEmitter} */
     #emitter;
+    #reactiveItem;
 
-    constructor() {
+    /**
+     * @param {import('../types.js').ReactiveItem} reactiveItem
+     */
+    constructor(reactiveItem) {
         this.#emitter = new EventEmitter();
+        this.#reactiveItem = reactiveItem;
     }
 
     /**
@@ -357,7 +362,7 @@ class SubscribeController {
     /**
      * Subscribes a callback to the 'change' event.
      *
-     * @param {(updates: Map<string, import('./types.d.ts').UpdateDataRecord>) => void} fn
+     * @param {(updates: Map<string, import('../types.js').UpdateDataRecord>) => void} fn
      * @param {{ delay?: number, signal?: AbortSignal }} [options]
      * @returns {() => void}
      */
@@ -365,7 +370,21 @@ class SubscribeController {
         const { delay = 0, signal } = options || {};
         const wrappedFn = delay > 0 ? debounce(fn, delay) : fn;
 
-        return this.#emitter.on('change', wrappedFn, { signal });
+        const unsubscribe = this.#emitter.on('change', wrappedFn, { signal });
+        /*
+        console.log(
+            `[SubscribeController] subscribe for ${this.#reactiveItem?.name || 'unknown'}, listener added`
+        );
+        */
+
+        return () => {
+            /*
+            console.log(
+                `[SubscribeController] unsubscribe called for ${this.#reactiveItem?.name || 'unknown'}`
+            );
+            */
+            unsubscribe();
+        };
     }
 
     /**
@@ -373,6 +392,11 @@ class SubscribeController {
      * Internal listeners (has/no subscribers) remain intact.
      */
     clearSubscribers() {
+        /*
+        console.log(
+            `[SubscribeController] clearSubscribers called for ${this.#reactiveItem?.name || 'unknown'}`
+        );
+        */
         this.#emitter.removeAllListenersOf('change');
     }
 
@@ -380,6 +404,11 @@ class SubscribeController {
      * Removes all subscribers, including internal listeners.
      */
     clearAllSubscribers() {
+        /*
+        console.log(
+            `[SubscribeController] clearAllSubscribers called for ${this.#reactiveItem?.name || 'unknown'}`
+        );
+        */
         this.#emitter.removeAllListeners({ removeInternalListeners: true });
     }
 
@@ -395,6 +424,11 @@ class SubscribeController {
      * Destroys the controller, emits 'destroy', and removes all listeners.
      */
     destroy() {
+        /*
+        console.log(
+            `[SubscribeController] destroy called for ${this.#reactiveItem?.name || 'unknown'}`
+        );
+        */
         this.#emitter.emit('destroy');
         this.#emitter.removeAllListeners({ removeInternalListeners: true });
     }
@@ -438,16 +472,16 @@ class ModeControllerService {
     #batchDepth = 0;
     #subscribersMode = false;
 
-    /** @type {EventEmitter<"batchModeStart"|"batchModeEnd"|"beforeBatchModeEnd">} */
+    /** @type {EventEmitterLite<"batchModeStart"|"batchModeEnd"|"beforeBatchModeEnd">} */
     batchModeEvents;
 
-    /** @type {EventEmitter<"subscribersModeEnd">} */
+    /** @type {EventEmitterLite<"subscribersModeEnd">} */
     subscribersModeEvents;
 
     constructor() {
-        this.batchModeEvents = new EventEmitter();
+        this.batchModeEvents = new EventEmitterLite();
 
-        this.subscribersModeEvents = new EventEmitter();
+        this.subscribersModeEvents = new EventEmitterLite();
     }
 
     /**
@@ -552,6 +586,9 @@ class ChangedItemsController {
      * @param {import('./types.d.ts').ReactiveItem} item - The reactive item that changed.
      */
     addItem(item) {
+        //console.log('[addItem]addItem:', item.name);
+        //console.log('[addItem]modeController.batchMode', modeController.batchMode);
+
         this.items.add(item);
         if (!modeController.batchMode) {
             this.runSubscribers();
@@ -584,6 +621,13 @@ class ChangedItemsController {
      * are processed in the next iteration, preventing lost updates.
      */
     runSubscribers() {
+        /*
+        console.log(
+            '[runSubscribers] itemsToProcess:',
+            Array.from(this.items).map(i => i.name)
+        );
+        */
+
         /** @type {Set<import('./types.d.ts').ReactiveItem>} */
         const changedItemsWithUpdates = new Set();
 
@@ -591,6 +635,12 @@ class ChangedItemsController {
         while (this.items.size > 0) {
             // 1. Take a snapshot of the current pending items and clear the queue
             const itemsToProcess = new Set(this.items);
+            /*
+            console.log(
+                '[runSubscribers] itemsToProcess:',
+                Array.from(this.items).map(i => i.name)
+            );
+            */
             this.items.clear();
 
             // 2. Determine which items actually have effective updates
@@ -608,16 +658,33 @@ class ChangedItemsController {
                 }
             });
 
+            /*
+            console.log(
+                '[runSubscribers] changedItemsWithUpdates:',
+                Array.from(changedItemsWithUpdates).map(i => i.name)
+            );
+            */
+
             // 3. Collect all deep dependents that have subscribers and need recalculation
             /** @type {Set<import('./types.d.ts').ReactiveItem>} */
             const itemsToRecalc = new Set();
             changedItemsWithUpdates.forEach(item => {
                 item.engine.getDeepDependents().forEach(dep => {
                     if (dep.hasSubscribers()) {
-                        itemsToRecalc.add(dep);
+                        // Если у dep уже есть updates, не пересчитываем его повторно
+                        if (!dep.engine.hasUpdates()) {
+                            itemsToRecalc.add(dep);
+                        }
                     }
                 });
             });
+
+            /*
+            console.log(
+                '[runSubscribers] itemsToRecalc:',
+                Array.from(itemsToRecalc).map(i => i.name)
+            );
+            */
 
             // 4. Recalculate the stale computed values in a deterministic order
             Array.from(itemsToRecalc)
@@ -645,10 +712,33 @@ class ChangedItemsController {
                 });
             }
 
+            /*
+            console.log(
+                '[runSubscribers] after step 5, changedItemsWithUpdates:',
+                Array.from(changedItemsWithUpdates).map(i => i.name)
+            );
+            */
+
             // 6. Sort the items by creation order and filter those with active subscribers
+            /*
+            console.log(
+                '[runSubscribers] hasSubscribers before filter:',
+                Array.from(changedItemsWithUpdates).map(i => ({
+                    name: i.name,
+                    has: i.hasSubscribers(),
+                }))
+            );
+            */
             const changedItemsWithUpdatesSorted = Array.from(changedItemsWithUpdates)
                 .filter(item => item.hasSubscribers())
                 .sort(sortReactiveItems);
+
+            /*
+            console.log(
+                '[runSubscribers] changedItemsWithUpdatesSorted:',
+                changedItemsWithUpdatesSorted.map(i => i.name)
+            );
+            */
 
             // 7. Notify all subscribers while preventing nested mutations
             modeController.startSubscribersMode();
@@ -660,6 +750,12 @@ class ChangedItemsController {
                 const item = changedItemsWithUpdatesSorted[i];
                 const itemSubscribers = item.engine.subscribeController.getSubscribers();
 
+                /*
+                console.log(
+                    `[runSubscribers] Calling subscribers for ${item.name}, updates:`,
+                    Array.from(item.engine.updates.entries())
+                );
+                */
                 for (const subscriber of itemSubscribers) {
                     // Avoid calling the same subscriber function multiple times
                     if (usedSubscribers.has(subscriber)) {
@@ -667,6 +763,7 @@ class ChangedItemsController {
                     }
                     usedSubscribers.add(subscriber);
                     try {
+                        //console.log(`[runSubscribers] Subscriber called for ${item.name}`);
                         subscriber(item.engine.updates);
                     } catch (e) {
                         const err = getError(e);
@@ -718,67 +815,162 @@ const changedItemsController = new ChangedItemsController();
 
 // @ts-check
 
-class UpdateDataRecord {
-    /** @type {"set"|"delete"} */
-    type;
 
-    /** @type {any} */
-    value;
-
-    /** @type {any} */
-    oldValue;
-
-    /** @type {import('./types.d.ts').ReactiveItem|undefined} */
-    reactiveItem;
+/**
+ * Manages the dependency graph for a reactive item.
+ * Handles adding/removing dependencies and dependents, and propagating messages through the graph.
+ */
+class DependencyGraph {
+    /** @type {Set<import('./types.d.ts').ReactiveItem>} */
+    #dependencies;
+    /** @type {Set<import('./types.d.ts').ReactiveItem>} */
+    #dependents;
+    /** @type {import('./types.d.ts').ReactiveItem} */
+    #reactiveItem;
 
     /**
-     * Initializes an instance of UpdateDataRecord with the provided type, old value, and new value.
-     * @param {"set"|"delete"} type - The action performed, either "set" or "delete".
-     * @param {any} oldValue - The previous value before the update.
-     * @param {any} value - The new value after the update.
-     * @param {import('./types.d.ts').ReactiveItem} [reactiveItem] - The reactive item that triggered the update.
+     * @param {Set<import('./types.d.ts').ReactiveItem>} dependencies - The engine's dependencies set.
+     * @param {Set<import('./types.d.ts').ReactiveItem>} dependents - The engine's dependents set.
+     * @param {import('./types.d.ts').ReactiveItem} reactiveItem - The owning reactive item.
      */
-    constructor(type, oldValue, value, reactiveItem) {
-        this.type = type;
-        this.oldValue = oldValue;
-        this.value = value;
-        this.reactiveItem = reactiveItem;
-    }
-}
-
-class UpdateDataRecordManager {
-    /**
-     * Initializes an instance of UpdateDataRecordManager with the given data.
-     * @param {Map<string, UpdateDataRecord>} data - The data to be managed.
-     */
-    constructor(data) {
-        this.data = data;
+    constructor(dependencies, dependents, reactiveItem) {
+        this.#dependencies = dependencies;
+        this.#dependents = dependents;
+        this.#reactiveItem = reactiveItem;
     }
 
     /**
-     * Removes the specified item and its related sub-items from the data map.
-     * Replaces the deleted items with new UpdateDataRecord instances indicating the "delete" action.
-     * @param {string} itemName - The name of the item to be destroyed.
+     * Adds a single dependency.
+     * @param {import('./types.d.ts').ReactiveItem} dependency
      */
-    removeItem(itemName) {
-        //this.data.delete(itemName);
-        this.data.set(
-            itemName,
-            new UpdateDataRecord("delete", undefined, undefined, undefined)
-        );
+    addDependency(dependency) {
+        if (!this.#dependencies.has(dependency)) {
+            this.#dependencies.add(dependency);
+        }
+    }
 
-        /** @type {string[]} */
-        const keysToDelete = [];
-
-        this.data.forEach((item, key) => {
-            if (key.startsWith(itemName + ".")) {
-                keysToDelete.push(key);
+    /**
+     * Adds multiple dependencies, sorted by id, and registers this reactive item as a dependent on each.
+     * @param {Set<import('./types.d.ts').ReactiveItem>} deps - Set of dependencies to add.
+     */
+    addDependencies(deps) {
+        const array = [];
+        for (const dep of deps) {
+            if (!this.#dependencies.has(dep)) {
+                array.push(dep);
+                dep.engine.addDependent(this.#reactiveItem);
             }
-        });
+        }
+        array.sort(sortReactiveItems);
+        for (const dep of array) {
+            this.#dependencies.add(dep);
+        }
+    }
 
-        keysToDelete.forEach((key) => {
-            this.data.delete(key);
-        });
+    /**
+     * Removes a dependent from the dependents set.
+     * @param {import('./types.d.ts').ReactiveItem} dependent
+     */
+    removeDependent(dependent) {
+        this.#dependents.delete(dependent);
+    }
+
+    /**
+     * Adds a dependent to the dependents set.
+     * @param {import('./types.d.ts').ReactiveItem} dependent
+     * @returns {boolean} True if the dependent was added (i.e., not already present).
+     */
+    addDependent(dependent) {
+        if (!this.#dependents.has(dependent)) {
+            this.#dependents.add(dependent);
+            return true;
+        }
+        return false;
+    }
+
+    /**
+     * Returns all dependents of this reactive item (direct and indirect).
+     * @returns {Set<import('./types.d.ts').ReactiveItem>}
+     */
+    getDeepDependents() {
+        const result = new Set();
+        const queue = [this.#reactiveItem];
+        const visited = new Set();
+        while (queue.length) {
+            const current = queue.shift();
+            if (!current || visited.has(current)) {continue;}
+            visited.add(current);
+            for (const dependent of current.engine.dependents) {
+                if (!result.has(dependent)) {
+                    result.add(dependent);
+                    queue.push(dependent);
+                }
+            }
+        }
+        return result;
+    }
+
+    /**
+     * Returns sorted array of deep dependents.
+     * @returns {Array<import('./types.d.ts').ReactiveItem>}
+     */
+    getDeepDependentsArray() {
+        const array = Array.from(this.getDeepDependents());
+        array.sort(sortReactiveItems);
+        return array;
+    }
+
+    /**
+     * Notifies all dependents of a message.
+     * @param {number} message - The message code (EngineMessages).
+     * @param {{ sender: import('./types.d.ts').ReactiveItem, recipients: Set<import('./types.d.ts').ReactiveItem> }} ctx - Context containing sender and recipient set.
+     */
+    notifyDependents(message, ctx) {
+        for (const dependent of this.#dependents) {
+            ctx.recipients.add(dependent);
+            dependent.engine.getMessage(message, ctx);
+        }
+    }
+
+    /**
+     * Notifies all dependencies of a message.
+     * @param {number} message - The message code.
+     * @param {{ sender: import('./types.d.ts').ReactiveItem, recipients: Set<import('./types.d.ts').ReactiveItem> }} ctx
+     */
+    notifyDependencies(message, ctx) {
+        for (const dependency of this.#dependencies) {
+            ctx.recipients.add(dependency);
+            dependency.engine.getMessage(message, ctx);
+        }
+    }
+
+    /**
+     * Updates the dependency set to a new set.
+     * @param {Set<import('./types.d.ts').ReactiveItem>} newDeps - New set of dependencies.
+     */
+    updateDependencies(newDeps) {
+        // Remove old dependencies no longer needed
+        for (const oldDep of this.#dependencies) {
+            if (!newDeps.has(oldDep)) {
+                this.#dependencies.delete(oldDep);
+                oldDep.engine.removeDependent(this.#reactiveItem);
+            }
+        }
+        // Add new dependencies
+        for (const newDep of newDeps) {
+            if (!this.#dependencies.has(newDep)) {
+                this.#dependencies.add(newDep);
+                newDep.engine.addDependent(this.#reactiveItem);
+            }
+        }
+    }
+
+    /**
+     * Clears the graph (removes all dependencies and dependents).
+     */
+    clear() {
+        this.#dependencies.clear();
+        this.#dependents.clear();
     }
 }
 
@@ -875,153 +1067,157 @@ class BatchSnapshot {
 
 // @ts-check
 
+class UpdateDataRecord {
+    /** @type {"set"|"delete"} */
+    type;
 
-/** @enum {number} */
-const EngineMessages = {
-    DEPENDENCY_CHANGED: 1,
-    DEPENDENCY_DESTROYED: 2,
-    HAS_ERROR: 3,
-    DEPENDENT_DESTROYED: 4,
-};
+    /** @type {any} */
+    value;
 
-const ATOM = 1;
-const COMPUTED = 2;
-const COLLECTION = 3;
-const SHALLOW_REACTIVE = 4;
+    /** @type {any} */
+    oldValue;
 
-class Engine {
-    /**
-     * The set of dependencies of the engine.
-     * @type {Set<import('./types.d.ts').ReactiveItem>}
-     */
-    dependencies = new Set();
-
-    /**
-     * The set of dependents of the engine.
-     * @type {Set<import('./types.d.ts').ReactiveItem>}
-     */
-    dependents = new Set();
-
-    /**
-     * Unique identifier for ordering.
-     * @type {number}
-     */
-    id = idService.generateId();
-
-    /**
-     * Version number (currently unused, kept for potential future use).
-     * @type {number}
-     */
-    version = 0;
-
-    /**
-     * Reference to the reactive item.
-     * @type {import('./types.d.ts').ReactiveItem}
-     */
+    /** @type {import('./types.d.ts').ReactiveItem|undefined} */
     reactiveItem;
 
     /**
-     * Flag indicating that the value should be recalculated.
-     * @type {boolean}
+     * Initializes an instance of UpdateDataRecord with the provided type, old value, and new value.
+     * @param {"set"|"delete"} type - The action performed, either "set" or "delete".
+     * @param {any} oldValue - The previous value before the update.
+     * @param {any} value - The new value after the update.
+     * @param {import('./types.d.ts').ReactiveItem} [reactiveItem] - The reactive item that triggered the update.
      */
-    shouldRecalc = false;
-
-    /**
-     * Indicates whether the engine has been destroyed.
-     * @type {boolean}
-     */
-    isDestroyed = false;
-
-    /**
-     * @type {null|Error}
-     */
-    #error = null;
-
-    subscribeController = new SubscribeController();
-
-    /**
-     * The type of the reactive item.
-     * @type {number}
-     */
-    type;
-
-    /**
-     * Map of pending updates (property -> UpdateDataRecord).
-     * @type {Map<string, UpdateDataRecord>}
-     */
-    updates = new Map();
-
-    /**
-     * Snapshot of original values when inside a batch.
-     * @type {BatchSnapshot|null}
-     */
-    #batchSnapshot = null;
-
-    /**
-     * Comparison function for equality.
-     * @type {import('./types.d.ts').CompareFunction|null}
-     */
-    compareFn = null;
-
-    /**
-     * Prevents updates from being propagated (used during mass updates).
-     * @type {boolean}
-     */
-    suppressNotifications = false;
-
-    /**
-     * Creates an Engine instance.
-     * @param {import('./types.d.ts').ReactiveItem} reactiveItem - The reactive item.
-     * @param {ATOM|COMPUTED|COLLECTION|SHALLOW_REACTIVE} type - The type.
-     */
-    constructor(reactiveItem, type) {
-        this.reactiveItem = reactiveItem;
+    constructor(type, oldValue, value, reactiveItem) {
         this.type = type;
+        this.oldValue = oldValue;
+        this.value = value;
+        this.reactiveItem = reactiveItem;
     }
+}
 
-    /** @type {Error|null} */
-    get error() {
-        return this.#error;
+class UpdateDataRecordManager {
+    /**
+     * Initializes an instance of UpdateDataRecordManager with the given data.
+     * @param {Map<string, UpdateDataRecord>} data - The data to be managed.
+     */
+    constructor(data) {
+        this.data = data;
     }
 
     /**
-     * Records a change attempt. In batch mode, stores the original value.
+     * Removes the specified item and its related sub-items from the data map.
+     * Replaces the deleted items with new UpdateDataRecord instances indicating the "delete" action.
+     * @param {string} itemName - The name of the item to be destroyed.
+     */
+    removeItem(itemName) {
+        //this.data.delete(itemName);
+        this.data.set(
+            itemName,
+            new UpdateDataRecord("delete", undefined, undefined, undefined)
+        );
+
+        /** @type {string[]} */
+        const keysToDelete = [];
+
+        this.data.forEach((item, key) => {
+            if (key.startsWith(itemName + ".")) {
+                keysToDelete.push(key);
+            }
+        });
+
+        keysToDelete.forEach((key) => {
+            this.data.delete(key);
+        });
+    }
+}
+
+// @ts-check
+
+
+/**
+ * Tracks updates and batch snapshots for a reactive item.
+ * Manages the `updates` map and handles batch change detection.
+ */
+class UpdateTracker {
+    /** @type {Map<string, import('./types.d.ts').UpdateDataRecord>} */
+    #updates;
+    /** @type {import('./types.d.ts').ReactiveItem} */
+    #reactiveItem;
+    /** @type {BatchSnapshot | null} */
+    #batchSnapshot = null;
+    /** @type {import('./Engine.js').Engine} */
+    #engine; // ссылка на Engine для доступа к version и batchSnapshot
+
+    /**
+     * @param {Map<string, import('./types.d.ts').UpdateDataRecord>} updates - The engine's updates map.
+     * @param {import('./types.d.ts').ReactiveItem} reactiveItem - The owning reactive item.
+     * @param {import('./Engine.js').Engine} engine - The owning engine (for version and batch snapshot access).
+     */
+    constructor(updates, reactiveItem, engine) {
+        this.#updates = updates;
+        this.#reactiveItem = reactiveItem;
+        this.#engine = engine;
+    }
+
+    /**
+     * Records a change attempt. In batch mode, stores the original value in a snapshot.
      * @param {string} property - The property key.
      * @param {any} oldValue - The value before the change.
      */
     #recordChange(property, oldValue) {
         if (modeController.batchMode) {
             if (!this.#batchSnapshot) {
-                this.#batchSnapshot = new BatchSnapshot(this.reactiveItem);
+                this.#batchSnapshot = new BatchSnapshot(this.#reactiveItem);
             }
             this.#batchSnapshot.record(property, oldValue);
         }
     }
 
     /**
-     * Alternative version that accepts explicit oldValue (preferred).
+     * Determines if a change is effective (i.e., not reverted) considering batch snapshots.
      * @param {string} property - The property key.
-     * @param {any} oldValue - The previous value (immediate before this change).
+     * @param {any} oldValue - The immediate previous value.
      * @param {any} newValue - The new value.
+     * @param {import('./types.d.ts').CompareFunction|null} compareFn - Equality function.
      * @returns {boolean}
      */
-    isEffectiveChangeWithOld(property, oldValue, newValue) {
+    isEffectiveChange(property, oldValue, newValue, compareFn) {
+        /**
+         * @param {*} a
+         * @param {*} b
+         * @returns {boolean}
+         */
+        const equals = (a, b) => (compareFn ? compareFn(a, b) : this.#reactiveItem.equals(a, b));
         if (modeController.batchMode && this.#batchSnapshot?.has(property)) {
             const original = this.#batchSnapshot.getOriginal(property);
-            return !this.reactiveItem.equals(original, newValue);
+            return !equals(original, newValue);
         }
-        return !this.reactiveItem.equals(oldValue, newValue);
+        return !equals(oldValue, newValue);
     }
 
     /**
-     * Commits a change: creates an UpdateDataRecord, adds to updates, and schedules notification.
+     * Adds an update record if the change is effective.
      * @param {string} property - The property key.
-     * @param {"set"|"delete"} type - The operation.
-     * @param {any} oldValue - The previous value (immediate before this change).
+     * @param {"set"|"delete"} type - The operation type.
+     * @param {any} oldValue - The previous value (immediate).
      * @param {any} newValue - The new value.
-     * @returns {boolean} True if committed (i.e., value actually changed).
+     * @param {import('./types.d.ts').CompareFunction|null} compareFn - Equality function.
+     * @param {() => void} notifyDependentsCallback - Callback to notify dependents of a change.
+     * @param {() => void} addToChangedItemsCallback - Callback to add the item to the changed items controller.
+     * @returns {boolean} True if an update was added.
      */
-    #commitChange(property, type, oldValue, newValue) {
+    addUpdate(
+        property,
+        type,
+        oldValue,
+        newValue,
+        compareFn,
+        notifyDependentsCallback,
+        addToChangedItemsCallback
+    ) {
+        this.#recordChange(property, oldValue);
+
+        // Compute the reported old value (original in batch, else immediate)
         let reportedOld = oldValue;
         let compareOld = oldValue;
         if (modeController.batchMode && this.#batchSnapshot?.has(property)) {
@@ -1030,67 +1226,265 @@ class Engine {
             compareOld = original;
         }
 
-        // 1. Check if the actual mutation (value change) occurred
-        const hasMutation =
-            property === '' ? !this.reactiveItem.equals(oldValue, newValue) : oldValue !== newValue;
+        // Check if the mutation actually changed the value (immediate check)
+        /**
+         * @param {*} a
+         * @param {*} b
+         * @returns {boolean}
+         */
+        const equals = (a, b) => (compareFn ? compareFn(a, b) : this.#reactiveItem.equals(a, b));
+        const hasMutation = property === '' ? !equals(oldValue, newValue) : oldValue !== newValue;
+        if (!hasMutation) {return false;}
 
-        if (!hasMutation) {
+        // Notify dependents and add to changed items controller
+        notifyDependentsCallback();
+        addToChangedItemsCallback();
+
+        // Determine if the change is effective relative to the batch original (if any)
+        const effective = !equals(compareOld, newValue);
+        if (!effective) {
+            // Reverted back to original – remove the update record
+            this.#updates.delete(property);
             return false;
         }
 
-        // 2. Always notify dependents and add item to changedItemsController
-        //    (even if in batch and value reverts later)
-        this.notifyDependents(EngineMessages.DEPENDENCY_CHANGED);
-        changedItemsController.addItem(this.reactiveItem);
+        // Create or update the record with the reported old value
+        const record = new UpdateDataRecord(type, reportedOld, newValue, this.#reactiveItem);
+        this.#updates.set(property, record);
+        // Increment engine version (needed for smartRecompute)
+        this.#engine.version++;
 
-        // 3. Determine if the value changed relative to the stable (or old outside batch) value
-        const isEffective =
-            property === ''
-                ? !this.reactiveItem.equals(compareOld, newValue)
-                : compareOld !== newValue;
-
-        if (!isEffective) {
-            // Value reverted to original – remove the update record
-            this.updates.delete(property);
-            return false;
-        }
-
-        // 4. Create or update the record in updates
-        const record = new UpdateDataRecord(type, reportedOld, newValue, this.reactiveItem);
-        this.updates.set(property, record);
-        this.version++;
+        /*
+        console.log(
+            `[UpdateTracker] ${this.#reactiveItem.name} addUpdate: property=${property}, old=${oldValue}, new=${newValue}, effective=${effective}, hasMutation=${hasMutation}`
+        );
+        */
         return true;
     }
 
     /**
-     * Legacy method for backward compatibility. Delegates to recordChange + #commitChange.
+     * Checks if there are any pending updates.
+     * @returns {boolean}
+     */
+    hasUpdates() {
+        return this.#updates.size > 0;
+    }
+
+    /**
+     * Clears all pending updates and resets the batch snapshot.
+     */
+    clearUpdates() {
+        this.#updates.clear();
+        if (this.#batchSnapshot) {
+            this.#batchSnapshot.clear();
+            this.#batchSnapshot = null;
+        }
+    }
+
+    /**
+     * Processes temporary changes after batch ends.
+     * Removes updates for properties that reverted to original values.
+     * @param {(prop: string) => any} getCurrentValue - Function to get current value for a property.
+     * @returns {boolean} True if any changes remain.
+     */
+    checkChangesTemporary(getCurrentValue) {
+        if (!this.#batchSnapshot) {
+            return this.hasUpdates();
+        }
+
+        const changedProps = this.#batchSnapshot.getChangedProperties(getCurrentValue);
+        for (const key of this.#updates.keys()) {
+            if (!changedProps.includes(key)) {
+                this.#updates.delete(key);
+            }
+        }
+
+        const hasChanges = this.#updates.size > 0;
+        this.#batchSnapshot.clear();
+        this.#batchSnapshot = null;
+        
+        /*
+        console.log(
+            `[checkChangesTemporary] ${this.#reactiveItem.name} result: ${hasChanges}, updates:`,
+            Array.from(this.#updates.keys())
+        );
+        */
+
+        return hasChanges;
+    }
+}
+
+// @ts-check
+
+
+/**
+ * Message codes used in the engine.
+ * @enum {number}
+ */
+const EngineMessages = {
+    DEPENDENCY_CHANGED: 1,
+    DEPENDENCY_DESTROYED: 2,
+    HAS_ERROR: 3,
+    DEPENDENT_DESTROYED: 4,
+};
+
+/**
+ * Handles incoming messages from dependencies/dependents.
+ * All logic is stateless; it mutates the engine's state via callbacks.
+ */
+class MessageHandler {
+    /**
+     * Processes an incoming message.
+     * @param {number} message - The message code.
+     * @param {{ sender: import('./types.d.ts').ReactiveItem, recipients: Set<import('./types.d.ts').ReactiveItem> }} ctx - Context.
+     * @param {_Engine} engineState - The engine's state container (provides getters/setters).
+     * @param {Function} setError - Callback to set the engine's error.
+     * @param {Function} setShouldRecalc - Callback to set the shouldRecalc flag.
+     * @param {Function} notifyDependents - Callback to notify dependents of a message.
+     * @param {Function} removeDependent - Callback to remove a dependent.
+     * @param {Function} destroyEngine - Callback to destroy the engine.
+     */
+    handleMessage(
+        message,
+        ctx,
+        engineState,
+        setError,
+        setShouldRecalc,
+        notifyDependents,
+        removeDependent,
+        destroyEngine
+    ) {
+        switch (message) {
+            case EngineMessages.DEPENDENT_DESTROYED:
+                removeDependent(ctx.sender);
+                break;
+
+            case EngineMessages.DEPENDENCY_CHANGED:
+                setError(null);
+                if (!engineState.shouldRecalc) {
+                    setShouldRecalc(true);
+                    notifyDependents(message, ctx);
+                }
+                break;
+
+            case EngineMessages.DEPENDENCY_DESTROYED:
+                destroyEngine(ctx);
+                break;
+
+            case EngineMessages.HAS_ERROR:
+                setShouldRecalc(true);
+                const error = ctx.sender.engine.error;
+                if (error) {
+                    setError(error);
+                    // Optionally re-notify dependents about the error
+                    notifyDependents(message, ctx);
+                }
+                break;
+        }
+    }
+}
+
+// @ts-check
+
+
+const ATOM = 1;
+const COMPUTED = 2;
+const COLLECTION = 3;
+const SHALLOW_REACTIVE = 4;
+
+/**
+ * Engine is the core reactive engine for a single reactive item.
+ * It manages dependencies, updates, and lifecycle, delegating to specialised submodules.
+ * All public properties and methods remain unchanged for backward compatibility.
+ */
+class Engine {
+    // --- Public fields (for backward compatibility) ---
+    /** @type {Set<import('./types.d.ts').ReactiveItem>} */
+    dependencies = new Set();
+
+    /** @type {Set<import('./types.d.ts').ReactiveItem>} */
+    dependents = new Set();
+
+    /** @type {number} */
+    id = idService.generateId();
+
+    /** @type {number} */
+    version = 0;
+
+    /** @type {import('./types.d.ts').ReactiveItem} */
+    reactiveItem;
+
+    /** @type {boolean} */
+    shouldRecalc = false;
+
+    /** @type {boolean} */
+    isDestroyed = false;
+
+    /** @type {null|Error} */
+    #error = null;
+
+    /** @type {SubscribeController} */
+    subscribeController;
+
+    /** @type {number} */
+    type;
+
+    /** @type {Map<string, import('./UpdateDataRecord.js').UpdateDataRecord>} */
+    updates = new Map();
+
+    /** @type {import('./types.d.ts').CompareFunction|null} */
+    compareFn = null;
+
+    /** @type {boolean} */
+    suppressNotifications = false;
+
+    // --- Private submodules ---
+    /** @type {DependencyGraph} */
+    #graph;
+    /** @type {UpdateTracker} */
+    #updateTracker;
+    /** @type {MessageHandler} */
+    #messageHandler;
+
+    /**
+     * Creates an Engine instance.
+     * @param {import('./types.d.ts').ReactiveItem} reactiveItem - The owning reactive item.
+     * @param {1|2|3|4} type - The type of reactive item.
+     */
+    constructor(reactiveItem, type) {
+        this.reactiveItem = reactiveItem;
+        this.type = type;
+
+        // Initialise submodules with references to the public Sets/Maps
+        this.#graph = new DependencyGraph(this.dependencies, this.dependents, reactiveItem);
+        this.#updateTracker = new UpdateTracker(this.updates, reactiveItem, this);
+        this.#messageHandler = new MessageHandler();
+        this.subscribeController = new SubscribeController(this.reactiveItem);
+    }
+
+    /** @type {Error|null} */
+    get error() {
+        return this.#error;
+    }
+
+    /**
+     * Records a change attempt.
      * @param {string} property - The property key.
-     * @param {"set"|"delete"} type - The operation.
+     * @param {"set"|"delete"} type - The operation type.
      * @param {any} oldValue - The previous value.
      * @param {any} value - The new value.
      * @returns {boolean} True if an update was added.
      */
     addUpdate(property, type, oldValue, value) {
-        this.#recordChange(property, oldValue);
-        return this.#commitChange(property, type, oldValue, value);
-    }
-
-    /**
-     * Adds dependencies to this engine.
-     * @param {Set<import('./types.d.ts').ReactiveItem>} dependencies
-     */
-    addDependencies(dependencies) {
-        const array = [];
-        for (const dependency of dependencies) {
-            if (!this.dependencies.has(dependency)) {
-                array.push(dependency);
-                dependency.engine.addDependent(this.reactiveItem);
-            }
-        }
-        array.sort(sortReactiveItems);
-        for (let i = 0; i < array.length; i++) {
-            this.addDependency(array[i]);
-        }
+        return this.#updateTracker.addUpdate(
+            property,
+            type,
+            oldValue,
+            value,
+            this.compareFn,
+            () => this.notifyDependents(EngineMessages.DEPENDENCY_CHANGED),
+            () => changedItemsController.addItem(this.reactiveItem)
+        );
     }
 
     /**
@@ -1098,9 +1492,15 @@ class Engine {
      * @param {import('./types.d.ts').ReactiveItem} dependency
      */
     addDependency(dependency) {
-        if (!this.dependencies.has(dependency)) {
-            this.dependencies.add(dependency);
-        }
+        this.#graph.addDependency(dependency);
+    }
+
+    /**
+     * Adds multiple dependencies.
+     * @param {Set<import('./types.d.ts').ReactiveItem>} dependencies
+     */
+    addDependencies(dependencies) {
+        this.#graph.addDependencies(dependencies);
     }
 
     /**
@@ -1112,10 +1512,7 @@ class Engine {
         if (this.isDestroyed) {
             return false;
         }
-        if (!this.dependents.has(dependent)) {
-            this.dependents.add(dependent);
-        }
-        return true;
+        return this.#graph.addDependent(dependent);
     }
 
     /**
@@ -1123,7 +1520,7 @@ class Engine {
      * @param {import('./types.d.ts').ReactiveItem} dependent
      */
     removeDependent(dependent) {
-        this.dependents.delete(dependent);
+        this.#graph.removeDependent(dependent);
     }
 
     /**
@@ -1131,23 +1528,7 @@ class Engine {
      * @returns {Set<import('./types.d.ts').ReactiveItem>}
      */
     getDeepDependents() {
-        const result = new Set();
-        const queue = [this.reactiveItem];
-        const visited = new Set();
-        while (queue.length) {
-            const current = queue.shift();
-            if (!current || visited.has(current)) {
-                continue;
-            }
-            visited.add(current);
-            for (const dependent of current.engine.dependents) {
-                if (!result.has(dependent)) {
-                    result.add(dependent);
-                    queue.push(dependent);
-                }
-            }
-        }
-        return result;
+        return this.#graph.getDeepDependents();
     }
 
     /**
@@ -1155,79 +1536,95 @@ class Engine {
      * @returns {Array<import('./types.d.ts').ReactiveItem>}
      */
     getDeepDependentsArray() {
-        const array = Array.from(this.getDeepDependents());
-        array.sort(sortReactiveItems);
-        return array;
+        return this.#graph.getDeepDependentsArray();
     }
 
     /**
      * Notifies dependents of a message.
-     * @param {EngineMessages} message
-     * @param {{sender: import('./types.d.ts').ReactiveItem, recipients: Set<import('./types.d.ts').ReactiveItem>}} [ctx]
+     * @param {number} message - The message code.
+     * @param {{ sender: import('./types.d.ts').ReactiveItem, recipients: Set<import('./types.d.ts').ReactiveItem> }} [ctx]
      */
     notifyDependents(message, ctx) {
-        if (ctx === undefined) {
+        if (!ctx) {
             ctx = { sender: this.reactiveItem, recipients: new Set() };
         }
-        for (const dependent of this.dependents) {
-            ctx.recipients.add(dependent);
-            dependent.engine.getMessage(message, ctx);
-        }
+        this.#graph.notifyDependents(message, ctx);
     }
 
     /**
      * Notifies dependencies (reverse direction).
-     * @param {EngineMessages} message
-     * @param {{sender: import('./types.d.ts').ReactiveItem, recipients: Set<import('./types.d.ts').ReactiveItem>}} ctx
+     * @param {number} message - The message code.
+     * @param {{ sender: import('./types.d.ts').ReactiveItem, recipients: Set<import('./types.d.ts').ReactiveItem> }} [ctx]
      */
     notifyDependencies(message, ctx) {
-        for (const dependency of this.dependencies) {
-            ctx.recipients.add(dependency);
-            dependency.engine.getMessage(message, ctx);
+        /*
+        console.log(
+            `[Engine] ${this.reactiveItem.name} notifyDependents, dependents:`,
+            Array.from(this.dependents).map(d => d.name)
+        );
+        */
+        if (!ctx) {
+            ctx = { sender: this.reactiveItem, recipients: new Set() };
         }
+        this.#graph.notifyDependencies(message, ctx);
     }
 
     /**
      * Handles incoming messages.
-     * @param {EngineMessages} message
-     * @param {{sender: import('./types.d.ts').ReactiveItem, recipients: Set<import('./types.d.ts').ReactiveItem>}} ctx
+     * @param {number} message - The message code.
+     * @param {{ sender: import('./types.d.ts').ReactiveItem, recipients: Set<import('./types.d.ts').ReactiveItem> }} ctx
      */
     getMessage(message, ctx) {
-        switch (message) {
-            case EngineMessages.DEPENDENT_DESTROYED:
-                this.dependents.delete(ctx.sender);
-                break;
-            case EngineMessages.DEPENDENCY_CHANGED:
-                this.#error = null;
-                this.shouldRecalc = true;
-                this.notifyDependents(message, ctx);
-                break;
-            case EngineMessages.DEPENDENCY_DESTROYED:
-                this.destroy(ctx);
-                break;
-            case EngineMessages.HAS_ERROR:
-                this.shouldRecalc = true;
-                this.setError(ctx.sender.engine.error, ctx);
-                break;
-        }
+        /** @param {Error|null} err */
+        const setError = err => {
+            this.#error = err;
+        };
+        /** @param {boolean} val */
+        const setShouldRecalc = val => {
+            this.shouldRecalc = val;
+        };
+        /**
+         * @param {number} msg @param {{ sender: import('./types.d.ts').ReactiveItem, recipients: Set<import('./types.d.ts').ReactiveItem> }} c
+         * @param {{ sender: import('./types.d.ts').ReactiveItem, recipients: Set<import('./types.d.ts').ReactiveItem> }} [c]
+         * @returns {void}
+         */
+        const notify = (msg, c) => this.notifyDependents(msg, c);
+        /**
+         * @param {import('./types.d.ts').ReactiveItem} dep
+         * @returns {void}
+         * */
+        const removeDep = dep => this.removeDependent(dep);
+        /**
+         * @param {{ sender: import('./types.d.ts').ReactiveItem, recipients: Set<import('./types.d.ts').ReactiveItem> }} c
+         * @returns {void}
+         */
+        const destroy = c => this.destroy(c);
+
+        this.#messageHandler.handleMessage(
+            message,
+            ctx,
+            this,
+            setError,
+            setShouldRecalc,
+            notify,
+            removeDep,
+            destroy
+        );
     }
 
     /**
      * Sets an error and notifies dependents.
      * @param {Error|null} error
-     * @param {{sender: import('./types.d.ts').ReactiveItem, recipients: Set<import('./types.d.ts').ReactiveItem>}} [ctx]
+     * @param {{ sender: import('./types.d.ts').ReactiveItem, recipients: Set<import('./types.d.ts').ReactiveItem> }} [ctx]
      */
     setError(error, ctx) {
         if (error === null) {
             return;
         }
-        if (ctx === undefined) {
-            ctx = { sender: this.reactiveItem, recipients: new Set() };
-        }
-        this.version++;
         this.#error = error;
         this.shouldRecalc = true;
-        this.notifyDependents(EngineMessages.HAS_ERROR, ctx);
+        const c = ctx || { sender: this.reactiveItem, recipients: new Set() };
+        this.notifyDependents(EngineMessages.HAS_ERROR, c);
     }
 
     /**
@@ -1239,34 +1636,27 @@ class Engine {
 
     /**
      * Destroys the engine.
-     * @param {{sender: import('./types.d.ts').ReactiveItem, recipients: Set<import('./types.d.ts').ReactiveItem>}} [ctx]
+     * @param {{ sender: import('./types.d.ts').ReactiveItem, recipients: Set<import('./types.d.ts').ReactiveItem> }} [ctx]
      */
     destroy(ctx) {
         if (this.isDestroyed) {
             return;
         }
-        if (ctx === undefined) {
-            ctx = { sender: this.reactiveItem, recipients: new Set() };
-        }
+        const c = ctx || { sender: this.reactiveItem, recipients: new Set() };
         this.#error = null;
-        this.notifyDependents(EngineMessages.DEPENDENCY_DESTROYED, ctx);
-        this.notifyDependencies(EngineMessages.DEPENDENT_DESTROYED, ctx);
+        this.notifyDependents(EngineMessages.DEPENDENCY_DESTROYED, c);
+        this.notifyDependencies(EngineMessages.DEPENDENT_DESTROYED, c);
         this.isDestroyed = true;
-        this.dependencies.clear();
-        this.dependents.clear();
-        this.subscribeController.destroy();
+        this.#graph.clear();
         this.clearUpdates();
-        if (this.#batchSnapshot) {
-            this.#batchSnapshot.clear();
-            this.#batchSnapshot = null;
-        }
+        this.subscribeController.destroy();
     }
 
     /**
      * Clears all pending updates.
      */
     clearUpdates() {
-        this.updates.clear();
+        this.#updateTracker.clearUpdates();
     }
 
     /**
@@ -1274,21 +1664,15 @@ class Engine {
      * @returns {boolean}
      */
     hasUpdates() {
-        return this.updates.size > 0;
+        return this.#updateTracker.hasUpdates();
     }
 
     /**
      * Processes temporary changes after batch ends.
-     * Removes updates for properties that reverted to original values.
      * @returns {boolean} True if any changes remain.
      */
     checkChangesTemporary() {
-        if (!this.#batchSnapshot) {
-            return this.hasUpdates();
-        }
-
         /**
-         *
          * @param {string} prop
          * @returns {any}
          */
@@ -1297,32 +1681,17 @@ class Engine {
                 return this.reactiveItem.peekValue();
             }
             const val = this.reactiveItem.peekValue();
-            return val ? val[prop] : undefined;
+            return val?.[prop];
         };
-
-        const changedProps = this.#batchSnapshot.getChangedProperties(getCurrent);
-
-        for (const key of this.updates.keys()) {
-            if (!changedProps.includes(key)) {
-                this.updates.delete(key);
-            }
-        }
-
-        const hasChanges = this.updates.size > 0;
-        this.#batchSnapshot.clear();
-        this.#batchSnapshot = null;
-
-        return hasChanges;
+        return this.#updateTracker.checkChangesTemporary(getCurrent);
     }
 
     /**
-     * Called after a value change to schedule notifications.
+     * Updates dependencies to a new set.
+     * @param {Set<import('./types.d.ts').ReactiveItem>} newDeps
      */
-    valueChangedCallback() {
-        if (this.suppressNotifications) {
-            return;
-        }
-        changedItemsController.addItem(this.reactiveItem);
+    updateDependencies(newDeps) {
+        this.#graph.updateDependencies(newDeps);
     }
 
     /**
@@ -1339,24 +1708,29 @@ class Engine {
     }
 
     /**
-     * Updates dependencies to a new set.
-     * @param {Set<import('./types.d.ts').ReactiveItem>} newDeps
+     * Called after a value change to schedule notifications.
      */
-    updateDependencies(newDeps) {
-        // Remove old dependencies no longer needed
-        for (const oldDep of this.dependencies) {
-            if (!newDeps.has(oldDep)) {
-                this.dependencies.delete(oldDep);
-                oldDep.engine.removeDependent(this.reactiveItem);
-            }
+    valueChangedCallback() {
+        //console.log('valueChangedCallback:', this.reactiveItem.name);
+        //console.log('this.suppressNotifications', this.suppressNotifications);
+
+        if (this.suppressNotifications) {
+            return;
         }
-        // Add new dependencies
-        for (const newDep of newDeps) {
-            if (!this.dependencies.has(newDep)) {
-                this.dependencies.add(newDep);
-                newDep.engine.addDependent(this.reactiveItem);
-            }
-        }
+        changedItemsController.addItem(this.reactiveItem);
+    }
+
+    /**
+     * Checks if a change is effective considering batch mode and snapshots.
+     * This method is kept for backward compatibility.
+     *
+     * @param {string} property - The property key.
+     * @param {any} oldValue - The immediate previous value.
+     * @param {any} newValue - The new value.
+     * @returns {boolean} True if the change is effective (not reverted).
+     */
+    isEffectiveChangeWithOld(property, oldValue, newValue) {
+        return this.#updateTracker.isEffectiveChange(property, oldValue, newValue, this.compareFn);
     }
 }
 
@@ -2150,7 +2524,9 @@ class Computed extends ReactiveItem {
         this.#currentValue = clone(value);
 
         const newValue = this.#currentValue;
-        //this.engine.version++;
+
+        //console.log(`[Computed] ${this.name} calc: old=${this.#currentValue}, new=${value}`);
+
         if (engine.addUpdate('', 'set', oldValue, newValue)) {
             engine.valueChangedCallback();
         }
@@ -3496,157 +3872,218 @@ class ReactiveList {
 
 
 /**
- * Automatically tracks and subscribes to changes in reactive items used by the specified function.
- * This allows the function to be re-executed whenever any of its dependencies change, maintaining
- * up-to-date results.
+ * Creates a reactive subscription with configurable dependency tracking.
  *
- * @param {(updates?:Map<string, import('./types.d.ts').UpdateDataRecord>)=>void} fn - The function to track and reactively execute.
- * @param {object} [options] - The options for the autorun function.
- * @param {string} [options.name] - An optional name for the autorun.
- * @param {number} [options.delay] - The number of milliseconds to delay the execution of the callback function.
- * @param {AbortSignal} [options.signal] - An optional AbortSignal to cancel the autorun.
- * @param {Function} [options.onError] - An optional function to handle errors.
- * @returns {()=>void} A function that can be called to unsubscribe the callback function from changes in the tracked dependencies.
- * @example
- * ```js
- * const a = atom(0, { name: "a" });
- * const b = atom(0, { name: "b" });
- * let foo = 0;
- *
- * autorun(() => {
- *     a.value;
- *     b.value;
- *     foo++;
- * });
- *
- * console.log(a.value, b.value, foo); // 0 0 1
- *
- * a.value++;
- * console.log(a.value, b.value, foo); // 1 0 2
- *
- * b.value++;
- * console.log(a.value, b.value, foo); // 1 1 3
- *
- * batch(() => {
- *     a.value++;
- *     b.value++;
- * });
- *
- * console.log(a.value, b.value, foo); // 2 2 4
- * ```
+ * @param {() => any} dataFn - Function whose reactive dependencies are tracked.
+ * @param {(updates?: Map<string, import('./types.d.ts').UpdateDataRecord>) => void} effectFn - Effect to run when dependencies change.
+ * @param {object} options - Configuration.
+ * @param {string} [options.name] - Debug name.
+ * @param {number} [options.delay] - Debounce delay (ms).
+ * @param {AbortSignal} [options.signal] - AbortSignal for cancellation.
+ * @param {Function} [options.onError] - Error handler.
+ * @param {boolean} [options.recomputeDependencies=true] - Re‑collect dependencies on every run.
+ * @param {boolean} [options.isAutorun=false] - Whether this is an autorun (dataFn === effectFn).
+ * @param {boolean} [options.passUpdates=false] - Whether to pass collected updates to effectFn.
+ * @returns {() => void} Unsubscribe function.
  */
-function autorun(fn, options) {
-    const _options = Object.assign(
-        {
-            name: undefined,
-            delay: 0,
-            signal: undefined,
-            onError: undefined,
-            type: 'autorun',
-        },
-        options
-    );
+function createReactiveSubscription(dataFn, effectFn, options = {}) {
+    const {
+        name = '',
+        delay = 0,
+        signal = undefined,
+        onError = undefined,
+        recomputeDependencies = true,
+        isAutorun = false,
+        passUpdates = false,
+    } = options;
 
     if (modeController.untrackMode) {
         throw new Error(
-            `Autorun${
-                _options.name ? ` (${_options.name})` : ''
-            }: cannot initialize when untrackMode is on.`
+            `Cannot initialize reactive subscription${name ? ` (${name})` : ''} when untrackMode is on.`
         );
     }
 
-    return reaction(fn, fn, _options);
+    const finalEffect = delay > 0 ? debounce(effectFn, delay) : effectFn;
+
+    /** @type {Array<() => void>} */
+    let unsubscribers = [];
+
+    let isActive = true;
+    let isRunning = false;
+
+    /** @type {Set<import('./types.d.ts').ReactiveItem> | null} */
+    let staticDependencies = null;
+
+    /** @type {Map<string, import('./types.d.ts').UpdateDataRecord>} */
+    const collectedUpdates = new Map();
+
+    // Single shared change handler – enables deduplication by changedItemsController
+    /**
+     *
+     * @param {Map<string, import('./types.d.ts').UpdateDataRecord>} updates
+     * @returns {void}
+     */
+    const onChange = updates => {
+        if (updates && passUpdates) {
+            for (const [key, record] of updates) {
+                collectedUpdates.set(key, record);
+            }
+        }
+        run();
+    };
+
+    /**
+     * Subscribes to a set of dependencies using the shared onChange handler.
+     * @param {Set<import('./types.d.ts').ReactiveItem>} deps
+     * @returns {Array<() => void>}
+     */
+    function subscribeTo(deps) {
+        const unsubs = [];
+        for (const item of deps) {
+            const unsub = item.subscribe(onChange, { signal });
+            unsubs.push(unsub);
+        }
+        return unsubs;
+    }
+
+    /**
+     * The main runner – called when any dependency changes.
+     * In dynamic mode, it re‑subscribes to fresh dependencies.
+     * In static mode, it just runs the effect.
+     */
+    function run() {
+        if (!isActive || isRunning) {
+            return;
+        }
+        isRunning = true;
+
+        try {
+            if (recomputeDependencies) {
+                // Unsubscribe from old dependencies
+                for (const unsub of unsubscribers) {
+                    try {
+                        unsub();
+                    } catch (e) {
+                        console.error(e);
+                    }
+                }
+                unsubscribers = [];
+
+                // Collect fresh dependencies (this executes dataFn)
+                const deps = getSetOfUsedReactiveItems(dataFn);
+                if (deps.size === 0) {
+                    throw new Error(`No reactive items found${name ? ` (${name})` : ''}.`);
+                }
+                unsubscribers = subscribeTo(deps);
+            }
+
+            // Run the effect only if this is NOT an autorun (because for autorun,
+            // the effect already ran inside dataFn during dependency collection).
+            // For reaction, dataFn is separate, so we need to run the effect.
+            if (!isAutorun) {
+                modeController.enterBatch();
+                try {
+                    if (passUpdates && collectedUpdates.size > 0) {
+                        finalEffect(collectedUpdates);
+                    } else {
+                        finalEffect(undefined);
+                    }
+                } finally {
+                    modeController.exitBatch();
+                }
+                collectedUpdates.clear();
+            }
+        } catch (error) {
+            if (onError) {
+                onError(error);
+            }
+            // Re-throw the error so it propagates to the subscriber handler
+            throw error;
+        } finally {
+            isRunning = false;
+        }
+    }
+
+    // ----- Initialization -----
+    // Collect initial dependencies (this executes dataFn once).
+    // For autorun, dataFn === effectFn, so the effect runs once.
+    // For reaction, dataFn !== effectFn, so the effect does NOT run.
+    const initialDeps = getSetOfUsedReactiveItems(dataFn);
+    if (initialDeps.size === 0) {
+        throw new Error(`No reactive items found${name ? ` (${name})` : ''}.`);
+    }
+
+    // Subscribe to the initial dependencies using the shared handler
+    if (recomputeDependencies) {
+        unsubscribers = subscribeTo(initialDeps);
+    } else {
+        staticDependencies = initialDeps;
+        unsubscribers = subscribeTo(staticDependencies);
+    }
+
+    // For autorun, the effect already ran inside getSetOfUsedReactiveItems above.
+    // For reaction, we do NOT want to run the effect yet.
+
+    // Return the final unsubscribe function
+    return function unsubscribe() {
+        isActive = false;
+        for (const unsub of unsubscribers) {
+            try {
+                unsub();
+            } catch (e) {
+                console.error(e);
+            }
+        }
+        unsubscribers = [];
+        staticDependencies = null;
+        collectedUpdates.clear();
+    };
 }
 
 /**
- * Tracks reactive items used by the specified data function and subscribes
- * the provided callback function to changes in these items. This ensures
- * that the callback is executed whenever any of the tracked dependencies
- * change, allowing for reactive updates based on the data function.
+ * Autorun – runs the effect immediately (during initial dependency collection)
+ * and re‑runs it on any dependency change.
+ * Dependencies are re‑collected on every run by default.
  *
- * @param {()=>any} dataFunction - The function whose reactive dependencies are tracked.
- * @param {(updates?:Map<string, import('./types.d.ts').UpdateDataRecord>)=>void} fn - The callback function to execute when tracked dependencies change.
- * @param {object} [options] - The options for the reaction function.
- * @param {string} [options.name] - An optional name for the reaction.
- * @param {number} [options.delay] - The number of milliseconds to delay the execution of the callback function.
- * @param {AbortSignal} [options.signal] - An optional signal to abort the reaction.
- * @param {string} [options.type] - An optional type for the reaction. Defaults to "reaction".
- * @returns {()=>void} A function that can be called to unsubscribe the callback function from changes in the tracked dependencies.
- * @example
- * ```js
- * const a = atom(0);
- * const b = atom(0);
- *
- * let foo = 0;
- *
- * // runs only data-function to get dependencies
- * // and then subscribes to changes in a and b
- * reaction(
- *     () => [a.value, b.value],
- *     () => {
- *         foo++;
- *     }
- * );
- *
- * console.log(a.value, b.value, foo); // 0 0 0
- *
- * a.value++;
- * console.log(a.value, b.value, foo); // 1 0 1
- *
- * b.value++;
- * console.log(a.value, b.value, foo); // 1 1 2
- *
- * batch(() => {
- *     a.value++;
- *     b.value++;
- * });
- *
- * console.log(a.value, b.value, foo); // 2 2 3
- * ```
+ * @param {() => void} fn - The effect function.
+ * @param {object} [options] - Options.
+ * @param {string} [options.name] - Debug name.
+ * @param {number} [options.delay] - Debounce delay (ms).
+ * @param {AbortSignal} [options.signal] - AbortSignal.
+ * @param {Function} [options.onError] - Error handler.
+ * @param {boolean} [options.recomputeDependencies=true] - Re‑collect dependencies each run.
+ * @returns {() => void} Unsubscribe function.
  */
-function reaction(dataFunction, fn, options) {
-    const _options = Object.assign(
-        { name: undefined, delay: 0, signal: undefined, type: 'reaction' },
-        options
-    );
+function autorun(fn, options = {}) {
+    return createReactiveSubscription(fn, fn, {
+        ...options,
+        recomputeDependencies: options.recomputeDependencies ?? true,
+        isAutorun: true,
+    });
+}
 
-    if (modeController.untrackMode) {
-        throw new Error(
-            `Reaction${
-                _options.name ? ` (${_options.name})` : ''
-            }: cannot initialize when untrackMode is on.`
-        );
-    }
-
-    if (_options.delay > 0) {
-        fn = debounce(fn, _options.delay);
-        _options.delay = 0;
-    }
-
-    /** @type {Function[]} */
-    const unsubscribers = [];
-
-    const items = getSetOfUsedReactiveItems(dataFunction);
-
-    if (items.size === 0) {
-        throw new Error(
-            `Autorun/Reaction${
-                _options.name ? ` (${_options.name})` : ''
-            }: No reactive items found.`
-        );
-    }
-
-    for (const item of items) {
-        unsubscribers.push(item.subscribe(fn, _options));
-    }
-
-    const unsubscriber = () => {
-        for (let i = 0; i < unsubscribers.length; i++) {
-            unsubscribers[i]();
-        }
-    };
-
-    return unsubscriber;
+/**
+ * Reaction – tracks dependencies via dataFn and runs effectFn when they change.
+ * The effect is NOT run immediately; it only runs after the first change.
+ * Dependencies are re‑collected on every run by default.
+ *
+ * @param {() => any} dataFn - Function whose dependencies are tracked.
+ * @param {(updates?: Map<string, import('./types.d.ts').UpdateDataRecord>) => void} effectFn - Effect to run.
+ * @param {object} [options] - Options.
+ * @param {string} [options.name] - Debug name.
+ * @param {number} [options.delay] - Debounce delay (ms).
+ * @param {AbortSignal} [options.signal] - AbortSignal.
+ * @param {Function} [options.onError] - Error handler.
+ * @param {boolean} [options.recomputeDependencies=true] - Re‑collect dependencies each run.
+ * @param {boolean} [options.passUpdates=true] - Pass collected updates to effectFn.
+ * @returns {() => void} Unsubscribe function.
+ */
+function reaction(dataFn, effectFn, options = {}) {
+    return createReactiveSubscription(dataFn, effectFn, {
+        ...options,
+        recomputeDependencies: options.recomputeDependencies ?? true,
+        isAutorun: false,
+    });
 }
 
 /**

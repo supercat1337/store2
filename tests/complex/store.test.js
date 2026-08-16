@@ -182,12 +182,12 @@ test('Store: subscribe', t => {
     a.value = 2;
     t.log(updatesKeys);
     // update a.value, then update c.value
-    t.deepEqual(updatesKeys, ['a', 'c.d']);
+    t.deepEqual(updatesKeys, ['c.d', 'a']);
     updatesKeys = [];
 
     b.value = 3;
     // update b.value, then update c.value
-    t.deepEqual(updatesKeys, ['b', 'c.d']);
+    t.deepEqual(updatesKeys, ['c.d', 'b']);
     updatesKeys = [];
 
     t.is(i, 4);

@@ -1,114 +1,86 @@
 // @ts-check
 
 import { idService } from '../services/idService.js';
-import { SubscribeController } from './subscribeController.js';
-import { sortReactiveItems } from '../helpers/tools.js';
+import { SubscribeController } from './SubscribeController.js';
 import { changedItemsController } from '../services/changedItemsController.js';
 import { modeController } from '../services/modeController.js';
-import { UpdateDataRecord } from './UpdateDataRecord.js';
-import { BatchSnapshot } from './BatchSnapshot.js';
-
-/** @enum {number} */
-export const EngineMessages = {
-    DEPENDENCY_CHANGED: 1,
-    DEPENDENCY_DESTROYED: 2,
-    HAS_ERROR: 3,
-    DEPENDENT_DESTROYED: 4,
-};
+import { DependencyGraph } from './DependencyGraph.js';
+import { UpdateTracker } from './UpdateTracker.js';
+import { MessageHandler, EngineMessages } from './MessageHandler.js';
 
 export const ATOM = 1;
 export const COMPUTED = 2;
 export const COLLECTION = 3;
 export const SHALLOW_REACTIVE = 4;
 
+/**
+ * Engine is the core reactive engine for a single reactive item.
+ * It manages dependencies, updates, and lifecycle, delegating to specialised submodules.
+ * All public properties and methods remain unchanged for backward compatibility.
+ */
 export class Engine {
-    /**
-     * The set of dependencies of the engine.
-     * @type {Set<import('../types.d.ts').ReactiveItem>}
-     */
+    // --- Public fields (for backward compatibility) ---
+    /** @type {Set<import('../types.d.ts').ReactiveItem>} */
     dependencies = new Set();
 
-    /**
-     * The set of dependents of the engine.
-     * @type {Set<import('../types.d.ts').ReactiveItem>}
-     */
+    /** @type {Set<import('../types.d.ts').ReactiveItem>} */
     dependents = new Set();
 
-    /**
-     * Unique identifier for ordering.
-     * @type {number}
-     */
+    /** @type {number} */
     id = idService.generateId();
 
-    /**
-     * Version number (currently unused, kept for potential future use).
-     * @type {number}
-     */
+    /** @type {number} */
     version = 0;
 
-    /**
-     * Reference to the reactive item.
-     * @type {import('../types.d.ts').ReactiveItem}
-     */
+    /** @type {import('../types.d.ts').ReactiveItem} */
     reactiveItem;
 
-    /**
-     * Flag indicating that the value should be recalculated.
-     * @type {boolean}
-     */
+    /** @type {boolean} */
     shouldRecalc = false;
 
-    /**
-     * Indicates whether the engine has been destroyed.
-     * @type {boolean}
-     */
+    /** @type {boolean} */
     isDestroyed = false;
 
-    /**
-     * @type {null|Error}
-     */
+    /** @type {null|Error} */
     #error = null;
 
-    subscribeController = new SubscribeController();
+    /** @type {SubscribeController} */
+    subscribeController;
 
-    /**
-     * The type of the reactive item.
-     * @type {number}
-     */
+    /** @type {number} */
     type;
 
-    /**
-     * Map of pending updates (property -> UpdateDataRecord).
-     * @type {Map<string, UpdateDataRecord>}
-     */
+    /** @type {Map<string, import('./UpdateDataRecord.js').UpdateDataRecord>} */
     updates = new Map();
 
-    /**
-     * Snapshot of original values when inside a batch.
-     * @type {BatchSnapshot|null}
-     */
-    #batchSnapshot = null;
-
-    /**
-     * Comparison function for equality.
-     * @type {import('../types.d.ts').CompareFunction|null}
-     */
+    /** @type {import('../types.d.ts').CompareFunction|null} */
     compareFn = null;
 
-    /**
-     * Prevents updates from being propagated (used during mass updates).
-     * @type {boolean}
-     */
+    /** @type {boolean} */
     suppressNotifications = false;
+
+    // --- Private submodules ---
+    /** @type {DependencyGraph} */
+    #graph;
+    /** @type {UpdateTracker} */
+    #updateTracker;
+    /** @type {MessageHandler} */
+    #messageHandler;
 
     /**
      * Creates an Engine instance.
-     * @param {import('../types.d.ts').ReactiveItem} reactiveItem - The reactive item.
-     * @param {ATOM|COMPUTED|COLLECTION|SHALLOW_REACTIVE} type - The type.
+     * @param {import('../types.d.ts').ReactiveItem} reactiveItem - The owning reactive item.
+     * @param {1|2|3|4} type - The type of reactive item.
      */
     constructor(reactiveItem, type) {
         this.reactiveItem = reactiveItem;
         this.type = type;
+
+        // Initialise submodules with references to the public Sets/Maps
+        this.#graph = new DependencyGraph(this.dependencies, this.dependents, reactiveItem);
+        this.#updateTracker = new UpdateTracker(this.updates, reactiveItem, this);
+        this.#messageHandler = new MessageHandler();
+        this.subscribeController = new SubscribeController(this.reactiveItem);
     }
 
     /** @type {Error|null} */
@@ -117,112 +89,23 @@ export class Engine {
     }
 
     /**
-     * Records a change attempt. In batch mode, stores the original value.
+     * Records a change attempt.
      * @param {string} property - The property key.
-     * @param {any} oldValue - The value before the change.
-     */
-    #recordChange(property, oldValue) {
-        if (modeController.batchMode) {
-            if (!this.#batchSnapshot) {
-                this.#batchSnapshot = new BatchSnapshot(this.reactiveItem);
-            }
-            this.#batchSnapshot.record(property, oldValue);
-        }
-    }
-
-    /**
-     * Alternative version that accepts explicit oldValue (preferred).
-     * @param {string} property - The property key.
-     * @param {any} oldValue - The previous value (immediate before this change).
-     * @param {any} newValue - The new value.
-     * @returns {boolean}
-     */
-    isEffectiveChangeWithOld(property, oldValue, newValue) {
-        if (modeController.batchMode && this.#batchSnapshot?.has(property)) {
-            const original = this.#batchSnapshot.getOriginal(property);
-            return !this.reactiveItem.equals(original, newValue);
-        }
-        return !this.reactiveItem.equals(oldValue, newValue);
-    }
-
-    /**
-     * Commits a change: creates an UpdateDataRecord, adds to updates, and schedules notification.
-     * @param {string} property - The property key.
-     * @param {"set"|"delete"} type - The operation.
-     * @param {any} oldValue - The previous value (immediate before this change).
-     * @param {any} newValue - The new value.
-     * @returns {boolean} True if committed (i.e., value actually changed).
-     */
-    #commitChange(property, type, oldValue, newValue) {
-        let reportedOld = oldValue;
-        let compareOld = oldValue;
-        if (modeController.batchMode && this.#batchSnapshot?.has(property)) {
-            const original = this.#batchSnapshot.getOriginal(property);
-            reportedOld = original;
-            compareOld = original;
-        }
-
-        // 1. Check if the actual mutation (value change) occurred
-        const hasMutation =
-            property === '' ? !this.reactiveItem.equals(oldValue, newValue) : oldValue !== newValue;
-
-        if (!hasMutation) {
-            return false;
-        }
-
-        // 2. Always notify dependents and add item to changedItemsController
-        //    (even if in batch and value reverts later)
-        this.notifyDependents(EngineMessages.DEPENDENCY_CHANGED);
-        changedItemsController.addItem(this.reactiveItem);
-
-        // 3. Determine if the value changed relative to the stable (or old outside batch) value
-        const isEffective =
-            property === ''
-                ? !this.reactiveItem.equals(compareOld, newValue)
-                : compareOld !== newValue;
-
-        if (!isEffective) {
-            // Value reverted to original – remove the update record
-            this.updates.delete(property);
-            return false;
-        }
-
-        // 4. Create or update the record in updates
-        const record = new UpdateDataRecord(type, reportedOld, newValue, this.reactiveItem);
-        this.updates.set(property, record);
-        this.version++;
-        return true;
-    }
-
-    /**
-     * Legacy method for backward compatibility. Delegates to recordChange + #commitChange.
-     * @param {string} property - The property key.
-     * @param {"set"|"delete"} type - The operation.
+     * @param {"set"|"delete"} type - The operation type.
      * @param {any} oldValue - The previous value.
      * @param {any} value - The new value.
      * @returns {boolean} True if an update was added.
      */
     addUpdate(property, type, oldValue, value) {
-        this.#recordChange(property, oldValue);
-        return this.#commitChange(property, type, oldValue, value);
-    }
-
-    /**
-     * Adds dependencies to this engine.
-     * @param {Set<import('../types.d.ts').ReactiveItem>} dependencies
-     */
-    addDependencies(dependencies) {
-        const array = [];
-        for (const dependency of dependencies) {
-            if (!this.dependencies.has(dependency)) {
-                array.push(dependency);
-                dependency.engine.addDependent(this.reactiveItem);
-            }
-        }
-        array.sort(sortReactiveItems);
-        for (let i = 0; i < array.length; i++) {
-            this.addDependency(array[i]);
-        }
+        return this.#updateTracker.addUpdate(
+            property,
+            type,
+            oldValue,
+            value,
+            this.compareFn,
+            () => this.notifyDependents(EngineMessages.DEPENDENCY_CHANGED),
+            () => changedItemsController.addItem(this.reactiveItem)
+        );
     }
 
     /**
@@ -230,9 +113,15 @@ export class Engine {
      * @param {import('../types.d.ts').ReactiveItem} dependency
      */
     addDependency(dependency) {
-        if (!this.dependencies.has(dependency)) {
-            this.dependencies.add(dependency);
-        }
+        this.#graph.addDependency(dependency);
+    }
+
+    /**
+     * Adds multiple dependencies.
+     * @param {Set<import('../types.d.ts').ReactiveItem>} dependencies
+     */
+    addDependencies(dependencies) {
+        this.#graph.addDependencies(dependencies);
     }
 
     /**
@@ -244,10 +133,7 @@ export class Engine {
         if (this.isDestroyed) {
             return false;
         }
-        if (!this.dependents.has(dependent)) {
-            this.dependents.add(dependent);
-        }
-        return true;
+        return this.#graph.addDependent(dependent);
     }
 
     /**
@@ -255,7 +141,7 @@ export class Engine {
      * @param {import('../types.d.ts').ReactiveItem} dependent
      */
     removeDependent(dependent) {
-        this.dependents.delete(dependent);
+        this.#graph.removeDependent(dependent);
     }
 
     /**
@@ -263,23 +149,7 @@ export class Engine {
      * @returns {Set<import('../types.d.ts').ReactiveItem>}
      */
     getDeepDependents() {
-        const result = new Set();
-        const queue = [this.reactiveItem];
-        const visited = new Set();
-        while (queue.length) {
-            const current = queue.shift();
-            if (!current || visited.has(current)) {
-                continue;
-            }
-            visited.add(current);
-            for (const dependent of current.engine.dependents) {
-                if (!result.has(dependent)) {
-                    result.add(dependent);
-                    queue.push(dependent);
-                }
-            }
-        }
-        return result;
+        return this.#graph.getDeepDependents();
     }
 
     /**
@@ -287,79 +157,95 @@ export class Engine {
      * @returns {Array<import('../types.d.ts').ReactiveItem>}
      */
     getDeepDependentsArray() {
-        const array = Array.from(this.getDeepDependents());
-        array.sort(sortReactiveItems);
-        return array;
+        return this.#graph.getDeepDependentsArray();
     }
 
     /**
      * Notifies dependents of a message.
-     * @param {EngineMessages} message
-     * @param {{sender: import('../types.d.ts').ReactiveItem, recipients: Set<import('../types.d.ts').ReactiveItem>}} [ctx]
+     * @param {number} message - The message code.
+     * @param {{ sender: import('../types.d.ts').ReactiveItem, recipients: Set<import('../types.d.ts').ReactiveItem> }} [ctx]
      */
     notifyDependents(message, ctx) {
-        if (ctx === undefined) {
+        if (!ctx) {
             ctx = { sender: this.reactiveItem, recipients: new Set() };
         }
-        for (const dependent of this.dependents) {
-            ctx.recipients.add(dependent);
-            dependent.engine.getMessage(message, ctx);
-        }
+        this.#graph.notifyDependents(message, ctx);
     }
 
     /**
      * Notifies dependencies (reverse direction).
-     * @param {EngineMessages} message
-     * @param {{sender: import('../types.d.ts').ReactiveItem, recipients: Set<import('../types.d.ts').ReactiveItem>}} ctx
+     * @param {number} message - The message code.
+     * @param {{ sender: import('../types.d.ts').ReactiveItem, recipients: Set<import('../types.d.ts').ReactiveItem> }} [ctx]
      */
     notifyDependencies(message, ctx) {
-        for (const dependency of this.dependencies) {
-            ctx.recipients.add(dependency);
-            dependency.engine.getMessage(message, ctx);
+        /*
+        console.log(
+            `[Engine] ${this.reactiveItem.name} notifyDependents, dependents:`,
+            Array.from(this.dependents).map(d => d.name)
+        );
+        */
+        if (!ctx) {
+            ctx = { sender: this.reactiveItem, recipients: new Set() };
         }
+        this.#graph.notifyDependencies(message, ctx);
     }
 
     /**
      * Handles incoming messages.
-     * @param {EngineMessages} message
-     * @param {{sender: import('../types.d.ts').ReactiveItem, recipients: Set<import('../types.d.ts').ReactiveItem>}} ctx
+     * @param {number} message - The message code.
+     * @param {{ sender: import('../types.d.ts').ReactiveItem, recipients: Set<import('../types.d.ts').ReactiveItem> }} ctx
      */
     getMessage(message, ctx) {
-        switch (message) {
-            case EngineMessages.DEPENDENT_DESTROYED:
-                this.dependents.delete(ctx.sender);
-                break;
-            case EngineMessages.DEPENDENCY_CHANGED:
-                this.#error = null;
-                this.shouldRecalc = true;
-                this.notifyDependents(message, ctx);
-                break;
-            case EngineMessages.DEPENDENCY_DESTROYED:
-                this.destroy(ctx);
-                break;
-            case EngineMessages.HAS_ERROR:
-                this.shouldRecalc = true;
-                this.setError(ctx.sender.engine.error, ctx);
-                break;
-        }
+        /** @param {Error|null} err */
+        const setError = err => {
+            this.#error = err;
+        };
+        /** @param {boolean} val */
+        const setShouldRecalc = val => {
+            this.shouldRecalc = val;
+        };
+        /**
+         * @param {number} msg @param {{ sender: import('../types.d.ts').ReactiveItem, recipients: Set<import('../types.d.ts').ReactiveItem> }} c
+         * @param {{ sender: import('../types.d.ts').ReactiveItem, recipients: Set<import('../types.d.ts').ReactiveItem> }} [c]
+         * @returns {void}
+         */
+        const notify = (msg, c) => this.notifyDependents(msg, c);
+        /**
+         * @param {import('../types.d.ts').ReactiveItem} dep
+         * @returns {void}
+         * */
+        const removeDep = dep => this.removeDependent(dep);
+        /**
+         * @param {{ sender: import('../types.d.ts').ReactiveItem, recipients: Set<import('../types.d.ts').ReactiveItem> }} c
+         * @returns {void}
+         */
+        const destroy = c => this.destroy(c);
+
+        this.#messageHandler.handleMessage(
+            message,
+            ctx,
+            this,
+            setError,
+            setShouldRecalc,
+            notify,
+            removeDep,
+            destroy
+        );
     }
 
     /**
      * Sets an error and notifies dependents.
      * @param {Error|null} error
-     * @param {{sender: import('../types.d.ts').ReactiveItem, recipients: Set<import('../types.d.ts').ReactiveItem>}} [ctx]
+     * @param {{ sender: import('../types.d.ts').ReactiveItem, recipients: Set<import('../types.d.ts').ReactiveItem> }} [ctx]
      */
     setError(error, ctx) {
         if (error === null) {
             return;
         }
-        if (ctx === undefined) {
-            ctx = { sender: this.reactiveItem, recipients: new Set() };
-        }
-        this.version++;
         this.#error = error;
         this.shouldRecalc = true;
-        this.notifyDependents(EngineMessages.HAS_ERROR, ctx);
+        const c = ctx || { sender: this.reactiveItem, recipients: new Set() };
+        this.notifyDependents(EngineMessages.HAS_ERROR, c);
     }
 
     /**
@@ -371,34 +257,27 @@ export class Engine {
 
     /**
      * Destroys the engine.
-     * @param {{sender: import('../types.d.ts').ReactiveItem, recipients: Set<import('../types.d.ts').ReactiveItem>}} [ctx]
+     * @param {{ sender: import('../types.d.ts').ReactiveItem, recipients: Set<import('../types.d.ts').ReactiveItem> }} [ctx]
      */
     destroy(ctx) {
         if (this.isDestroyed) {
             return;
         }
-        if (ctx === undefined) {
-            ctx = { sender: this.reactiveItem, recipients: new Set() };
-        }
+        const c = ctx || { sender: this.reactiveItem, recipients: new Set() };
         this.#error = null;
-        this.notifyDependents(EngineMessages.DEPENDENCY_DESTROYED, ctx);
-        this.notifyDependencies(EngineMessages.DEPENDENT_DESTROYED, ctx);
+        this.notifyDependents(EngineMessages.DEPENDENCY_DESTROYED, c);
+        this.notifyDependencies(EngineMessages.DEPENDENT_DESTROYED, c);
         this.isDestroyed = true;
-        this.dependencies.clear();
-        this.dependents.clear();
-        this.subscribeController.destroy();
+        this.#graph.clear();
         this.clearUpdates();
-        if (this.#batchSnapshot) {
-            this.#batchSnapshot.clear();
-            this.#batchSnapshot = null;
-        }
+        this.subscribeController.destroy();
     }
 
     /**
      * Clears all pending updates.
      */
     clearUpdates() {
-        this.updates.clear();
+        this.#updateTracker.clearUpdates();
     }
 
     /**
@@ -406,21 +285,15 @@ export class Engine {
      * @returns {boolean}
      */
     hasUpdates() {
-        return this.updates.size > 0;
+        return this.#updateTracker.hasUpdates();
     }
 
     /**
      * Processes temporary changes after batch ends.
-     * Removes updates for properties that reverted to original values.
      * @returns {boolean} True if any changes remain.
      */
     checkChangesTemporary() {
-        if (!this.#batchSnapshot) {
-            return this.hasUpdates();
-        }
-
         /**
-         *
          * @param {string} prop
          * @returns {any}
          */
@@ -429,32 +302,17 @@ export class Engine {
                 return this.reactiveItem.peekValue();
             }
             const val = this.reactiveItem.peekValue();
-            return val ? val[prop] : undefined;
+            return val?.[prop];
         };
-
-        const changedProps = this.#batchSnapshot.getChangedProperties(getCurrent);
-
-        for (const key of this.updates.keys()) {
-            if (!changedProps.includes(key)) {
-                this.updates.delete(key);
-            }
-        }
-
-        const hasChanges = this.updates.size > 0;
-        this.#batchSnapshot.clear();
-        this.#batchSnapshot = null;
-
-        return hasChanges;
+        return this.#updateTracker.checkChangesTemporary(getCurrent);
     }
 
     /**
-     * Called after a value change to schedule notifications.
+     * Updates dependencies to a new set.
+     * @param {Set<import('../types.d.ts').ReactiveItem>} newDeps
      */
-    valueChangedCallback() {
-        if (this.suppressNotifications) {
-            return;
-        }
-        changedItemsController.addItem(this.reactiveItem);
+    updateDependencies(newDeps) {
+        this.#graph.updateDependencies(newDeps);
     }
 
     /**
@@ -471,23 +329,28 @@ export class Engine {
     }
 
     /**
-     * Updates dependencies to a new set.
-     * @param {Set<import('../types.d.ts').ReactiveItem>} newDeps
+     * Called after a value change to schedule notifications.
      */
-    updateDependencies(newDeps) {
-        // Remove old dependencies no longer needed
-        for (const oldDep of this.dependencies) {
-            if (!newDeps.has(oldDep)) {
-                this.dependencies.delete(oldDep);
-                oldDep.engine.removeDependent(this.reactiveItem);
-            }
+    valueChangedCallback() {
+        //console.log('valueChangedCallback:', this.reactiveItem.name);
+        //console.log('this.suppressNotifications', this.suppressNotifications);
+
+        if (this.suppressNotifications) {
+            return;
         }
-        // Add new dependencies
-        for (const newDep of newDeps) {
-            if (!this.dependencies.has(newDep)) {
-                this.dependencies.add(newDep);
-                newDep.engine.addDependent(this.reactiveItem);
-            }
-        }
+        changedItemsController.addItem(this.reactiveItem);
+    }
+
+    /**
+     * Checks if a change is effective considering batch mode and snapshots.
+     * This method is kept for backward compatibility.
+     *
+     * @param {string} property - The property key.
+     * @param {any} oldValue - The immediate previous value.
+     * @param {any} newValue - The new value.
+     * @returns {boolean} True if the change is effective (not reverted).
+     */
+    isEffectiveChangeWithOld(property, oldValue, newValue) {
+        return this.#updateTracker.isEffectiveChange(property, oldValue, newValue, this.compareFn);
     }
 }

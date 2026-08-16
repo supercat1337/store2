@@ -121,50 +121,25 @@ export function shallowReactive<T>(value: T, options?: {
     name?: string;
 }): ShallowReactive<T>;
 /**
- * Automatically tracks and subscribes to changes in reactive items used by the specified function.
- * This allows the function to be re-executed whenever any of its dependencies change, maintaining
- * up-to-date results.
+ * Autorun – runs the effect immediately (during initial dependency collection)
+ * and re‑runs it on any dependency change.
+ * Dependencies are re‑collected on every run by default.
  *
- * @param {(updates?:Map<string, UpdateDataRecord>)=>void} fn - The function to track and reactively execute.
- * @param {object} [options] - The options for the autorun function.
- * @param {string} [options.name] - An optional name for the autorun.
- * @param {number} [options.delay] - The number of milliseconds to delay the execution of the callback function.
- * @param {AbortSignal} [options.signal] - An optional AbortSignal to cancel the autorun.
- * @param {Function} [options.onError] - An optional function to handle errors.
- * @returns {()=>void} A function that can be called to unsubscribe the callback function from changes in the tracked dependencies.
- * @example
- * ```js
- * const a = atom(0, { name: "a" });
- * const b = atom(0, { name: "b" });
- * let foo = 0;
- *
- * autorun(() => {
- *     a.value;
- *     b.value;
- *     foo++;
- * });
- *
- * console.log(a.value, b.value, foo); // 0 0 1
- *
- * a.value++;
- * console.log(a.value, b.value, foo); // 1 0 2
- *
- * b.value++;
- * console.log(a.value, b.value, foo); // 1 1 3
- *
- * batch(() => {
- *     a.value++;
- *     b.value++;
- * });
- *
- * console.log(a.value, b.value, foo); // 2 2 4
- * ```
+ * @param {() => void} fn - The effect function.
+ * @param {object} [options] - Options.
+ * @param {string} [options.name] - Debug name.
+ * @param {number} [options.delay] - Debounce delay (ms).
+ * @param {AbortSignal} [options.signal] - AbortSignal.
+ * @param {Function} [options.onError] - Error handler.
+ * @param {boolean} [options.recomputeDependencies=true] - Re‑collect dependencies each run.
+ * @returns {() => void} Unsubscribe function.
  */
-export function autorun(fn: (updates?: Map<string, UpdateDataRecord>) => void, options?: {
+export function autorun(fn: () => void, options?: {
     name?: string;
     delay?: number;
     signal?: AbortSignal;
     onError?: Function;
+    recomputeDependencies?: boolean;
 }): () => void;
 /**
  * Executes the specified function while batching notifications to reactive items.
@@ -199,56 +174,28 @@ export function autorun(fn: (updates?: Map<string, UpdateDataRecord>) => void, o
  */
 export function batch(fn: Function): void;
 /**
- * Tracks reactive items used by the specified data function and subscribes
- * the provided callback function to changes in these items. This ensures
- * that the callback is executed whenever any of the tracked dependencies
- * change, allowing for reactive updates based on the data function.
+ * Reaction – tracks dependencies via dataFn and runs effectFn when they change.
+ * The effect is NOT run immediately; it only runs after the first change.
+ * Dependencies are re‑collected on every run by default.
  *
- * @param {()=>any} dataFunction - The function whose reactive dependencies are tracked.
- * @param {(updates?:Map<string, UpdateDataRecord>)=>void} fn - The callback function to execute when tracked dependencies change.
- * @param {object} [options] - The options for the reaction function.
- * @param {string} [options.name] - An optional name for the reaction.
- * @param {number} [options.delay] - The number of milliseconds to delay the execution of the callback function.
- * @param {AbortSignal} [options.signal] - An optional signal to abort the reaction.
- * @param {string} [options.type] - An optional type for the reaction. Defaults to "reaction".
- * @returns {()=>void} A function that can be called to unsubscribe the callback function from changes in the tracked dependencies.
- * @example
- * ```js
- * const a = atom(0);
- * const b = atom(0);
- *
- * let foo = 0;
- *
- * // runs only data-function to get dependencies
- * // and then subscribes to changes in a and b
- * reaction(
- *     () => [a.value, b.value],
- *     () => {
- *         foo++;
- *     }
- * );
- *
- * console.log(a.value, b.value, foo); // 0 0 0
- *
- * a.value++;
- * console.log(a.value, b.value, foo); // 1 0 1
- *
- * b.value++;
- * console.log(a.value, b.value, foo); // 1 1 2
- *
- * batch(() => {
- *     a.value++;
- *     b.value++;
- * });
- *
- * console.log(a.value, b.value, foo); // 2 2 3
- * ```
+ * @param {() => any} dataFn - Function whose dependencies are tracked.
+ * @param {(updates?: Map<string, UpdateDataRecord>) => void} effectFn - Effect to run.
+ * @param {object} [options] - Options.
+ * @param {string} [options.name] - Debug name.
+ * @param {number} [options.delay] - Debounce delay (ms).
+ * @param {AbortSignal} [options.signal] - AbortSignal.
+ * @param {Function} [options.onError] - Error handler.
+ * @param {boolean} [options.recomputeDependencies=true] - Re‑collect dependencies each run.
+ * @param {boolean} [options.passUpdates=true] - Pass collected updates to effectFn.
+ * @returns {() => void} Unsubscribe function.
  */
-export function reaction(dataFunction: () => any, fn: (updates?: Map<string, UpdateDataRecord>) => void, options?: {
+export function reaction(dataFn: () => any, effectFn: (updates?: Map<string, UpdateDataRecord>) => void, options?: {
     name?: string;
     delay?: number;
     signal?: AbortSignal;
-    type?: string;
+    onError?: Function;
+    recomputeDependencies?: boolean;
+    passUpdates?: boolean;
 }): () => void;
 /**
  * Automatically calls the given function whenever the given predicate evaluates to true.
@@ -860,110 +807,141 @@ class BatchSnapshot {
 
 }
 
-/* From core\Engine.d.ts */
-type EngineMessages = number;
-namespace EngineMessages {
-    let DEPENDENCY_CHANGED: number;
-    let DEPENDENCY_DESTROYED: number;
-    let HAS_ERROR: number;
-    let DEPENDENT_DESTROYED: number;
+/* From core\DependencyGraph.d.ts */
+/**
+ * Manages the dependency graph for a reactive item.
+ * Handles adding/removing dependencies and dependents, and propagating messages through the graph.
+ */
+export class DependencyGraph {
+    /**
+     * @param {Set<ReactiveItem>} dependencies - The engine's dependencies set.
+     * @param {Set<ReactiveItem>} dependents - The engine's dependents set.
+     * @param {ReactiveItem} reactiveItem - The owning reactive item.
+     */
+    constructor(dependencies: Set<ReactiveItem>, dependents: Set<ReactiveItem>, reactiveItem: ReactiveItem);
+    /**
+     * Adds a single dependency.
+     * @param {ReactiveItem} dependency
+     */
+    addDependency(dependency: ReactiveItem): void;
+    /**
+     * Adds multiple dependencies, sorted by id, and registers this reactive item as a dependent on each.
+     * @param {Set<ReactiveItem>} deps - Set of dependencies to add.
+     */
+    addDependencies(deps: Set<ReactiveItem>): void;
+    /**
+     * Removes a dependent from the dependents set.
+     * @param {ReactiveItem} dependent
+     */
+    removeDependent(dependent: ReactiveItem): void;
+    /**
+     * Adds a dependent to the dependents set.
+     * @param {ReactiveItem} dependent
+     * @returns {boolean} True if the dependent was added (i.e., not already present).
+     */
+    addDependent(dependent: ReactiveItem): boolean;
+    /**
+     * Returns all dependents of this reactive item (direct and indirect).
+     * @returns {Set<ReactiveItem>}
+     */
+    getDeepDependents(): Set<ReactiveItem>;
+    /**
+     * Returns sorted array of deep dependents.
+     * @returns {Array<ReactiveItem>}
+     */
+    getDeepDependentsArray(): Array<ReactiveItem>;
+    /**
+     * Notifies all dependents of a message.
+     * @param {number} message - The message code (EngineMessages).
+     * @param {{ sender: ReactiveItem, recipients: Set<ReactiveItem> }} ctx - Context containing sender and recipient set.
+     */
+    notifyDependents(message: number, ctx: {
+        sender: ReactiveItem;
+        recipients: Set<ReactiveItem>;
+    }): void;
+    /**
+     * Notifies all dependencies of a message.
+     * @param {number} message - The message code.
+     * @param {{ sender: ReactiveItem, recipients: Set<ReactiveItem> }} ctx
+     */
+    notifyDependencies(message: number, ctx: {
+        sender: ReactiveItem;
+        recipients: Set<ReactiveItem>;
+    }): void;
+    /**
+     * Updates the dependency set to a new set.
+     * @param {Set<ReactiveItem>} newDeps - New set of dependencies.
+     */
+    updateDependencies(newDeps: Set<ReactiveItem>): void;
+    /**
+     * Clears the graph (removes all dependencies and dependents).
+     */
+    clear(): void;
+
 }
+
+/* From core\Engine.d.ts */
 const ATOM: 1;
 const COMPUTED: 2;
 const COLLECTION: 3;
 const SHALLOW_REACTIVE: 4;
+/**
+ * Engine is the core reactive engine for a single reactive item.
+ * It manages dependencies, updates, and lifecycle, delegating to specialised submodules.
+ * All public properties and methods remain unchanged for backward compatibility.
+ */
 class Engine {
     /**
      * Creates an Engine instance.
-     * @param {ReactiveItem} reactiveItem - The reactive item.
-     * @param {ATOM|COMPUTED|COLLECTION|SHALLOW_REACTIVE} type - The type.
+     * @param {ReactiveItem} reactiveItem - The owning reactive item.
+     * @param {1|2|3|4} type - The type of reactive item.
      */
     constructor(reactiveItem: ReactiveItem, type: 1 | 2 | 3 | 4);
-    /**
-     * The set of dependencies of the engine.
-     * @type {Set<ReactiveItem>}
-     */
+    /** @type {Set<ReactiveItem>} */
     dependencies: Set<ReactiveItem>;
-    /**
-     * The set of dependents of the engine.
-     * @type {Set<ReactiveItem>}
-     */
+    /** @type {Set<ReactiveItem>} */
     dependents: Set<ReactiveItem>;
-    /**
-     * Unique identifier for ordering.
-     * @type {number}
-     */
+    /** @type {number} */
     id: number;
-    /**
-     * Version number (currently unused, kept for potential future use).
-     * @type {number}
-     */
+    /** @type {number} */
     version: number;
-    /**
-     * Reference to the reactive item.
-     * @type {ReactiveItem}
-     */
+    /** @type {ReactiveItem} */
     reactiveItem: ReactiveItem;
-    /**
-     * Flag indicating that the value should be recalculated.
-     * @type {boolean}
-     */
+    /** @type {boolean} */
     shouldRecalc: boolean;
-    /**
-     * Indicates whether the engine has been destroyed.
-     * @type {boolean}
-     */
+    /** @type {boolean} */
     isDestroyed: boolean;
+    /** @type {SubscribeController} */
     subscribeController: SubscribeController;
-    /**
-     * The type of the reactive item.
-     * @type {number}
-     */
+    /** @type {number} */
     type: number;
-    /**
-     * Map of pending updates (property -> UpdateDataRecord).
-     * @type {Map<string, UpdateDataRecord>}
-     */
+    /** @type {Map<string, UpdateDataRecord>} */
     updates: Map<string, UpdateDataRecord>;
-    /**
-     * Comparison function for equality.
-     * @type {CompareFunction|null}
-     */
+    /** @type {CompareFunction|null} */
     compareFn: CompareFunction | null;
-    /**
-     * Prevents updates from being propagated (used during mass updates).
-     * @type {boolean}
-     */
+    /** @type {boolean} */
     suppressNotifications: boolean;
     /** @type {Error|null} */
     get error(): Error;
     /**
-     * Alternative version that accepts explicit oldValue (preferred).
+     * Records a change attempt.
      * @param {string} property - The property key.
-     * @param {any} oldValue - The previous value (immediate before this change).
-     * @param {any} newValue - The new value.
-     * @returns {boolean}
-     */
-    isEffectiveChangeWithOld(property: string, oldValue: any, newValue: any): boolean;
-    /**
-     * Legacy method for backward compatibility. Delegates to recordChange + #commitChange.
-     * @param {string} property - The property key.
-     * @param {"set"|"delete"} type - The operation.
+     * @param {"set"|"delete"} type - The operation type.
      * @param {any} oldValue - The previous value.
      * @param {any} value - The new value.
      * @returns {boolean} True if an update was added.
      */
     addUpdate(property: string, type: "set" | "delete", oldValue: any, value: any): boolean;
     /**
-     * Adds dependencies to this engine.
-     * @param {Set<ReactiveItem>} dependencies
-     */
-    addDependencies(dependencies: Set<ReactiveItem>): void;
-    /**
      * Adds a single dependency.
      * @param {ReactiveItem} dependency
      */
     addDependency(dependency: ReactiveItem): void;
+    /**
+     * Adds multiple dependencies.
+     * @param {Set<ReactiveItem>} dependencies
+     */
+    addDependencies(dependencies: Set<ReactiveItem>): void;
     /**
      * Adds a dependent.
      * @param {ReactiveItem} dependent
@@ -987,35 +965,35 @@ class Engine {
     getDeepDependentsArray(): Array<ReactiveItem>;
     /**
      * Notifies dependents of a message.
-     * @param {EngineMessages} message
-     * @param {{sender: ReactiveItem, recipients: Set<ReactiveItem>}} [ctx]
+     * @param {number} message - The message code.
+     * @param {{ sender: ReactiveItem, recipients: Set<ReactiveItem> }} [ctx]
      */
-    notifyDependents(message: EngineMessages, ctx?: {
+    notifyDependents(message: number, ctx?: {
         sender: ReactiveItem;
         recipients: Set<ReactiveItem>;
     }): void;
     /**
      * Notifies dependencies (reverse direction).
-     * @param {EngineMessages} message
-     * @param {{sender: ReactiveItem, recipients: Set<ReactiveItem>}} ctx
+     * @param {number} message - The message code.
+     * @param {{ sender: ReactiveItem, recipients: Set<ReactiveItem> }} [ctx]
      */
-    notifyDependencies(message: EngineMessages, ctx: {
+    notifyDependencies(message: number, ctx?: {
         sender: ReactiveItem;
         recipients: Set<ReactiveItem>;
     }): void;
     /**
      * Handles incoming messages.
-     * @param {EngineMessages} message
-     * @param {{sender: ReactiveItem, recipients: Set<ReactiveItem>}} ctx
+     * @param {number} message - The message code.
+     * @param {{ sender: ReactiveItem, recipients: Set<ReactiveItem> }} ctx
      */
-    getMessage(message: EngineMessages, ctx: {
+    getMessage(message: number, ctx: {
         sender: ReactiveItem;
         recipients: Set<ReactiveItem>;
     }): void;
     /**
      * Sets an error and notifies dependents.
      * @param {Error|null} error
-     * @param {{sender: ReactiveItem, recipients: Set<ReactiveItem>}} [ctx]
+     * @param {{ sender: ReactiveItem, recipients: Set<ReactiveItem> }} [ctx]
      */
     setError(error: Error | null, ctx?: {
         sender: ReactiveItem;
@@ -1027,7 +1005,7 @@ class Engine {
     clearError(): void;
     /**
      * Destroys the engine.
-     * @param {{sender: ReactiveItem, recipients: Set<ReactiveItem>}} [ctx]
+     * @param {{ sender: ReactiveItem, recipients: Set<ReactiveItem> }} [ctx]
      */
     destroy(ctx?: {
         sender: ReactiveItem;
@@ -1044,33 +1022,79 @@ class Engine {
     hasUpdates(): boolean;
     /**
      * Processes temporary changes after batch ends.
-     * Removes updates for properties that reverted to original values.
      * @returns {boolean} True if any changes remain.
      */
     checkChangesTemporary(): boolean;
     /**
-     * Called after a value change to schedule notifications.
+     * Updates dependencies to a new set.
+     * @param {Set<ReactiveItem>} newDeps
      */
-    valueChangedCallback(): void;
+    updateDependencies(newDeps: Set<ReactiveItem>): void;
     /**
      * Prepares the engine for setting a new value.
      * @throws {Error} If destroyed or in subscribers mode.
      */
     prepareSetValue(): void;
     /**
-     * Updates dependencies to a new set.
-     * @param {Set<ReactiveItem>} newDeps
+     * Called after a value change to schedule notifications.
      */
-    updateDependencies(newDeps: Set<ReactiveItem>): void;
+    valueChangedCallback(): void;
+    /**
+     * Checks if a change is effective considering batch mode and snapshots.
+     * This method is kept for backward compatibility.
+     *
+     * @param {string} property - The property key.
+     * @param {any} oldValue - The immediate previous value.
+     * @param {any} newValue - The new value.
+     * @returns {boolean} True if the change is effective (not reverted).
+     */
+    isEffectiveChangeWithOld(property: string, oldValue: any, newValue: any): boolean;
 
 }
 
-/* From core\subscribeController.d.ts */
+/* From core\MessageHandler.d.ts */
+/**
+ * Message codes used in the engine.
+ */
+type EngineMessages = number;
+namespace EngineMessages {
+    let DEPENDENCY_CHANGED: number;
+    let DEPENDENCY_DESTROYED: number;
+    let HAS_ERROR: number;
+    let DEPENDENT_DESTROYED: number;
+}
+/**
+ * Handles incoming messages from dependencies/dependents.
+ * All logic is stateless; it mutates the engine's state via callbacks.
+ */
+export class MessageHandler {
+    /**
+     * Processes an incoming message.
+     * @param {number} message - The message code.
+     * @param {{ sender: ReactiveItem, recipients: Set<ReactiveItem> }} ctx - Context.
+     * @param {_Engine} engineState - The engine's state container (provides getters/setters).
+     * @param {Function} setError - Callback to set the engine's error.
+     * @param {Function} setShouldRecalc - Callback to set the shouldRecalc flag.
+     * @param {Function} notifyDependents - Callback to notify dependents of a message.
+     * @param {Function} removeDependent - Callback to remove a dependent.
+     * @param {Function} destroyEngine - Callback to destroy the engine.
+     */
+    handleMessage(message: number, ctx: {
+        sender: ReactiveItem;
+        recipients: Set<ReactiveItem>;
+    }, engineState: _Engine, setError: Function, setShouldRecalc: Function, notifyDependents: Function, removeDependent: Function, destroyEngine: Function): void;
+}
+
+/* From core\SubscribeController.d.ts */
 /**
  * Manages change subscriptions and lifecycle hooks for a reactive item.
  * Uses a single EventEmitter for all events: 'change' and 'destroy'.
  */
 class SubscribeController {
+    /**
+     * @param {ReactiveItem} reactiveItem
+     */
+    constructor(reactiveItem: ReactiveItem);
     /**
      * Returns a copy of the current 'change' subscriber list.
      * @returns {Function[]}
@@ -1158,6 +1182,58 @@ class UpdateDataRecordManager {
      * @param {string} itemName - The name of the item to be destroyed.
      */
     removeItem(itemName: string): void;
+}
+
+/* From core\UpdateTracker.d.ts */
+/**
+ * Tracks updates and batch snapshots for a reactive item.
+ * Manages the `updates` map and handles batch change detection.
+ */
+export class UpdateTracker {
+    /**
+     * @param {Map<string, UpdateDataRecord>} updates - The engine's updates map.
+     * @param {ReactiveItem} reactiveItem - The owning reactive item.
+     * @param {Engine} engine - The owning engine (for version and batch snapshot access).
+     */
+    constructor(updates: Map<string, UpdateDataRecord>, reactiveItem: ReactiveItem, engine: Engine);
+    /**
+     * Determines if a change is effective (i.e., not reverted) considering batch snapshots.
+     * @param {string} property - The property key.
+     * @param {any} oldValue - The immediate previous value.
+     * @param {any} newValue - The new value.
+     * @param {CompareFunction|null} compareFn - Equality function.
+     * @returns {boolean}
+     */
+    isEffectiveChange(property: string, oldValue: any, newValue: any, compareFn: CompareFunction | null): boolean;
+    /**
+     * Adds an update record if the change is effective.
+     * @param {string} property - The property key.
+     * @param {"set"|"delete"} type - The operation type.
+     * @param {any} oldValue - The previous value (immediate).
+     * @param {any} newValue - The new value.
+     * @param {CompareFunction|null} compareFn - Equality function.
+     * @param {() => void} notifyDependentsCallback - Callback to notify dependents of a change.
+     * @param {() => void} addToChangedItemsCallback - Callback to add the item to the changed items controller.
+     * @returns {boolean} True if an update was added.
+     */
+    addUpdate(property: string, type: "set" | "delete", oldValue: any, newValue: any, compareFn: CompareFunction | null, notifyDependentsCallback: () => void, addToChangedItemsCallback: () => void): boolean;
+    /**
+     * Checks if there are any pending updates.
+     * @returns {boolean}
+     */
+    hasUpdates(): boolean;
+    /**
+     * Clears all pending updates and resets the batch snapshot.
+     */
+    clearUpdates(): void;
+    /**
+     * Processes temporary changes after batch ends.
+     * Removes updates for properties that reverted to original values.
+     * @param {(prop: string) => any} getCurrentValue - Function to get current value for a property.
+     * @returns {boolean} True if any changes remain.
+     */
+    checkChangesTemporary(getCurrentValue: (prop: string) => any): boolean;
+
 }
 
 /* From helpers\tools.d.ts */
@@ -1966,10 +2042,10 @@ declare class ModeControllerService {
     isComputing: boolean;
     untrackMode: boolean;
     throwErrorInSubscribers: boolean;
-    /** @type {EventEmitter<"batchModeStart"|"batchModeEnd"|"beforeBatchModeEnd">} */
-    batchModeEvents: EventEmitter<"batchModeStart" | "batchModeEnd" | "beforeBatchModeEnd">;
-    /** @type {EventEmitter<"subscribersModeEnd">} */
-    subscribersModeEvents: EventEmitter<"subscribersModeEnd">;
+    /** @type {EventEmitterLite<"batchModeStart"|"batchModeEnd"|"beforeBatchModeEnd">} */
+    batchModeEvents: EventEmitterLite<"batchModeStart" | "batchModeEnd" | "beforeBatchModeEnd">;
+    /** @type {EventEmitterLite<"subscribersModeEnd">} */
+    subscribersModeEvents: EventEmitterLite<"subscribersModeEnd">;
     /**
      * Subscribes a function to be called whenever the given event is triggered.
      * @param {"batchModeStart"|"batchModeEnd"|"beforeBatchModeEnd"} event - The event to subscribe to.

@@ -44,7 +44,7 @@ The library is built around the concept of **Reactive Items**. Every piece of re
 - **Engine** – core dependency graph, update propagation, batching, and subscription management.
 - **Services** – global controllers for batching (`modeController`), change tracking (`changedItemsController`), dependency tracking (`dependencyTracker`), and ID generation (`idService`).
 - **Containers** – `Store` and `ReactiveList` that compose multiple reactive items.
-- **API functions** – `autorun`, `reaction`, `batch`, `makeObservable`, etc. – high‑level utilities that build on the core primitives.
+- **API functions** – `autorun`, `reaction`, `batch`, `makeObservable`, etc. – high-level utilities that build on the core primitives. `reaction` supports an optional `passUpdates` flag to receive a `Map` of change details.
 
 ---
 
@@ -227,6 +227,13 @@ The first approach is preferred because it avoids extra comparison overhead and 
     7. Clear all `updates` maps and the global set.
     8. Exit `subscribersMode`.
 
+#### Collecting updates in reaction
+
+When a subscriber is invoked, it receives the `item.engine.updates` map (see Step 6 in the processing steps above). The high-level `reaction` API uses this mechanism to collect all updates from the dependencies it tracks. In `createReactiveSubscription`, each dependency's subscriber callback (`onChange`) accumulates updates into a local `Map`. When the effect runs, this accumulated map is passed to the `effectFn` if the `passUpdates` option is `true` (default for `reaction`). This enables fine‑grained change detection without re‑executing the entire effect.
+
+- `passUpdates: true` (default) – passes a `Map` of updates to `effectFn`.
+- `passUpdates: false` – disables this behaviour (useful for performance when updates are not needed).
+
 ### 4.3. Subscribers Mode
 
 - When `subscribersMode` is active, any attempt to modify a reactive item throws an error. This prevents re‑entrancy and infinite loops.
@@ -310,6 +317,7 @@ console.log(list.toArray()); // ['x', 'c']
 - For large collections (>10,000 items), prefer `Collection` over `ShallowReactive` for arrays to avoid proxy overhead on each element.
 - Avoid deep `compareFunction` in `computed` – use immutable updates instead.
 - Use `batch()` for bulk updates to reduce notification overhead.
+- The `passUpdates` option in `reaction` introduces a small overhead of collecting updates into a `Map`. This is negligible for most use cases, but for extremely high‑frequency updates, consider setting `passUpdates: false` if you don't need the update details.
 
 ---
 
@@ -367,6 +375,18 @@ When generating code that uses `store2`, be aware of these frequent mistakes to 
 8. **Assuming `batch()` automatically returns a promise**  
    ❌ `await batch(() => { ... })` – `batch` is synchronous and does not return a promise.  
    ✅ Use `batch` synchronously; for async workflows, call `batch` inside async functions.
+
+9. **Confusing `autorun` and `reaction` for updates**  
+   ❌ `autorun(() => { console.log('changed'); })` – does **not** receive `updates`.  
+   ✅ Use `reaction` with `passUpdates: true` (the default) to get a `Map` of changes:
+    ```js
+    reaction(
+        () => [a.value, b.value],
+        updates => {
+            console.log('Changed keys:', Array.from(updates.keys()));
+        }
+    );
+    ```
 
 By following these guidelines, AI-generated code will work correctly and efficiently with `store2`.
 

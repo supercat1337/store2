@@ -9,157 +9,218 @@ import { Collection } from '../reactives/Collection.js';
 import { ShallowReactive } from '../reactives/ShallowReactive.js';
 
 /**
- * Automatically tracks and subscribes to changes in reactive items used by the specified function.
- * This allows the function to be re-executed whenever any of its dependencies change, maintaining
- * up-to-date results.
+ * Creates a reactive subscription with configurable dependency tracking.
  *
- * @param {(updates?:Map<string, import('../types.d.ts').UpdateDataRecord>)=>void} fn - The function to track and reactively execute.
- * @param {object} [options] - The options for the autorun function.
- * @param {string} [options.name] - An optional name for the autorun.
- * @param {number} [options.delay] - The number of milliseconds to delay the execution of the callback function.
- * @param {AbortSignal} [options.signal] - An optional AbortSignal to cancel the autorun.
- * @param {Function} [options.onError] - An optional function to handle errors.
- * @returns {()=>void} A function that can be called to unsubscribe the callback function from changes in the tracked dependencies.
- * @example
- * ```js
- * const a = atom(0, { name: "a" });
- * const b = atom(0, { name: "b" });
- * let foo = 0;
- *
- * autorun(() => {
- *     a.value;
- *     b.value;
- *     foo++;
- * });
- *
- * console.log(a.value, b.value, foo); // 0 0 1
- *
- * a.value++;
- * console.log(a.value, b.value, foo); // 1 0 2
- *
- * b.value++;
- * console.log(a.value, b.value, foo); // 1 1 3
- *
- * batch(() => {
- *     a.value++;
- *     b.value++;
- * });
- *
- * console.log(a.value, b.value, foo); // 2 2 4
- * ```
+ * @param {() => any} dataFn - Function whose reactive dependencies are tracked.
+ * @param {(updates?: Map<string, import('../types.d.ts').UpdateDataRecord>) => void} effectFn - Effect to run when dependencies change.
+ * @param {object} options - Configuration.
+ * @param {string} [options.name] - Debug name.
+ * @param {number} [options.delay] - Debounce delay (ms).
+ * @param {AbortSignal} [options.signal] - AbortSignal for cancellation.
+ * @param {Function} [options.onError] - Error handler.
+ * @param {boolean} [options.recomputeDependencies=true] - Re‑collect dependencies on every run.
+ * @param {boolean} [options.isAutorun=false] - Whether this is an autorun (dataFn === effectFn).
+ * @param {boolean} [options.passUpdates=false] - Whether to pass collected updates to effectFn.
+ * @returns {() => void} Unsubscribe function.
  */
-function autorun(fn, options) {
-    const _options = Object.assign(
-        {
-            name: undefined,
-            delay: 0,
-            signal: undefined,
-            onError: undefined,
-            type: 'autorun',
-        },
-        options
-    );
+function createReactiveSubscription(dataFn, effectFn, options = {}) {
+    const {
+        name = '',
+        delay = 0,
+        signal = undefined,
+        onError = undefined,
+        recomputeDependencies = true,
+        isAutorun = false,
+        passUpdates = false,
+    } = options;
 
     if (modeController.untrackMode) {
         throw new Error(
-            `Autorun${
-                _options.name ? ` (${_options.name})` : ''
-            }: cannot initialize when untrackMode is on.`
+            `Cannot initialize reactive subscription${name ? ` (${name})` : ''} when untrackMode is on.`
         );
     }
 
-    return reaction(fn, fn, _options);
+    const finalEffect = delay > 0 ? debounce(effectFn, delay) : effectFn;
+
+    /** @type {Array<() => void>} */
+    let unsubscribers = [];
+
+    let isActive = true;
+    let isRunning = false;
+
+    /** @type {Set<import('../types.d.ts').ReactiveItem> | null} */
+    let staticDependencies = null;
+
+    /** @type {Map<string, import('../types.d.ts').UpdateDataRecord>} */
+    const collectedUpdates = new Map();
+
+    // Single shared change handler – enables deduplication by changedItemsController
+    /**
+     *
+     * @param {Map<string, import('../types.d.ts').UpdateDataRecord>} updates
+     * @returns {void}
+     */
+    const onChange = updates => {
+        if (updates && passUpdates) {
+            for (const [key, record] of updates) {
+                collectedUpdates.set(key, record);
+            }
+        }
+        run();
+    };
+
+    /**
+     * Subscribes to a set of dependencies using the shared onChange handler.
+     * @param {Set<import('../types.d.ts').ReactiveItem>} deps
+     * @returns {Array<() => void>}
+     */
+    function subscribeTo(deps) {
+        const unsubs = [];
+        for (const item of deps) {
+            const unsub = item.subscribe(onChange, { signal });
+            unsubs.push(unsub);
+        }
+        return unsubs;
+    }
+
+    /**
+     * The main runner – called when any dependency changes.
+     * In dynamic mode, it re‑subscribes to fresh dependencies.
+     * In static mode, it just runs the effect.
+     */
+    function run() {
+        if (!isActive || isRunning) {
+            return;
+        }
+        isRunning = true;
+
+        try {
+            if (recomputeDependencies) {
+                // Unsubscribe from old dependencies
+                for (const unsub of unsubscribers) {
+                    try {
+                        unsub();
+                    } catch (e) {
+                        console.error(e);
+                    }
+                }
+                unsubscribers = [];
+
+                // Collect fresh dependencies (this executes dataFn)
+                const deps = getSetOfUsedReactiveItems(dataFn);
+                if (deps.size === 0) {
+                    throw new Error(`No reactive items found${name ? ` (${name})` : ''}.`);
+                }
+                unsubscribers = subscribeTo(deps);
+            }
+
+            // Run the effect only if this is NOT an autorun (because for autorun,
+            // the effect already ran inside dataFn during dependency collection).
+            // For reaction, dataFn is separate, so we need to run the effect.
+            if (!isAutorun) {
+                modeController.enterBatch();
+                try {
+                    if (passUpdates && collectedUpdates.size > 0) {
+                        finalEffect(collectedUpdates);
+                    } else {
+                        finalEffect(undefined);
+                    }
+                } finally {
+                    modeController.exitBatch();
+                }
+                collectedUpdates.clear();
+            }
+        } catch (error) {
+            if (onError) {
+                onError(error);
+            }
+            // Re-throw the error so it propagates to the subscriber handler
+            throw error;
+        } finally {
+            isRunning = false;
+        }
+    }
+
+    // ----- Initialization -----
+    // Collect initial dependencies (this executes dataFn once).
+    // For autorun, dataFn === effectFn, so the effect runs once.
+    // For reaction, dataFn !== effectFn, so the effect does NOT run.
+    const initialDeps = getSetOfUsedReactiveItems(dataFn);
+    if (initialDeps.size === 0) {
+        throw new Error(`No reactive items found${name ? ` (${name})` : ''}.`);
+    }
+
+    // Subscribe to the initial dependencies using the shared handler
+    if (recomputeDependencies) {
+        unsubscribers = subscribeTo(initialDeps);
+    } else {
+        staticDependencies = initialDeps;
+        unsubscribers = subscribeTo(staticDependencies);
+    }
+
+    // For autorun, the effect already ran inside getSetOfUsedReactiveItems above.
+    // For reaction, we do NOT want to run the effect yet.
+
+    // Return the final unsubscribe function
+    return function unsubscribe() {
+        isActive = false;
+        for (const unsub of unsubscribers) {
+            try {
+                unsub();
+            } catch (e) {
+                console.error(e);
+            }
+        }
+        unsubscribers = [];
+        staticDependencies = null;
+        collectedUpdates.clear();
+    };
 }
 
 /**
- * Tracks reactive items used by the specified data function and subscribes
- * the provided callback function to changes in these items. This ensures
- * that the callback is executed whenever any of the tracked dependencies
- * change, allowing for reactive updates based on the data function.
+ * Autorun – runs the effect immediately (during initial dependency collection)
+ * and re‑runs it on any dependency change.
+ * Dependencies are re‑collected on every run by default.
  *
- * @param {()=>any} dataFunction - The function whose reactive dependencies are tracked.
- * @param {(updates?:Map<string, import('../types.d.ts').UpdateDataRecord>)=>void} fn - The callback function to execute when tracked dependencies change.
- * @param {object} [options] - The options for the reaction function.
- * @param {string} [options.name] - An optional name for the reaction.
- * @param {number} [options.delay] - The number of milliseconds to delay the execution of the callback function.
- * @param {AbortSignal} [options.signal] - An optional signal to abort the reaction.
- * @param {string} [options.type] - An optional type for the reaction. Defaults to "reaction".
- * @returns {()=>void} A function that can be called to unsubscribe the callback function from changes in the tracked dependencies.
- * @example
- * ```js
- * const a = atom(0);
- * const b = atom(0);
- *
- * let foo = 0;
- *
- * // runs only data-function to get dependencies
- * // and then subscribes to changes in a and b
- * reaction(
- *     () => [a.value, b.value],
- *     () => {
- *         foo++;
- *     }
- * );
- *
- * console.log(a.value, b.value, foo); // 0 0 0
- *
- * a.value++;
- * console.log(a.value, b.value, foo); // 1 0 1
- *
- * b.value++;
- * console.log(a.value, b.value, foo); // 1 1 2
- *
- * batch(() => {
- *     a.value++;
- *     b.value++;
- * });
- *
- * console.log(a.value, b.value, foo); // 2 2 3
- * ```
+ * @param {() => void} fn - The effect function.
+ * @param {object} [options] - Options.
+ * @param {string} [options.name] - Debug name.
+ * @param {number} [options.delay] - Debounce delay (ms).
+ * @param {AbortSignal} [options.signal] - AbortSignal.
+ * @param {Function} [options.onError] - Error handler.
+ * @param {boolean} [options.recomputeDependencies=true] - Re‑collect dependencies each run.
+ * @returns {() => void} Unsubscribe function.
  */
-function reaction(dataFunction, fn, options) {
-    const _options = Object.assign(
-        { name: undefined, delay: 0, signal: undefined, type: 'reaction' },
-        options
-    );
+function autorun(fn, options = {}) {
+    return createReactiveSubscription(fn, fn, {
+        ...options,
+        recomputeDependencies: options.recomputeDependencies ?? true,
+        isAutorun: true,
+    });
+}
 
-    if (modeController.untrackMode) {
-        throw new Error(
-            `Reaction${
-                _options.name ? ` (${_options.name})` : ''
-            }: cannot initialize when untrackMode is on.`
-        );
-    }
-
-    if (_options.delay > 0) {
-        fn = debounce(fn, _options.delay);
-        _options.delay = 0;
-    }
-
-    /** @type {Function[]} */
-    const unsubscribers = [];
-
-    const items = getSetOfUsedReactiveItems(dataFunction);
-
-    if (items.size === 0) {
-        throw new Error(
-            `Autorun/Reaction${
-                _options.name ? ` (${_options.name})` : ''
-            }: No reactive items found.`
-        );
-    }
-
-    for (const item of items) {
-        unsubscribers.push(item.subscribe(fn, _options));
-    }
-
-    const unsubscriber = () => {
-        for (let i = 0; i < unsubscribers.length; i++) {
-            unsubscribers[i]();
-        }
-    };
-
-    return unsubscriber;
+/**
+ * Reaction – tracks dependencies via dataFn and runs effectFn when they change.
+ * The effect is NOT run immediately; it only runs after the first change.
+ * Dependencies are re‑collected on every run by default.
+ *
+ * @param {() => any} dataFn - Function whose dependencies are tracked.
+ * @param {(updates?: Map<string, import('../types.d.ts').UpdateDataRecord>) => void} effectFn - Effect to run.
+ * @param {object} [options] - Options.
+ * @param {string} [options.name] - Debug name.
+ * @param {number} [options.delay] - Debounce delay (ms).
+ * @param {AbortSignal} [options.signal] - AbortSignal.
+ * @param {Function} [options.onError] - Error handler.
+ * @param {boolean} [options.recomputeDependencies=true] - Re‑collect dependencies each run.
+ * @param {boolean} [options.passUpdates=true] - Pass collected updates to effectFn.
+ * @returns {() => void} Unsubscribe function.
+ */
+function reaction(dataFn, effectFn, options = {}) {
+    return createReactiveSubscription(dataFn, effectFn, {
+        ...options,
+        recomputeDependencies: options.recomputeDependencies ?? true,
+        isAutorun: false,
+    });
 }
 
 /**

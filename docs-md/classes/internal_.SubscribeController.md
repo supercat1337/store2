@@ -16,6 +16,7 @@ Uses a single EventEmitter for all events: 'change' and 'destroy'.
 ### Properties
 
 - [#emitter](internal_.SubscribeController.md##emitter)
+- [#reactiveItem](internal_.SubscribeController.md##reactiveitem)
 
 ### Methods
 
@@ -33,7 +34,13 @@ Uses a single EventEmitter for all events: 'change' and 'destroy'.
 
 ### constructor
 
-• **new SubscribeController**(): [`SubscribeController`](internal_.SubscribeController.md)
+• **new SubscribeController**(`reactiveItem`): [`SubscribeController`](internal_.SubscribeController.md)
+
+#### Parameters
+
+| Name | Type |
+| :------ | :------ |
+| `reactiveItem` | [`ReactiveItem`](ReactiveItem.md) |
 
 #### Returns
 
@@ -41,7 +48,7 @@ Uses a single EventEmitter for all events: 'change' and 'destroy'.
 
 #### Defined in
 
-[src/core/subscribeController.js:14](https://github.com/supercat1337/store2/blob/0a79678b73c0883858e42307757f633e90a127e5/src/core/subscribeController.js#L14)
+src/core/SubscribeController.js:18
 
 ## Properties
 
@@ -51,7 +58,17 @@ Uses a single EventEmitter for all events: 'change' and 'destroy'.
 
 #### Defined in
 
-[src/core/subscribeController.js:12](https://github.com/supercat1337/store2/blob/0a79678b73c0883858e42307757f633e90a127e5/src/core/subscribeController.js#L12)
+src/core/SubscribeController.js:12
+
+___
+
+### #reactiveItem
+
+• `Private` **#reactiveItem**: [`ReactiveItem`](ReactiveItem.md)
+
+#### Defined in
+
+src/core/SubscribeController.js:13
 
 ## Methods
 
@@ -67,7 +84,7 @@ Removes all subscribers, including internal listeners.
 
 #### Defined in
 
-[src/core/subscribeController.js:51](https://github.com/supercat1337/store2/blob/0a79678b73c0883858e42307757f633e90a127e5/src/core/subscribeController.js#L51)
+src/core/SubscribeController.js:75
 
 ___
 
@@ -84,7 +101,7 @@ Internal listeners (has/no subscribers) remain intact.
 
 #### Defined in
 
-[src/core/subscribeController.js:44](https://github.com/supercat1337/store2/blob/0a79678b73c0883858e42307757f633e90a127e5/src/core/subscribeController.js#L44)
+src/core/SubscribeController.js:63
 
 ___
 
@@ -100,7 +117,7 @@ Destroys the controller, emits 'destroy', and removes all listeners.
 
 #### Defined in
 
-[src/core/subscribeController.js:66](https://github.com/supercat1337/store2/blob/0a79678b73c0883858e42307757f633e90a127e5/src/core/subscribeController.js#L66)
+src/core/SubscribeController.js:95
 
 ___
 
@@ -116,7 +133,7 @@ Returns a copy of the current 'change' subscriber list.
 
 #### Defined in
 
-[src/core/subscribeController.js:22](https://github.com/supercat1337/store2/blob/0a79678b73c0883858e42307757f633e90a127e5/src/core/subscribeController.js#L22)
+src/core/SubscribeController.js:27
 
 ___
 
@@ -132,7 +149,7 @@ Returns whether there are any 'change' subscribers.
 
 #### Defined in
 
-[src/core/subscribeController.js:59](https://github.com/supercat1337/store2/blob/0a79678b73c0883858e42307757f633e90a127e5/src/core/subscribeController.js#L59)
+src/core/SubscribeController.js:88
 
 ___
 
@@ -160,7 +177,7 @@ Registers a callback that fires when the controller is destroyed.
 
 #### Defined in
 
-[src/core/subscribeController.js:94](https://github.com/supercat1337/store2/blob/0a79678b73c0883858e42307757f633e90a127e5/src/core/subscribeController.js#L94)
+src/core/SubscribeController.js:128
 
 ___
 
@@ -188,7 +205,7 @@ Registers a callback that fires when the first 'change' subscriber is added.
 
 #### Defined in
 
-[src/core/subscribeController.js:76](https://github.com/supercat1337/store2/blob/0a79678b73c0883858e42307757f633e90a127e5/src/core/subscribeController.js#L76)
+src/core/SubscribeController.js:110
 
 ___
 
@@ -216,7 +233,7 @@ Registers a callback that fires when the last 'change' subscriber is removed.
 
 #### Defined in
 
-[src/core/subscribeController.js:85](https://github.com/supercat1337/store2/blob/0a79678b73c0883858e42307757f633e90a127e5/src/core/subscribeController.js#L85)
+src/core/SubscribeController.js:119
 
 ___
 
@@ -247,4 +264,4 @@ Subscribes a callback to the 'change' event.
 
 #### Defined in
 
-[src/core/subscribeController.js:33](https://github.com/supercat1337/store2/blob/0a79678b73c0883858e42307757f633e90a127e5/src/core/subscribeController.js#L33)
+src/core/SubscribeController.js:38

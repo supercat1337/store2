@@ -87,13 +87,14 @@ btn.addEventListener('click', () => count.value++);
 
 ## Examples
 
-Check out the [`examples/`](./examples) folder for runnable demos:
+Check out the [`examples/`](./examples) folder for runnable demos covering all features:
 
-- **[Counter](./examples/counter)** — Basic atom + DOM binding
-- **[Todos](./examples/todos)** — Reactive list with `Collection`
-- **[Autorun](./examples/autorun)** — `autorun`, `reaction`, and `when` in action
-- **[Sum](./examples/sum)** — Computed values with multiple dependencies
-- **[TodoMVC](./examples/todomvc)** — Full-featured TodoMVC implementation
+- **Basics** – atoms, computed, batch, untrack
+- **Reactions** – autorun, reaction, when, waitUntil
+- **Collections** – collection, shallowReactive, ReactiveList
+- **Stores** – Store, nested stores
+- **Classes** – makeObservable, makeAutoObservable, extendObservable
+- **Async** – fromPromise, getNow
 
 ---
 
@@ -261,7 +262,9 @@ console.log(list.toArray()); // [42, 3]
 
 ### `autorun(fn, options)`
 
-Runs `fn` immediately and re‑runs it whenever any reactive value used inside changes. Dependencies are collected **only during the first run**.
+Runs `fn` immediately and re‑runs it whenever any reactive value used inside changes.  
+Dependencies are re‑collected on every run by default (unless `recomputeDependencies: false` is set).  
+Unlike `reaction`, `autorun` does **not** receive a `updates` map – it simply re‑executes the whole function.
 
 ```js
 const a = atom(1);
@@ -275,14 +278,33 @@ a.value = 5; // Output: 7
 
 ### `reaction(dataFn, effectFn, options)`
 
-Tracks dependencies inside `dataFn` and runs `effectFn` whenever those dependencies change.
+Tracks dependencies inside `dataFn` and runs `effectFn` whenever those dependencies change.  
+By default, `effectFn` receives a `Map` containing the exact updates (property paths → `UpdateDataRecord`) that triggered the reaction. This is useful for fine-grained DOM updates, logging, or optimising expensive operations.
 
 ```js
+import { reaction, atom } from '@supercat1337/store2';
+
+const a = atom(1);
+const b = atom(2);
+
 reaction(
     () => [a.value, b.value],
-    () => console.log('a or b changed')
+    updates => {
+        console.log('Changed keys:', Array.from(updates.keys()));
+        // updates contains: oldValue, newValue, type for each changed key
+    }
 );
+
+a.value = 10; // triggers reaction with updates
 ```
+
+**Options:**
+
+- `passUpdates` (boolean, default `true`) – if `true`, passes a `Map` of updates to `effectFn`. Set to `false` to disable.
+- `recomputeDependencies` (boolean, default `true`) – re‑collect dependencies on each run.
+- `delay` (number) – debounce delay in milliseconds.
+- `signal` (AbortSignal) – cancellation signal.
+- `onError` (function) – error handler.
 
 ### `batch(fn)`
 
@@ -398,6 +420,9 @@ counter.increment(); // logs "Double: 2"
 - **Destroyed items**  
   Calling `destroy()` on a reactive item cleans up all subscriptions and dependencies. Further operations (except checking `isDestroyed`) will throw an error.
 
+- **`autorun` vs `reaction` for updates**  
+  `autorun` does **not** receive `updates` – it re‑runs the entire effect. If you need fine‑grained change information (e.g., for selective DOM updates), use `reaction` with `passUpdates: true` (the default).
+
 ---
 
 ## TypeScript Support
@@ -410,6 +435,7 @@ This library is written in plain JavaScript with JSDoc annotations. Type definit
 
 - **Full API Documentation**: [`docs-md/README.md`](docs-md/README.md)
 - **Examples**: Check out the [`examples/`](./examples) folder for runnable code snippets covering all features.
+- **Architecture Overview**: For a deep dive into the internal architecture, dependency graph, batching, and core engine mechanics, see [`AGENTS.md`](./AGENTS.md) — this file is also intended for AI assistants and advanced developers.
 
 ---
 
@@ -423,7 +449,3 @@ MIT © 2025–2026 Albert Bazaleev
 
 - [GitHub Repository](https://github.com/supercat1337/store2)
 - [NPM Package](https://www.npmjs.com/package/@supercat1337/store2)
-
-```
-
-```

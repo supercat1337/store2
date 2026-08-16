@@ -772,9 +772,8 @@ test('makeObservable 4: Class (collection)', t => {
 
     let foo = 0;
 
-    autorun(updates => {
+    autorun(() => {
         t.log(`list.length = ${list.length}`);
-        t.log(updates);
         //list.length;
         foo++;
     });
@@ -825,9 +824,8 @@ test('makeObservable 4: Class (collection) with batch', t => {
 
     let foo = 0;
 
-    autorun(updates => {
+    autorun(() => {
         t.log(`list.length = ${list.length}`);
-        t.log(updates);
         //list.length;
         foo++;
     });
@@ -873,7 +871,7 @@ test('makeObservable 5: Class (collection, computed)', t => {
 
     let foo = 0;
 
-    autorun(updates => {
+    autorun(() => {
         t.log(`list.length = ${list.length}`);
         //list.length;
         foo++;

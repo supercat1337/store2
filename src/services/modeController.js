@@ -1,6 +1,6 @@
 // @ts-check
 
-import { EventEmitter } from '@supercat1337/event-emitter';
+import { EventEmitterLite } from '@supercat1337/event-emitter';
 
 class ModeControllerService {
     isComputing = false;
@@ -10,16 +10,16 @@ class ModeControllerService {
     #batchDepth = 0;
     #subscribersMode = false;
 
-    /** @type {EventEmitter<"batchModeStart"|"batchModeEnd"|"beforeBatchModeEnd">} */
+    /** @type {EventEmitterLite<"batchModeStart"|"batchModeEnd"|"beforeBatchModeEnd">} */
     batchModeEvents;
 
-    /** @type {EventEmitter<"subscribersModeEnd">} */
+    /** @type {EventEmitterLite<"subscribersModeEnd">} */
     subscribersModeEvents;
 
     constructor() {
-        this.batchModeEvents = new EventEmitter();
+        this.batchModeEvents = new EventEmitterLite();
 
-        this.subscribersModeEvents = new EventEmitter();
+        this.subscribersModeEvents = new EventEmitterLite();
     }
 
     /**

@@ -17,6 +17,9 @@ class ChangedItemsController {
      * @param {import('../types.d.ts').ReactiveItem} item - The reactive item that changed.
      */
     addItem(item) {
+        //console.log('[addItem]addItem:', item.name);
+        //console.log('[addItem]modeController.batchMode', modeController.batchMode);
+
         this.items.add(item);
         if (!modeController.batchMode) {
             this.runSubscribers();
@@ -49,6 +52,13 @@ class ChangedItemsController {
      * are processed in the next iteration, preventing lost updates.
      */
     runSubscribers() {
+        /*
+        console.log(
+            '[runSubscribers] itemsToProcess:',
+            Array.from(this.items).map(i => i.name)
+        );
+        */
+
         /** @type {Set<import('../types.d.ts').ReactiveItem>} */
         const changedItemsWithUpdates = new Set();
 
@@ -56,6 +66,12 @@ class ChangedItemsController {
         while (this.items.size > 0) {
             // 1. Take a snapshot of the current pending items and clear the queue
             const itemsToProcess = new Set(this.items);
+            /*
+            console.log(
+                '[runSubscribers] itemsToProcess:',
+                Array.from(this.items).map(i => i.name)
+            );
+            */
             this.items.clear();
 
             // 2. Determine which items actually have effective updates
@@ -73,16 +89,33 @@ class ChangedItemsController {
                 }
             });
 
+            /*
+            console.log(
+                '[runSubscribers] changedItemsWithUpdates:',
+                Array.from(changedItemsWithUpdates).map(i => i.name)
+            );
+            */
+
             // 3. Collect all deep dependents that have subscribers and need recalculation
             /** @type {Set<import('../types.d.ts').ReactiveItem>} */
             const itemsToRecalc = new Set();
             changedItemsWithUpdates.forEach(item => {
                 item.engine.getDeepDependents().forEach(dep => {
                     if (dep.hasSubscribers()) {
-                        itemsToRecalc.add(dep);
+                        // Если у dep уже есть updates, не пересчитываем его повторно
+                        if (!dep.engine.hasUpdates()) {
+                            itemsToRecalc.add(dep);
+                        }
                     }
                 });
             });
+
+            /*
+            console.log(
+                '[runSubscribers] itemsToRecalc:',
+                Array.from(itemsToRecalc).map(i => i.name)
+            );
+            */
 
             // 4. Recalculate the stale computed values in a deterministic order
             Array.from(itemsToRecalc)
@@ -110,10 +143,33 @@ class ChangedItemsController {
                 });
             }
 
+            /*
+            console.log(
+                '[runSubscribers] after step 5, changedItemsWithUpdates:',
+                Array.from(changedItemsWithUpdates).map(i => i.name)
+            );
+            */
+
             // 6. Sort the items by creation order and filter those with active subscribers
+            /*
+            console.log(
+                '[runSubscribers] hasSubscribers before filter:',
+                Array.from(changedItemsWithUpdates).map(i => ({
+                    name: i.name,
+                    has: i.hasSubscribers(),
+                }))
+            );
+            */
             const changedItemsWithUpdatesSorted = Array.from(changedItemsWithUpdates)
                 .filter(item => item.hasSubscribers())
                 .sort(sortReactiveItems);
+
+            /*
+            console.log(
+                '[runSubscribers] changedItemsWithUpdatesSorted:',
+                changedItemsWithUpdatesSorted.map(i => i.name)
+            );
+            */
 
             // 7. Notify all subscribers while preventing nested mutations
             modeController.startSubscribersMode();
@@ -125,6 +181,12 @@ class ChangedItemsController {
                 const item = changedItemsWithUpdatesSorted[i];
                 const itemSubscribers = item.engine.subscribeController.getSubscribers();
 
+                /*
+                console.log(
+                    `[runSubscribers] Calling subscribers for ${item.name}, updates:`,
+                    Array.from(item.engine.updates.entries())
+                );
+                */
                 for (const subscriber of itemSubscribers) {
                     // Avoid calling the same subscriber function multiple times
                     if (usedSubscribers.has(subscriber)) {
@@ -132,6 +194,7 @@ class ChangedItemsController {
                     }
                     usedSubscribers.add(subscriber);
                     try {
+                        //console.log(`[runSubscribers] Subscriber called for ${item.name}`);
                         subscriber(item.engine.updates);
                     } catch (e) {
                         const err = getError(e);

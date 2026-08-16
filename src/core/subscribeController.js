@@ -10,9 +10,14 @@ import { debounce } from '../helpers/tools.js';
 class SubscribeController {
     /** @type {EventEmitter} */
     #emitter;
+    #reactiveItem;
 
-    constructor() {
+    /**
+     * @param {import('../types.js').ReactiveItem} reactiveItem
+     */
+    constructor(reactiveItem) {
         this.#emitter = new EventEmitter();
+        this.#reactiveItem = reactiveItem;
     }
 
     /**
@@ -26,7 +31,7 @@ class SubscribeController {
     /**
      * Subscribes a callback to the 'change' event.
      *
-     * @param {(updates: Map<string, import('../types.d.ts').UpdateDataRecord>) => void} fn
+     * @param {(updates: Map<string, import('../types.js').UpdateDataRecord>) => void} fn
      * @param {{ delay?: number, signal?: AbortSignal }} [options]
      * @returns {() => void}
      */
@@ -34,7 +39,21 @@ class SubscribeController {
         const { delay = 0, signal } = options || {};
         const wrappedFn = delay > 0 ? debounce(fn, delay) : fn;
 
-        return this.#emitter.on('change', wrappedFn, { signal });
+        const unsubscribe = this.#emitter.on('change', wrappedFn, { signal });
+        /*
+        console.log(
+            `[SubscribeController] subscribe for ${this.#reactiveItem?.name || 'unknown'}, listener added`
+        );
+        */
+
+        return () => {
+            /*
+            console.log(
+                `[SubscribeController] unsubscribe called for ${this.#reactiveItem?.name || 'unknown'}`
+            );
+            */
+            unsubscribe();
+        };
     }
 
     /**
@@ -42,6 +61,11 @@ class SubscribeController {
      * Internal listeners (has/no subscribers) remain intact.
      */
     clearSubscribers() {
+        /*
+        console.log(
+            `[SubscribeController] clearSubscribers called for ${this.#reactiveItem?.name || 'unknown'}`
+        );
+        */
         this.#emitter.removeAllListenersOf('change');
     }
 
@@ -49,6 +73,11 @@ class SubscribeController {
      * Removes all subscribers, including internal listeners.
      */
     clearAllSubscribers() {
+        /*
+        console.log(
+            `[SubscribeController] clearAllSubscribers called for ${this.#reactiveItem?.name || 'unknown'}`
+        );
+        */
         this.#emitter.removeAllListeners({ removeInternalListeners: true });
     }
 
@@ -64,6 +93,11 @@ class SubscribeController {
      * Destroys the controller, emits 'destroy', and removes all listeners.
      */
     destroy() {
+        /*
+        console.log(
+            `[SubscribeController] destroy called for ${this.#reactiveItem?.name || 'unknown'}`
+        );
+        */
         this.#emitter.emit('destroy');
         this.#emitter.removeAllListeners({ removeInternalListeners: true });
     }

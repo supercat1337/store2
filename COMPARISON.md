@@ -38,7 +38,7 @@ Both libraries solve the same problem — reactive state management. They are in
 | **Size**                    | ~15 KB (minified) plus optional React‑integration packages.                                                                         | ~10 KB + one tiny dependency (`@supercat1337/event-emitter`).                                                                                    |
 | **Dependencies**            | No external dependencies (except optional React packages).                                                                          | One dependency (event emitter).                                                                                                                  |
 | **Maturity and ecosystem**  | Stable, widely adopted, many examples, plugins, and integrations.                                                                   | Young library; ecosystem is still evolving.                                                                                                      |
-
+| **Fine‑grained updates in reactions** | No built‑in way to receive a `Map` of changes in reactions (though you can manually track previous values). | `reaction` can receive a `Map` of updates via `passUpdates: true` (enabled by default). This allows selective DOM updates or optimised side effects. |
 ---
 
 ### When to choose MobX
@@ -58,6 +58,7 @@ Both libraries solve the same problem — reactive state management. They are in
 - You work in environments where React integration is not required (Vanilla JS, Node.js, other frameworks).
 - You value simplicity and predictability over “magic”.
 - You are building a library or plugin and don't want to drag heavy dependencies.
+- You want to optimise UI updates by knowing exactly which properties changed (via `reaction` with `updates`).
 
 ---
 
