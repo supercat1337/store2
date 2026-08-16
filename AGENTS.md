@@ -1,4 +1,4 @@
-# AI_DOCS.md – Technical Architecture of @supercat1337/store2
+# AGENTS.md – Technical Architecture of @supercat1337/store2
 
 This document provides an in‑depth technical overview of the `store2` reactive library. It is intended for AI assistants and developers who need to understand the internal mechanics for debugging, extending, or integrating the library.
 
