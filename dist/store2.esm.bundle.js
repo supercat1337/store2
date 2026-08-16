@@ -733,7 +733,7 @@ var SubscribeController = class {
   #emitter;
   #reactiveItem;
   /**
-   * @param {import('../types.js').ReactiveItem} reactiveItem
+   * @param {import('./types.d.ts').ReactiveItem} reactiveItem
    */
   constructor(reactiveItem) {
     this.#emitter = new EventEmitter();
@@ -749,7 +749,7 @@ var SubscribeController = class {
   /**
    * Subscribes a callback to the 'change' event.
    *
-   * @param {(updates: Map<string, import('../types.js').UpdateDataRecord>) => void} fn
+   * @param {(updates: Map<string, import('./types.d.ts').UpdateDataRecord>) => void} fn
    * @param {{ delay?: number, signal?: AbortSignal }} [options]
    * @returns {() => void}
    */
