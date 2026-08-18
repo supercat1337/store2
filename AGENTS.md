@@ -360,9 +360,8 @@ When generating code that uses `store2`, be aware of these frequent mistakes to 
    ❌ `atom.subscribe(() => { anotherAtom.value = ... })` – throws because `subscribersMode` is active.  
    ✅ Use `runInAction(() => { anotherAtom.value = ... })` to defer the mutation.
 
-5. **Using `autorun` with conditional dependencies**  
-   ❌ `autorun(() => { if (flag.value) { use(a.value) } })` – if `flag` is false on first run, `a` is never tracked.  
-   ✅ Use `computed` for conditional logic or ensure all dependencies are read unconditionally.
+5. **Conditional dependencies in `autorun` / `reaction`**  
+   ❌ `autorun(() => { if (flag.value) { use(a.value) } })` – if `flag` is `false` on the first run, `a` is not yet tracked. When `flag` later becomes `true`, the effect re‑runs (because `flag` is tracked) and `a` will then be added to the dependency set. However, changes to `a` that occur **before** `flag` becomes `true` will **not** trigger the effect. This behaviour is often desired, but if you need `a` to be tracked regardless of `flag`, restructure your code to read `a` unconditionally (e.g., using a `computed` that always reads `a` but returns a conditional value).
 
 6. **Not cleaning up subscriptions**  
    ❌ Subscribing without storing the unsubscribe function can cause memory leaks.  

@@ -301,7 +301,7 @@ a.value = 10; // triggers reaction with updates
 **Options:**
 
 - `passUpdates` (boolean, default `true`) – if `true`, passes a `Map` of updates to `effectFn`. Set to `false` to disable.
-- `recomputeDependencies` (boolean, default `true`) – re‑collect dependencies on each run.
+- `recomputeDependencies` (default `true`) – if `true`, dependencies are re‑collected on every run. Set to `false` to capture dependencies only once (static collection).
 - `delay` (number) – debounce delay in milliseconds.
 - `signal` (AbortSignal) – cancellation signal.
 - `onError` (function) – error handler.
@@ -401,9 +401,10 @@ counter.increment(); // logs "Double: 2"
 
 ## Important Notes / Known Limitations
 
-- **Static dependency collection in `autorun` and `reaction`**  
-  Dependencies are captured **only once** – during the first execution of the tracked function. If your function conditionally uses different reactive items (e.g., inside an `if` statement), changes to items not used in the first run **will not** trigger the effect.  
-  **Workaround:** Use `computed` to pre‑compute conditional values, or restructure your effect so that all possible dependencies are accessed during the first run (e.g., by reading them unconditionally).
+> **Dynamic dependency collection in `autorun` and `reaction`**  
+> By default, dependencies are **re‑collected on every execution** of the tracked function. This means that conditional reads (e.g., inside an `if` statement) are handled correctly: if a condition changes and a new reactive item is read, it will be added to the dependency set for subsequent runs.  
+> However, note that **only the items actually read during a particular execution are tracked** for that run. If a reactive item is not read because a condition is false, a change to that item will **not** trigger a re‑run until the item is read again (i.e., when the condition becomes true in some later execution).  
+> If you need to **fix the dependency set once** (static collection), set the `recomputeDependencies: false` option. This can improve performance in cases where dependencies never change, but be cautious with conditional logic.
 
 - **`Atom` clones objects shallowly**  
   When you assign an object/array to an `Atom`, it is shallow‑cloned (`Object.assign` or `slice`). Mutating nested properties **will not** trigger reactivity. Use `Collection` or `ShallowReactive` for nested structures.
