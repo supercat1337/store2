@@ -17,13 +17,17 @@ export { Collection } from './reactives/Collection.js';
 export { ShallowReactive } from './reactives/ShallowReactive.js';
 export { Store } from './complex/Store.js';
 export { ReactiveList } from './complex/ReactiveList.js';
+export { Engine } from './core/Engine.js';
 export { UpdateDataRecord } from './core/UpdateDataRecord.js';
 
 export {
+    SNAPSHOT_VERSION,
+    PLUGIN_API_VERSION,
     Store2Context,
     defaultContext,
     getCurrentContext,
     runWithContext,
+    runWithContextAsync,
     createStore2Context,
 } from './core/context.js';
 
@@ -61,24 +65,24 @@ export {
     sortReactiveItems,
 } from './helpers/tools.js';
 
-export { DevToolsPlugin, createDevToolsPlugin } from './plugins/devtools.js';
-
-// Services — публичные по контракту с Store2Context
 export { IdService } from './services/idService.js';
 export { ModeControllerService } from './services/modeController.js';
 export { Tracker } from './services/dependencyTracker.js';
 export { ChangedItemsController } from './services/changedItemsController.js';
 
-// Type-only exports — то, ради чего затевался этот файл
+// Type-only exports
 export type {
     ActionInfo,
     BatchInfo,
     ActionMiddleware,
     ContextSnapshot,
+    SnapshotMigration,
     SnapshotRoot,
     Store2Plugin,
     CompareFunction,
     ReactiveItemType,
+    ObservableValue,
+    GraphDump,
+    GraphDumpItem,
+    GraphDumpEdge,
 } from './types.js';
-
-export type { DevToolsOptions, DevToolsEntry } from './plugins/devtools.js';

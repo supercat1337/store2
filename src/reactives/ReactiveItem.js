@@ -15,9 +15,16 @@ import { compareAny, getError } from '../helpers/tools.js';
  */
 class ReactiveItem {
     /**
-     * The reactive engine driving this item. Internal coordination only.
-     * @type {Engine}
-     * @internal
+     * The reactive engine driving this item. Provides access to the
+     * dependency graph, version counter, and type tag — the machinery
+     * ecosystem packages (DevTools, diagnostics, structural sharing)
+     * need to inspect.
+     *
+     * Treat the engine as read-only from outside the library. Constructing
+     * reactive items directly (via `ReactiveItem` factories) is the only
+     * supported way to create an engine.
+     *
+     * @type {import('../core/Engine.js').Engine}
      */
     engine;
 
@@ -285,6 +292,20 @@ class ReactiveItem {
     }
 
     /**
+     * Returns the current value as a plain JavaScript value, for use with
+     * `JSON.stringify()`. Subclasses override this to return their raw
+     * value without proxies.
+     *
+     * This is a debug/inspection convenience, not a persistence protocol —
+     * use `serialize()` for snapshots.
+     *
+     * @returns {any}
+     */
+    toJSON() {
+        return this.peekValue();
+    }
+
+    /**
      * Restores state previously produced by `serialize()`.
      *
      * The base implementation is a no-op. Subclasses override this to apply
@@ -295,6 +316,34 @@ class ReactiveItem {
      */
     hydrate(_data) {
         // no-op by default
+    }
+
+    /**
+     * Returns a minimal observable facade for framework adapters.
+     *
+     * - `get()` returns the current value without tracking a dependency.
+     * - `subscribe(fn)` invokes `fn` with the current value on every
+     *   effective change.
+     * - `version()` returns the monotonic version, suitable as a token
+     *   for `useSyncExternalStore`.
+     *
+     * @returns {import('../types.js').ObservableValue<any>}
+     */
+    toObservable() {
+        const self = this;
+        return {
+            get() {
+                return self.getValue({ untracked: true });
+            },
+            subscribe(fn) {
+                return self.subscribe(() => {
+                    fn(self.getValue({ untracked: true }));
+                });
+            },
+            version() {
+                return self.getVersion();
+            },
+        };
     }
 }
 

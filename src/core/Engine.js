@@ -19,48 +19,110 @@ export const SHALLOW_REACTIVE = 4;
  * All coordination with the id service, mode controller, and changed-items
  * controller goes through that context, so multiple isolated roots can
  * coexist in one process.
+ *
+ * The public surface of this class is intentionally narrow: only the
+ * fields an ecosystem package (DevTools, diagnostics, structural sharing)
+ * needs to inspect. Everything else is marked `@internal` and is not part
+ * of the supported API.
+ *
+ * @public
  */
 export class Engine {
-    /** @type {import('./context.js').Store2Context} */
+    /**
+     * The context this engine belongs to. Captured once at construction and
+     * never changes.
+     * @type {import('./context.js').Store2Context}
+     */
     context;
 
-    /** @type {Set<import('../reactives/ReactiveItem.js').ReactiveItem>} */
+    /**
+     * The set of items this engine depends on. Populated by `Computed`
+     * during dependency collection and by explicit `addDependency` calls.
+     * @type {Set<import('../reactives/ReactiveItem.js').ReactiveItem>}
+     */
     dependencies = new Set();
 
-    /** @type {Set<import('../reactives/ReactiveItem.js').ReactiveItem>} */
+    /**
+     * The set of items that depend on this engine's reactive item. Maintained
+     * in sync with each dependency's `dependencies` set.
+     * @type {Set<import('../reactives/ReactiveItem.js').ReactiveItem>}
+     */
     dependents = new Set();
 
-    /** @type {number} */
+    /**
+     * Monotonic numeric id, assigned by the owning context's id service.
+     * Used for deterministic ordering of subscriber notifications.
+     * @type {number}
+     */
     id;
 
-    /** @type {number} */
+    /**
+     * Monotonic version counter, bumped on every effective change.
+     * @type {number}
+     */
     version = 0;
 
-    /** @type {import('../reactives/ReactiveItem.js').ReactiveItem} */
+    /**
+     * The reactive item this engine drives.
+     * @type {import('../reactives/ReactiveItem.js').ReactiveItem}
+     */
     reactiveItem;
 
-    /** @type {boolean} */
+    /**
+     * Set to `true` when a dependency has notified a change and the
+     * computed value must be recalculated on the next read.
+     * @type {boolean}
+     */
     shouldRecalc = false;
 
-    /** @type {boolean} */
+    /**
+     * Set to `true` after `destroy()` completes. Subsequent reads and
+     * writes throw.
+     * @type {boolean}
+     */
     isDestroyed = false;
+
+    /**
+     * Pending updates, keyed by property path. Read by plugins via
+     * `onSubscriberRun` and by `Store` to build notification payloads.
+     * @type {Map<string, import('./UpdateDataRecord.js').UpdateDataRecord>}
+     */
+    updates = new Map();
 
     /** @type {Error | null} */
     #error = null;
 
-    /** @type {SubscribeController} */
+    /**
+     * Manages change subscriptions and lifecycle hooks for the reactive
+     * item.
+     *
+     * @internal
+     * @type {SubscribeController}
+     */
     subscribeController;
 
-    /** @type {import('../types.js').ReactiveItemType} */
+    /**
+     * The numeric type tag of the reactive item.
+     * @type {import('../types.js').ReactiveItemType}
+     */
     type;
 
-    /** @type {Map<string, import('./UpdateDataRecord.js').UpdateDataRecord>} */
-    updates = new Map();
-
-    /** @type {import('../types.js').CompareFunction | null} */
+    /**
+     * Custom equality function, set by the reactive item at construction.
+     *
+     * @internal
+     * @type {import('../types.js').CompareFunction | null}
+     */
     compareFn = null;
 
-    /** @type {boolean} */
+    /**
+     * When `true`, `valueChangedCallback` skips scheduling notifications.
+     * Used internally by `Collection` and `ShallowReactive` during bulk
+     * updates.
+     *
+     * @internal
+     * @type {boolean}
+     */
     suppressNotifications = false;
 
     /** @type {DependencyGraph} */
@@ -82,6 +144,8 @@ export class Engine {
         this.context = getCurrentContext();
         this.id = this.context.idService.generateId();
 
+        this.context.registerItem(this.reactiveItem);
+
         this.#graph = new DependencyGraph(this.dependencies, this.dependents, reactiveItem);
         this.#updateTracker = new UpdateTracker(this.updates, reactiveItem, this);
         this.#messageHandler = new MessageHandler();
@@ -89,7 +153,12 @@ export class Engine {
     }
 
     /**
-     * @returns {Error | null}
+     * Returns the last error produced by this engine, or `null`.
+     *
+     * For `Computed`, this is the error thrown during the most recent
+     * evaluation. The error is preserved until a dependency changes.
+     *
+     * @type {Error | null}
      */
     get error() {
         return this.#error;
@@ -98,6 +167,8 @@ export class Engine {
     /**
      * Records a change attempt and emits `onUpdate` when the change is
      * effective.
+     *
+     * @internal
      * @param {string} property
      * @param {"set" | "delete"} type
      * @param {any} oldValue
@@ -126,6 +197,13 @@ export class Engine {
     }
 
     /**
+     * Adds a single dependency to this engine's dependency set.
+     *
+     * Unlike `addDependencies`, this does not register the reverse link on
+     * the dependency — use it only when the reverse link has been set up
+     * elsewhere or when you know what you are doing.
+     *
+     * @internal
      * @param {import('../reactives/ReactiveItem.js').ReactiveItem} dependency
      */
     addDependency(dependency) {
@@ -133,6 +211,12 @@ export class Engine {
     }
 
     /**
+     * Adds multiple dependencies, sorted by id, and registers this engine
+     * as a dependent on each.
+     *
+     * Used by `Computed` during dependency collection.
+     *
+     * @internal
      * @param {Set<import('../reactives/ReactiveItem.js').ReactiveItem>} dependencies
      */
     addDependencies(dependencies) {
@@ -140,6 +224,12 @@ export class Engine {
     }
 
     /**
+     * Registers `dependent` as depending on this engine's reactive item.
+     *
+     * Returns `true` if the dependent was newly added, `false` if it was
+     * already present or if the engine is destroyed.
+     *
+     * @internal
      * @param {import('../reactives/ReactiveItem.js').ReactiveItem} dependent
      * @returns {boolean}
      */
@@ -151,6 +241,13 @@ export class Engine {
     }
 
     /**
+     * Removes `dependent` from this engine's dependents set.
+     *
+     * Called when a dependent is destroyed or when it stops depending on
+     * this item (for example, after a `Computed` recalculates and drops
+     * a conditional dependency).
+     *
+     * @internal
      * @param {import('../reactives/ReactiveItem.js').ReactiveItem} dependent
      */
     removeDependent(dependent) {
@@ -158,6 +255,12 @@ export class Engine {
     }
 
     /**
+     * Returns all transitive dependents of this engine's reactive item.
+     *
+     * The traversal is cycle-safe: a visited set prevents infinite loops
+     * on graphs where computed items mutually depend on each other.
+     *
+     * @internal
      * @returns {Set<import('../reactives/ReactiveItem.js').ReactiveItem>}
      */
     getDeepDependents() {
@@ -165,6 +268,13 @@ export class Engine {
     }
 
     /**
+     * Returns transitive dependents as an array, sorted by engine id.
+     *
+     * Sorting by id makes the order deterministic across runs, which the
+     * `ChangedItemsController` relies on when it recalculates stale
+     * computed values.
+     *
+     * @internal
      * @returns {Array<import('../reactives/ReactiveItem.js').ReactiveItem>}
      */
     getDeepDependentsArray() {
@@ -172,6 +282,13 @@ export class Engine {
     }
 
     /**
+     * Propagates a message to all direct dependents.
+     *
+     * A fresh `{ sender, recipients }` context is created when none is
+     * supplied; recipients accumulated during the traversal are attached to
+     * that context.
+     *
+     * @internal
      * @param {number} message
      * @param {{ sender: import('../reactives/ReactiveItem.js').ReactiveItem, recipients: Set<import('../reactives/ReactiveItem.js').ReactiveItem> }} [ctx]
      */
@@ -183,6 +300,12 @@ export class Engine {
     }
 
     /**
+     * Propagates a message to all direct dependencies.
+     *
+     * Used mainly to announce that this engine's item has been destroyed,
+     * so that each dependency can drop its back-reference.
+     *
+     * @internal
      * @param {number} message
      * @param {{ sender: import('../reactives/ReactiveItem.js').ReactiveItem, recipients: Set<import('../reactives/ReactiveItem.js').ReactiveItem> }} [ctx]
      */
@@ -194,6 +317,14 @@ export class Engine {
     }
 
     /**
+     * Handles an incoming message from a dependency or dependent.
+     *
+     * Wires the stateless `MessageHandler` to this engine's mutable state
+     * (error, `shouldRecalc`) and to the callbacks that forward messages
+     * downstream. The handler itself performs no I/O — it dispatches on
+     * the message code and calls back into the engine.
+     *
+     * @internal
      * @param {number} message
      * @param {{ sender: import('../reactives/ReactiveItem.js').ReactiveItem, recipients: Set<import('../reactives/ReactiveItem.js').ReactiveItem> }} ctx
      */
@@ -237,6 +368,12 @@ export class Engine {
 
     /**
      * Sets an error and notifies dependents. Emits `onError`.
+     *
+     * Called by `Computed` when its derivation function throws. Dependents
+     * receive a `HAS_ERROR` message and can propagate the error further
+     * downstream.
+     *
+     * @internal
      * @param {Error | null} error
      * @param {{ sender: import('../reactives/ReactiveItem.js').ReactiveItem, recipients: Set<import('../reactives/ReactiveItem.js').ReactiveItem> }} [ctx]
      */
@@ -253,6 +390,11 @@ export class Engine {
 
     /**
      * Clears the current error.
+     *
+     * Called at the start of a recomputation — a successful recalculation
+     * removes any error left by a previous failed evaluation.
+     *
+     * @internal
      */
     clearError() {
         this.#error = null;
@@ -260,6 +402,15 @@ export class Engine {
 
     /**
      * Destroys the engine. Emits `onDestroy` after teardown.
+     *
+     * Notifies dependents and dependencies that this item is going away,
+     * clears the graph and pending updates, disposes the subscription
+     * controller, emits the `onDestroy` plugin hook, and removes the item
+     * from its context's registry.
+     *
+     * Idempotent — subsequent calls are no-ops.
+     *
+     * @internal
      * @param {{ sender: import('../reactives/ReactiveItem.js').ReactiveItem, recipients: Set<import('../reactives/ReactiveItem.js').ReactiveItem> }} [ctx]
      */
     destroy(ctx) {
@@ -275,16 +426,25 @@ export class Engine {
         this.clearUpdates();
         this.subscribeController.destroy();
         this.context.emitPlugin('onDestroy', this.reactiveItem);
+        this.context.unregisterItem(this.reactiveItem);
     }
 
     /**
      * Clears all pending updates.
+     *
+     * Called at the end of each subscriber notification round and during
+     * teardown. Also resets the batch snapshot used for `checkChangesTemporary`.
+     *
+     * @internal
      */
     clearUpdates() {
         this.#updateTracker.clearUpdates();
     }
 
     /**
+     * Returns `true` if there are pending (uncommitted) updates.
+     *
+     * @internal
      * @returns {boolean}
      */
     hasUpdates() {
@@ -292,6 +452,14 @@ export class Engine {
     }
 
     /**
+     * In batch mode, drops updates for properties that reverted to their
+     * original values and returns whether any effective changes remain.
+     *
+     * Called by `ChangedItemsController` after a batch closes. Outside
+     * batch mode, this delegates to `hasUpdates` because no snapshot was
+     * taken.
+     *
+     * @internal
      * @returns {boolean}
      */
     checkChangesTemporary() {
@@ -310,6 +478,16 @@ export class Engine {
     }
 
     /**
+     * Replaces the engine's dependency set with `newDeps`.
+     *
+     * Updates both the graph and the reverse links on each dependency:
+     * dependencies no longer needed have this engine removed from their
+     * `dependents`; new dependencies have it added.
+     *
+     * Used by `Computed` after each recalculation to keep the dependency
+     * graph in sync with conditional reads.
+     *
+     * @internal
      * @param {Set<import('../reactives/ReactiveItem.js').ReactiveItem>} newDeps
      */
     updateDependencies(newDeps) {
@@ -317,6 +495,14 @@ export class Engine {
     }
 
     /**
+     * Checks that the engine is in a state where a value may be written.
+     *
+     * Throws if the item has been destroyed or if subscribers are
+     * currently running — writing to a reactive item from inside a
+     * subscriber would re-enter the notification loop and is forbidden.
+     * Use `runInAction()` to defer such writes.
+     *
+     * @internal
      * @throws {Error} If destroyed or in subscribers mode.
      */
     prepareSetValue() {
@@ -330,6 +516,15 @@ export class Engine {
 
     /**
      * Called after a value change to schedule notifications.
+     *
+     * Registers the item with the context's changed-items controller,
+     * which either runs subscribers immediately (outside a batch) or
+     * defers them to the end of the batch.
+     *
+     * No-op when `suppressNotifications` is set, used by `Collection` and
+     * `ShallowReactive` during bulk updates.
+     *
+     * @internal
      */
     valueChangedCallback() {
         if (this.suppressNotifications) {
@@ -339,6 +534,14 @@ export class Engine {
     }
 
     /**
+     * Returns `true` if the change from `oldValue` to `newValue` on
+     * `property` is effective.
+     *
+     * In batch mode, effective means "differs from the value recorded at
+     * the start of the batch", which catches reverted writes. Outside a
+     * batch, it falls back to plain `oldValue !== newValue` comparison.
+     *
+     * @internal
      * @param {string} property
      * @param {any} oldValue
      * @param {any} newValue

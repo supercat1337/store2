@@ -193,6 +193,16 @@ class Collection extends ReactiveItem {
     }
 
     /**
+     * Returns the raw array contents without the reactive proxy, so that
+     * `JSON.stringify(collection)` produces a clean array.
+     *
+     * @returns {T[]}
+     */
+    toJSON() {
+        return this.#target.slice();
+    }
+
+    /**
      * Applies data previously produced by `serialize()`.
      *
      * Silently ignores malformed input.

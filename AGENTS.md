@@ -35,7 +35,7 @@ This document provides an in‑depth technical overview of the `store2` reactive
 - [13. Plugins](#13-plugins)
 - [14. Actions and Middleware](#14-actions-and-middleware)
 - [15. Serialization and Time-Travel](#15-serialization-and-time-travel)
-- [16. DevTools Plugin](#16-devtools-plugin)
+- [16. DevTools](#16-devtools)
 - [17. Additional Architectural Invariants](#17-additional-architectural-invariants)
 - [18. Additional Common Pitfalls](#18-additional-common-pitfalls)
 
@@ -693,50 +693,26 @@ adapter (`store2-persist`), not in the core. The core only guarantees the
 
 ---
 
-## 16. DevTools Plugin
+## 16. DevTools
 
-The reference plugin at `src/plugins/devtools.js` demonstrates the plugin
-API. It is the seed for the future `@supercat1337/store2-devtools` package.
+DevTools live in a separate package: `@supercat1337/store2-devtools`.
 
-### What it does
+The core provides the primitives the package needs:
 
-1. Records a **baseline** snapshot on install.
-2. Records one **entry** per completed action (after `onActionEnd`).
-3. Exposes `jumpTo(index)` which calls `hydrate(snapshot, { timeTravel: true })`.
-4. Truncates future history when a new action arrives after a `jumpTo`.
-5. Optionally bridges to `__REDUX_DEVTOOLS_EXTENSION__` — sending each
-   action with its post-state and translating `JUMP_TO_ACTION` messages
-   back into `jumpTo()`.
+- `Store2Plugin` interface with lifecycle hooks (`onActionStart/End`,
+  `onBatchStart/End`, `onUpdate`, `onComputedRecalc`, `onSubscriberRun`,
+  `onDestroy`, `onError`).
+- `Store2Context.snapshot()` / `hydrate()` for state capture and
+  time-travel.
+- `Store2Context.dumpGraph()` for dependency-graph introspection.
+- `PLUGIN_API_VERSION` for compatibility checks.
 
-### Programmatic API
+The DevTools package uses only these public APIs. It never touches
+`Engine` internals, `SubscribeController`, or `ChangedItemsController`
+directly. This keeps the core free of UI concerns and lets DevTools
+evolve on its own release cycle.
 
-```js
-const devtools = createDevToolsPlugin({ name: 'my app', maxAge: 50 });
-ctx.use(devtools);
-
-devtools.getHistory(); // Array<DevToolsEntry>
-devtools.getCurrentIndex();
-devtools.getCurrentEntry();
-devtools.jumpTo(index);
-devtools.reset();
-devtools.subscribe((entry, index) => {
-    /* ... */
-});
-devtools.disconnect();
-```
-
-`DevToolsEntry` is `{ id, name, timestamp, durationMs, snapshot }`.
-
-### Extension bridge offset
-
-The Redux DevTools Extension tracks actions independently. Since the plugin
-sends a baseline via `extension.init()` and each action via
-`extension.send()`, the extension's action index `N` corresponds to plugin
-entry `N + 1`. `JUMP_TO_ACTION` is translated accordingly. `JUMP_TO_STATE`
-maps to entry `0`. `RESET` calls `plugin.reset()`.
-
-This offset is a subtle contract; if you replace the bridge, keep it in
-mind.
+See `@supercat1337/store2-devtools` for the reference implementation.
 
 ---
 

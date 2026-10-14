@@ -8,6 +8,7 @@ export { Collection } from './reactives/Collection.js';
 export { ShallowReactive } from './reactives/ShallowReactive.js';
 export { Store } from './complex/Store.js';
 export { ReactiveList } from './complex/ReactiveList.js';
+export { Engine } from './core/Engine.js';
 
 // High-level API
 export {
@@ -47,12 +48,12 @@ export {
 
 // Context: new public surface for the ecosystem.
 export {
+    SNAPSHOT_VERSION,
+    PLUGIN_API_VERSION,
     Store2Context,
     defaultContext,
     getCurrentContext,
     runWithContext,
+    runWithContextAsync,
     createStore2Context,
 } from './core/context.js';
-
-// Plugins
-export { DevToolsPlugin, createDevToolsPlugin } from './plugins/devtools.js';

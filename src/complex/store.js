@@ -58,6 +58,9 @@ class Store {
     /** @type {Store | null} */
     #parentStore = null;
 
+    /** @type {number} */
+    #version = 0;
+
     /**
      * Creates a new empty Store.
      */
@@ -125,13 +128,57 @@ class Store {
         return this.path;
     }
 
+    /**
+     * Monotonic version counter, bumped on every store-level notification.
+     *
+     * The value is stable between notifications, which makes it suitable
+     * as a snapshot token for `useSyncExternalStore` and similar APIs.
+     *
+     * @returns {number}
+     */
+    getVersion() {
+        if (this.#isDestroyed) {
+            throw new Error('Store has been destroyed');
+        }
+        return this.#version;
+    }
+
+    /**
+     * Returns a minimal observable facade for framework adapters.
+     *
+     * - `get()` returns a fresh plain-object snapshot via `toJSON()`.
+     * - `subscribe(fn)` invokes `fn` with the snapshot on every effective
+     *   store-level change.
+     * - `version()` returns the monotonic version, suitable as a token for
+     *   `useSyncExternalStore`.
+     *
+     * @returns {import('../types.js').ObservableValue<any>}
+     */
+    toObservable() {
+        const self = this;
+        return {
+            get() {
+                return self.toJSON();
+            },
+            subscribe(fn) {
+                return self.subscribe(() => {
+                    fn(self.toJSON());
+                });
+            },
+            version() {
+                return self.getVersion();
+            },
+        };
+    }
+
     #notifySubscribers() {
         if (this.#muted) {
             this.#pendingUpdate = true;
-        } else {
-            this.#eventEmitter.emit('change');
-            this.#eventEmitter.emit('clear-updates');
+            return;
         }
+        this.#version++;
+        this.#eventEmitter.emit('change');
+        this.#eventEmitter.emit('clear-updates');
     }
 
     /**
@@ -603,7 +650,8 @@ class Store {
      *
      * The callback receives a `Map` of dot-separated update paths to
      * `UpdateDataRecord` instances, plus this store as the second
-     * argument. It is invoked once per batch of effective changes.
+     * argument. It is invoked once per child change propagated up to this
+     * store.
      *
      * @param {(update: Map<string, import('../core/UpdateDataRecord.js').UpdateDataRecord>, store: Store) => void} fn
      * @returns {() => void} An unsubscribe function.

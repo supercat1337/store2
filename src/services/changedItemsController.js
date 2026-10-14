@@ -72,6 +72,12 @@ class ChangedItemsController {
      * The outer loop re-checks `this.items` after each notification round so
      * that updates added during subscriber execution (e.g. via `runInAction`)
      * are processed in the same call.
+     *
+     * Iterations that produce no subscribers to run are short-circuited:
+     * they still clean up update records, but do not enter subscribers-mode
+     * and therefore do not emit `subscribersModeEnd`. This keeps the
+     * subscribers-mode lifecycle aligned with actual subscriber execution —
+     * a single mutation emits exactly one `subscribersModeEnd`.
      */
     runSubscribers() {
         /** @type {Set<import('../reactives/ReactiveItem.js').ReactiveItem>} */
@@ -132,6 +138,16 @@ class ChangedItemsController {
                 .filter(item => item.hasSubscribers())
                 .sort(sortById);
 
+            if (sorted.length === 0) {
+                // No subscribers to notify. Clear update records of the
+                // processed items so the next round starts clean, and skip
+                // the subscribers-mode lifecycle entirely.
+                itemsToProcess.forEach(item => {
+                    item.engine.clearUpdates();
+                });
+                continue;
+            }
+
             this.#modeController.startSubscribersMode();
 
             /** @type {Set<Function>} */
@@ -156,10 +172,9 @@ class ChangedItemsController {
                         subscriber(item.engine.updates);
                     } catch (e) {
                         const err = getError(e);
-                        const error = new Error(
-                            `Error in ${item.name}: ${err.message}`,
-                            { cause: item }
-                        );
+                        const error = new Error(`Error in ${item.name}: ${err.message}`, {
+                            cause: item,
+                        });
                         error.stack = err.stack;
                         errors.push(error);
                     }

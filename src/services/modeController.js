@@ -54,12 +54,21 @@ class ModeControllerService {
     }
 
     /**
-     * Subscribes to a batch lifecycle event.
-     * @param {"batchModeStart"|"batchModeEnd"|"beforeBatchModeEnd"} event
+     * Subscribes to a lifecycle event.
+     *
+     * Batch events (`batchModeStart`, `batchModeEnd`, `beforeBatchModeEnd`)
+     * and the subscribers-mode-end event (`subscribersModeEnd`) are
+     * dispatched through this single public entry point. Internally they
+     * use two different emitters, but callers should not care.
+     *
+     * @param {"batchModeStart"|"batchModeEnd"|"beforeBatchModeEnd"|"subscribersModeEnd"} event
      * @param {() => void} callback
      * @returns {() => void}
      */
     on(event, callback) {
+        if (event === 'subscribersModeEnd') {
+            return this.subscribersModeEvents.on(event, callback);
+        }
         return this.batchModeEvents.on(event, callback);
     }
 
@@ -167,8 +176,10 @@ class ModeControllerService {
     }
 
     /**
-     * Returns the currently running action, or null if no action is in flight.
-     * @returns {import('../types.js').ActionInfo | null}
+     * Returns the currently running action, or `null` if no action is in
+     * flight.
+     *
+     * @type {import('../types.js').ActionInfo | null}
      */
     get currentAction() {
         if (this.#actionStack.length === 0) {

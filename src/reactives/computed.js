@@ -33,6 +33,9 @@ class Computed extends ReactiveItem {
     /** @type {string} */
     #cachedDependentsVersionString = '';
 
+    /** @type {boolean} */
+    #warnedAboutReference = false;
+
     /**
      * Read-only view of the options passed to the constructor. Currently
      * exposes `smartRecompute`.
@@ -309,6 +312,26 @@ class Computed extends ReactiveItem {
         // computed recalculation), #currentValue is already up to date and
         // we must not fire subscribers a second time.
         if (this.equals(this.#currentValue, value)) {
+            // Detect the "Collection proxy identity" trap: the computed
+            // returned the same reference as before, but at least one
+            // dependency's version changed. In that case downstream
+            // subscribers will not fire, which is almost never what the
+            // user wanted.
+            if (
+                !this.#warnedAboutReference &&
+                this.#hasReactiveContainerDependency() &&
+                this.#hasAnyDependencyVersionChanged()
+            ) {
+                this.#warnedAboutReference = true;
+                console.warn(
+                    `[store2] Computed${this.name ? ` (${this.name})` : ''} ` +
+                        `returned the same reference as before, but a Collection ` +
+                        `or ShallowReactive dependency changed. Downstream ` +
+                        `subscribers will not fire. Return a fresh array ` +
+                        `(e.g. [...collection.value]) or pass ` +
+                        `{ compareFunction: compareAny }.`
+                );
+            }
             engine.clearUpdates();
             return this.#currentValue;
         }
@@ -335,6 +358,42 @@ class Computed extends ReactiveItem {
      */
     serialize() {
         return null;
+    }
+
+    /**
+     * Returns true if any direct dependency is a Collection or
+     * ShallowReactive (both expose a proxy whose identity does not change
+     * when contents change).
+     *
+     * @returns {boolean}
+     */
+    #hasReactiveContainerDependency() {
+        for (const dep of this.engine.dependencies) {
+            const type = dep.engine.type;
+            if (type === 3 /* COLLECTION */ || type === 4 /* SHALLOW_REACTIVE */) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Returns true if at least one dependency has been notified of a change
+     * since the previous computation. We cannot know the "previous" version
+     * exactly, but the version counter on each dependency is monotonic, so
+     * any dependency with `shouldRecalc === true` or a version bump that
+     * the computed has not seen yet qualifies. A simpler proxy: check
+     * whether any dependency's engine has pending updates.
+     *
+     * @returns {boolean}
+     */
+    #hasAnyDependencyVersionChanged() {
+        for (const dep of this.engine.dependencies) {
+            if (dep.engine.shouldRecalc || dep.engine.hasUpdates()) {
+                return true;
+            }
+        }
+        return false;
     }
 }
 

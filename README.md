@@ -358,15 +358,22 @@ migration logic belongs in the adapter, not in the core.
 
 ### DevTools
 
+DevTools are available as a separate package:
+
+```bash
+npm install @supercat1337/store2-devtools
+```
+
 ```js
-import { createDevToolsPlugin } from '@supercat1337/store2';
+import { createStore2Context } from '@supercat1337/store2';
+import { createDevToolsPlugin } from '@supercat1337/store2-devtools';
+
+const ctx = createStore2Context({ name: 'app' });
+ctx.registerRoot('app', store);
 
 const devtools = createDevToolsPlugin({ name: 'my app', maxAge: 50 });
 ctx.use(devtools);
 
-await ctx.action('increment', () => {
-    count.value++;
-});
 await ctx.action('increment', () => {
     count.value++;
 });

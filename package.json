@@ -1,6 +1,6 @@
 {
     "name": "@supercat1337/store2",
-    "version": "3.0.0",
+    "version": "3.0.1",
     "description": "A lightweight, efficient, and easy-to-use reactive state management system for JavaScript applications.",
     "author": "Albert Bazaleev",
     "license": "MIT",
@@ -15,7 +15,7 @@
     "scripts": {
         "test": "c8 ava",
         "test_custom": "c8 ava ./tests/reactivity.test.js",
-        "clean": "shx rm -rf ./dist && shx mkdir ./dist",
+        "clean": "shx rm -rf ./dist && shx mkdir ./dist && shx rm etc/store2.api.md",
         "build_esm": "rollup ./src/index.js --file ./dist/store2.esm.js --format es",
         "build_esm_bundle": "esbuild ./src/index.js --format=esm --bundle --platform=neutral --outfile=./dist/store2.esm.bundle.js",
         "build_esm_bundle_min": "esbuild ./src/index.js --format=esm --bundle --platform=neutral --minify --outfile=./dist/store2.esm.bundle.min.js",
@@ -24,7 +24,7 @@
         "gen_types": "npx tsc --project my.tsconfig.types.json && shx cp src/index.d.ts dist/types-temp/src/index.d.ts",
         "bundle_types": "api-extractor run --local",
         "build": "npm run clean && npm run build_esm && npm run build_esm_bundle && npm run build_esm_bundle_min && npm run build_iife && npm run build_iife_min && npm run gen_types && npm run bundle_types && shx rm -rf dist/types-temp",
-        "lint": "eslint src/ tests/ scripts/",
+        "lint": "eslint src/ tests/",
         "lint_fix": "npm run lint -- --fix",
         "docs": "typedoc --tsconfig \"my.tsconfig.docs.json\" --options \"typedoc.json\"",
         "docs-md": "typedoc --tsconfig \"my.tsconfig.docs.json\" --options \"typedoc-md.json\""

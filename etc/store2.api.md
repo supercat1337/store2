@@ -85,6 +85,7 @@ export class Collection<T> extends ReactiveItem {
     getValue(options?: {
         untracked?: boolean;
     }): T[];
+    toJSON(): T[];
     set value(value: T[]);
     get value(): T[];
 }
@@ -133,15 +134,13 @@ export function computed<T>(fn: () => T, options?: {
 
 // @public
 export interface ContextSnapshot {
+    meta?: Record<string, unknown>;
     roots: {
         [rootName: string]: any;
     };
     timestamp: number;
     version: number;
 }
-
-// @public
-export function createDevToolsPlugin(options?: DevToolsOptions): DevToolsPlugin;
 
 // @public
 export function createStore2Context(options?: object): Store2Context;
@@ -153,34 +152,82 @@ export function debounce<T extends Function>(func: T, wait: number): T;
 export const defaultContext: Store2Context;
 
 // @public
-export type DevToolsEntry = {
+export class Engine {
+    constructor(reactiveItem: ReactiveItem, type: ReactiveItemType);
+    // @internal
+    addDependencies(dependencies: Set<ReactiveItem>): void;
+    // @internal
+    addDependency(dependency: ReactiveItem): void;
+    // @internal
+    addDependent(dependent: ReactiveItem): boolean;
+    // @internal
+    addUpdate(property: string, type: "set" | "delete", oldValue: any, value: any): boolean;
+    // @internal
+    checkChangesTemporary(): boolean;
+    // @internal
+    clearError(): void;
+    // @internal
+    clearUpdates(): void;
+    // @internal
+    compareFn: CompareFunction | null;
+    context: Store2Context;
+    dependencies: Set<ReactiveItem>;
+    dependents: Set<ReactiveItem>;
+    // @internal
+    destroy(ctx?: {
+        sender: ReactiveItem;
+        recipients: Set<ReactiveItem>;
+    }): void;
+    get error(): Error;
+    // @internal
+    getDeepDependents(): Set<ReactiveItem>;
+    // @internal
+    getDeepDependentsArray(): Array<ReactiveItem>;
+    // @internal
+    getMessage(message: number, ctx: {
+        sender: ReactiveItem;
+        recipients: Set<ReactiveItem>;
+    }): void;
+    // @internal
+    hasUpdates(): boolean;
     id: number;
-    name: string;
-    timestamp: number;
-    durationMs: number;
-    snapshot: ContextSnapshot;
-};
-
-// @public
-export type DevToolsOptions = {
-    name?: string;
-    maxAge?: number;
-    connectToExtension?: boolean;
-};
-
-// @public
-export class DevToolsPlugin {
-    constructor(options?: DevToolsOptions);
-    disconnect(): void;
-    getCurrentEntry(): DevToolsEntry | null;
-    getCurrentIndex(): number;
-    getHistory(): Array<DevToolsEntry>;
-    install(context: Store2Context): void;
-    jumpTo(index: number): void;
-    name: string;
-    onActionEnd(action: ActionInfo): void;
-    reset(): void;
-    subscribe(fn: (entry: DevToolsEntry | null, index: number) => void): () => void;
+    isDestroyed: boolean;
+    // @internal
+    isEffectiveChangeWithOld(property: string, oldValue: any, newValue: any): boolean;
+    // @internal
+    notifyDependencies(message: number, ctx?: {
+        sender: ReactiveItem;
+        recipients: Set<ReactiveItem>;
+    }): void;
+    // @internal
+    notifyDependents(message: number, ctx?: {
+        sender: ReactiveItem;
+        recipients: Set<ReactiveItem>;
+    }): void;
+    // @internal
+    prepareSetValue(): void;
+    reactiveItem: ReactiveItem;
+    // @internal
+    removeDependent(dependent: ReactiveItem): void;
+    // @internal
+    setError(error: Error | null, ctx?: {
+        sender: ReactiveItem;
+        recipients: Set<ReactiveItem>;
+    }): void;
+    shouldRecalc: boolean;
+    // Warning: (ae-forgotten-export) The symbol "SubscribeController" needs to be exported by the entry point index.d.ts
+    //
+    // @internal
+    subscribeController: SubscribeController;
+    // @internal
+    suppressNotifications: boolean;
+    type: ReactiveItemType;
+    // @internal
+    updateDependencies(newDeps: Set<ReactiveItem>): void;
+    updates: Map<string, UpdateDataRecord>;
+    // @internal
+    valueChangedCallback(): void;
+    version: number;
 }
 
 // @public
@@ -226,6 +273,32 @@ export function getNow(interval?: number): Atom<number>;
 export function getSortedReactiveItems(...items: (ReactiveItem | Set<ReactiveItem>)[]): Array<ReactiveItem>;
 
 // @public
+export interface GraphDump {
+    // (undocumented)
+    edges: GraphDumpEdge[];
+    // (undocumented)
+    items: GraphDumpItem[];
+}
+
+// @public
+export interface GraphDumpEdge {
+    // (undocumented)
+    from: number;
+    // (undocumented)
+    kind: 'dep' | 'sub';
+    // (undocumented)
+    to: number;
+}
+
+// @public
+export interface GraphDumpItem {
+    id: number;
+    name: string;
+    type: ReactiveItemType;
+    version: number;
+}
+
+// @public
 export class IdService {
     compareIds(a: number, b: number): number;
     generateId(): number;
@@ -265,7 +338,7 @@ export class ModeControllerService {
     enterBatch(name?: string): void;
     exitBatch(): void;
     isComputing: boolean;
-    on(event: "batchModeStart" | "batchModeEnd" | "beforeBatchModeEnd", callback: () => void): () => void;
+    on(event: "batchModeStart" | "batchModeEnd" | "beforeBatchModeEnd" | "subscribersModeEnd", callback: () => void): () => void;
     onAction(event: "actionStart" | "actionEnd", callback: (action: ActionInfo) => void): () => void;
     runAfterSubscribers(callback: () => void): void;
     startSubscribersMode(): void;
@@ -275,6 +348,16 @@ export class ModeControllerService {
     throwErrorInSubscribers: boolean;
     untrackMode: boolean;
 }
+
+// @public
+export interface ObservableValue<T = any> {
+    get(): T;
+    subscribe(fn: (value: T) => void): () => void;
+    version(): number;
+}
+
+// @public
+export const PLUGIN_API_VERSION: 1;
 
 // @public
 export function reaction(dataFn: () => any, effectFn: (updates?: Map<string, UpdateDataRecord>) => void, options?: {
@@ -292,9 +375,6 @@ export class ReactiveItem {
     clearAllSubscribers(): void;
     clearSubscribers(): void;
     destroy(): void;
-    // Warning: (ae-forgotten-export) The symbol "Engine" needs to be exported by the entry point index.d.ts
-    //
-    // @internal
     engine: Engine;
     equals(a: any, b?: any): boolean;
     getLastError(): Error | null;
@@ -317,6 +397,8 @@ export class ReactiveItem {
         delay?: number;
         signal?: AbortSignal;
     }): () => void;
+    toJSON(): any;
+    toObservable(): ObservableValue<any>;
     get type(): ReactiveItemType;
 }
 
@@ -329,6 +411,8 @@ export class ReactiveList<T> {
     clear(): void;
     destroy(): void;
     getItem(index: number): T | undefined;
+    getItemVersionAt(index: number): number;
+    getVersion(): number;
     hydrate(data: any): void;
     get isDestroyed(): boolean;
     get length(): number;
@@ -342,6 +426,8 @@ export class ReactiveList<T> {
     setItems(values: T[]): void;
     subscribe(fn: (updates: Map<string, UpdateDataRecord>) => void): () => void;
     toArray(): T[];
+    toJSON(): T[];
+    toObservable(): ObservableValue<any[]>;
 }
 
 // @public
@@ -349,6 +435,9 @@ export function runInAction(fn: Function): void;
 
 // @public
 export function runWithContext<T>(context: Store2Context, fn: () => T): T;
+
+// @public
+export function runWithContextAsync<T>(context: Store2Context, fn: () => Promise<T>): Promise<T>;
 
 // @public
 export class ShallowReactive<T extends {
@@ -362,6 +451,7 @@ export class ShallowReactive<T extends {
         untracked?: boolean;
     }): T;
     setValue(value: T): void;
+    toJSON(): T;
     set value(value: T);
     get value(): T;
 }
@@ -375,6 +465,16 @@ export function shallowReactive<T extends {
 
 // @public
 export function sleep(ms: number): Promise<void>;
+
+// @public
+export const SNAPSHOT_VERSION: 1;
+
+// @public
+export interface SnapshotMigration {
+    from: number;
+    migrate(snapshot: ContextSnapshot): ContextSnapshot;
+    to: number;
+}
 
 // @public
 export interface SnapshotRoot {
@@ -396,6 +496,7 @@ export class Store {
     getItem(key: string): ReactiveItem | Store | null;
     getItemNames(filter?: "all" | "reactives" | "stores"): Array<string>;
     getPath(): string;
+    getVersion(): number;
     hasItem(key: string): boolean;
     hydrate(data: any): void;
     get isDestroyed(): boolean;
@@ -408,6 +509,7 @@ export class Store {
     subscribe(fn: (update: Map<string, UpdateDataRecord>, store: Store) => void): () => void;
     toJSON(filter?: "all" | "reactives" | "stores"): object;
     toMap(filter?: "all" | "reactives" | "stores"): Map<string, ReactiveItem | Store>;
+    toObservable(): ObservableValue<any>;
     unmuteUpdates(): void;
 }
 
@@ -426,8 +528,12 @@ export class Store2Context {
     changedItemsController: ChangedItemsController;
     dependencyTracker: Tracker;
     dispose(): void;
+    dumpGraph(): GraphDump;
     emitPlugin(hook: string, ...args: any[]): void;
+    emitPluginDirect(hook: string, ...args: any[]): void;
     flush(): void;
+    flushSync(): void;
+    getRoot(name: string): SnapshotRoot | null;
     getRootNames(): Array<string>;
     hydrate(snapshot: ContextSnapshot, options?: {
         timeTravel?: boolean;
@@ -436,15 +542,20 @@ export class Store2Context {
     get middlewares(): ActionMiddleware[];
     modeController: ModeControllerService;
     name: string;
+    onAnyUpdate(callback: () => void): () => void;
     get plugins(): Store2Plugin[];
+    registerItem(item: ReactiveItem): void;
+    registerMigration(migration: SnapshotMigration): this;
     registerRoot(name: string, root: SnapshotRoot): this;
     snapshot(): ContextSnapshot;
+    unregisterItem(item: ReactiveItem): void;
     unregisterRoot(name: string): boolean;
     use(plugin: Store2Plugin): this;
 }
 
 // @public
 export interface Store2Plugin {
+    apiVersion?: number;
     install(context: Store2Context): void;
     name: string;
     onActionEnd?(action: ActionInfo): void;
@@ -454,6 +565,12 @@ export interface Store2Plugin {
     onComputedRecalc?(item: ReactiveItem, oldValue: any, newValue: any): void;
     onDestroy?(item: ReactiveItem): void;
     onError?(item: ReactiveItem, error: Error): void;
+    onHydrateEnd?(snapshot: ContextSnapshot, opts: {
+        timeTravel: boolean;
+    }): void;
+    onHydrateStart?(snapshot: ContextSnapshot, opts: {
+        timeTravel: boolean;
+    }): void;
     onSubscriberRun?(item: ReactiveItem, updates: Map<string, UpdateDataRecord>): void;
     onUpdate?(item: ReactiveItem, property: string, record: UpdateDataRecord): void;
 }

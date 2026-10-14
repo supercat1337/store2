@@ -191,6 +191,16 @@ class ShallowReactive extends ReactiveItem {
     }
 
     /**
+     * Returns a shallow copy of the raw object without the reactive proxy,
+     * so that `JSON.stringify(shallowReactive)` produces a plain object.
+     *
+     * @returns {T}
+     */
+    toJSON() {
+        return { ...this.#target };
+    }
+
+    /**
      * Applies data previously produced by `serialize()`.
      *
      * Silently ignores malformed input.

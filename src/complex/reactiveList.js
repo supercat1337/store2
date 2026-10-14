@@ -416,6 +416,16 @@ export class ReactiveList {
     }
 
     /**
+     * Returns the list's contents as a plain array. Enables
+     * `JSON.stringify(list)` to produce useful output.
+     *
+     * @returns {T[]}
+     */
+    toJSON() {
+        return this.toArray();
+    }
+
+    /**
      * Applies data produced by `serialize()`.
      *
      * Uses `setItems` internally, so the whole replacement is batched and
@@ -427,5 +437,70 @@ export class ReactiveList {
         if (data && typeof data === 'object' && data.type === 'list' && Array.isArray(data.value)) {
             this.setItems(data.value);
         }
+    }
+
+    /**
+     * Monotonic version counter, bumped on every effective change of the
+     * list, including changes that come from nested items.
+     *
+     * The value is stable between notifications, which makes it suitable
+     * as a snapshot token for `useSyncExternalStore`.
+     *
+     * @returns {number}
+     */
+    getVersion() {
+        if (this.isDestroyed) {
+            throw new Error('ReactiveList has been destroyed');
+        }
+        return this.#store.getVersion();
+    }
+
+    /**
+     * Returns the version of the item at the given index, or `-1` if the
+     * index is out of bounds.
+     *
+     * Framework adapters use this to implement fine-grained list selectors
+     * without re-rendering the whole list on every change.
+     *
+     * @param {number} index
+     * @returns {number}
+     */
+    getItemVersionAt(index) {
+        if (this.isDestroyed) {
+            throw new Error('ReactiveList has been destroyed');
+        }
+        const wrapper = this.#store.getItem(index.toString());
+        if (isReactiveWrapper(wrapper)) {
+            return wrapper.getVersion();
+        }
+        return -1;
+    }
+
+    /**
+     * Returns a minimal observable facade for framework adapters.
+     *
+     * - `get()` returns a fresh array via `toArray()`.
+     * - `subscribe(fn)` invokes `fn` with the array on every effective
+     *   change of the list.
+     * - `version()` returns the monotonic version, suitable as a token
+     *   for `useSyncExternalStore`.
+     *
+     * @returns {import('../types.js').ObservableValue<any[]>}
+     */
+    toObservable() {
+        const self = this;
+        return {
+            get() {
+                return self.toArray();
+            },
+            subscribe(fn) {
+                return self.subscribe(() => {
+                    fn(self.toArray());
+                });
+            },
+            version() {
+                return self.getVersion();
+            },
+        };
     }
 }

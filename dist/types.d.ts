@@ -250,6 +250,12 @@ export declare class ChangedItemsController {
      * The outer loop re-checks `this.items` after each notification round so
      * that updates added during subscriber execution (e.g. via `runInAction`)
      * are processed in the same call.
+     *
+     * Iterations that produce no subscribers to run are short-circuited:
+     * they still clean up update records, but do not enter subscribers-mode
+     * and therefore do not emit `subscribersModeEnd`. This keeps the
+     * subscribers-mode lifecycle aligned with actual subscriber execution —
+     * a single mutation emits exactly one `subscribersModeEnd`.
      */
     runSubscribers(): void;
     #private;
@@ -325,6 +331,13 @@ export declare class Collection<T> extends ReactiveItem {
      * @returns {T[]}
      */
     getRawValue(): T[];
+    /**
+     * Returns the raw array contents without the reactive proxy, so that
+     * `JSON.stringify(collection)` produces a clean array.
+     *
+     * @returns {T[]}
+     */
+    toJSON(): T[];
     #private;
 }
 
@@ -512,13 +525,13 @@ export declare function computed<T>(fn: () => T, options?: {
  */
 export declare interface ContextSnapshot {
     /**
-     * Snapshot format version. Currently `1`. Persistence adapters should
-     * dispatch on this field for migrations.
+     * Snapshot format version. Persistence adapters should dispatch on
+     * this field for migrations.
      */
     version: number;
     /**
-     * Wall-clock timestamp (milliseconds since epoch) when the snapshot was
-     * captured.
+     * Wall-clock timestamp (milliseconds since epoch) when the snapshot
+     * was captured.
      */
     timestamp: number;
     /**
@@ -527,27 +540,13 @@ export declare interface ContextSnapshot {
     roots: {
         [rootName: string]: any;
     };
+    /**
+     * Adapter-defined metadata. The core never inspects this field —
+     * `store2-persist` and `store2-ssr` may store TTL, hashes, encryption
+     * parameters, adapter name, etc. here.
+     */
+    meta?: Record<string, unknown>;
 }
-
-/**
- * Creates a DevTools plugin instance.
- *
- * @param {DevToolsOptions} [options]
- * @returns {DevToolsPlugin}
- *
- * @example
- * ```js
- * const devtools = createDevToolsPlugin({ name: 'my app', maxAge: 100 });
- * ctx.use(devtools);
- *
- * devtools.subscribe((entry, index) => {
- *     console.log('now at', index, entry?.name);
- * });
- * ```
- *
- * @public
- */
-export declare function createDevToolsPlugin(options?: DevToolsOptions): DevToolsPlugin;
 
 /**
  * Creates a new isolated context.
@@ -573,216 +572,6 @@ export declare function debounce<T extends Function>(func: T, wait: number): T;
 export declare const defaultContext: Store2Context;
 
 /**
- * A single entry in the DevTools history.
- */
-export declare type DevToolsEntry = {
-    /**
-     * Monotonic id assigned by the plugin.
-     */
-    id: number;
-    /**
-     * Action name, or `'@@INIT'` for the baseline.
-     */
-    name: string;
-    /**
-     * Wall-clock time when the entry was recorded.
-     */
-    timestamp: number;
-    /**
-     * Duration of the recorded action in milliseconds.
-     */
-    durationMs: number;
-    /**
-     * State captured after the action completed.
-     */
-    snapshot: ContextSnapshot;
-};
-
-/**
- * Options accepted by `createDevToolsPlugin`.
- */
-export declare type DevToolsOptions = {
-    /**
-     * Display name in the Redux DevTools Extension.
-     */
-    name?: string;
-    /**
-     * Maximum number of entries kept in history. Defaults to 50.
-     */
-    maxAge?: number;
-    /**
-     * Set to `false` to skip the extension bridge. Defaults to `true`.
-     */
-    connectToExtension?: boolean;
-};
-
-/**
- * A single entry in the DevTools history.
- *
- * @typedef {Object} DevToolsEntry@typedef {Object} DevToolsEntry
- * @property {number} id           Monotonic id assigned by the plugin.
- * @property {string} name         Action name, or `'@@INIT'` for the baseline.
- * @property {number} timestamp    Wall-clock time when the entry was recorded.
- * @property {number} durationMs   Duration of the recorded action in milliseconds.
- * @property {import('../types.js').ContextSnapshot} snapshot  State captured after the action completed.
- * @public
- */
-/**
- * Options accepted by `createDevToolsPlugin`.
- *
- * @typedef {Object} DevToolsOptions@typedef {Object} DevToolsOptions
- * @property {string} [name]                 Display name in the Redux DevTools Extension.
- * @property {number} [maxAge]               Maximum number of entries kept in history. Defaults to 50.
- * @property {boolean} [connectToExtension]  Set to `false` to skip the extension bridge. Defaults to `true`.
- * @public
- */
-/**
- * Records a snapshot after every completed action and exposes a `jumpTo()`
- * method for time-travel.
- *
- * The plugin maintains a linear history. Entry `0` is the baseline snapshot
- * taken at install time; entries `1..N` are the state after each completed
- * action. When a new action arrives after a `jumpTo()`, the future is
- * truncated before the new entry is appended — matching Redux DevTools
- * behaviour.
- *
- * Time-travel calls `context.hydrate(snapshot, { timeTravel: true })`, which
- * suppresses plugin hooks for the duration of the rehydration so the
- * rehydration does not itself appear as an action.
- *
- * Recommended usage: install the plugin **after** registering all roots, so
- * the baseline snapshot captures their initial state.
- *
- * @example
- * ```js
- * import { createStore2Context, createDevToolsPlugin, Store, atom } from '@supercat1337/store2';
- *
- * const ctx = createStore2Context({ name: 'app' });
- * const store = new Store();
- * const count = atom(0, { name: 'count' });
- * store.addItems({ count });
- * ctx.registerRoot('app', store);
- *
- * const devtools = createDevToolsPlugin({ name: 'my app' });
- * ctx.use(devtools);
- *
- * await ctx.action('increment', () => { count.value++; });
- * await ctx.action('increment', () => { count.value++; });
- *
- * devtools.getHistory().length; // 3: baseline + 2 actions
- * devtools.jumpTo(1);
- * count.value; // 1
- * ```
- *
- * @public
- */
-export declare class DevToolsPlugin {
-    /**
-     * @param {DevToolsOptions} [options]
-     */
-    constructor(options?: DevToolsOptions);
-    /**
-     * Plugin identifier. Also used as the default display name in the
-     * Redux DevTools Extension when no `name` option is provided.
-     */
-    name: string;
-    /**
-     * Called by the context when the plugin is registered via `use()`.
-     *
-     * Captures the initial baseline snapshot and connects to the Redux
-     * DevTools Extension when it is available in the host environment.
-     *
-     * Do not call this method directly — it is part of the plugin
-     * installation contract.
-     *
-     * @param {import('../core/context.js').Store2Context} context
-     */
-    install(context: Store2Context): void;
-    /**
-     * Records a new history entry after an action completes.
-     *
-     * Called by the context's action lifecycle. Ignored while a time-travel
-     * jump is in progress, so that rewinding does not itself appear as a
-     * new action in the history.
-     *
-     * @param {import('../types.js').ActionInfo} action
-     */
-    onActionEnd(action: ActionInfo): void;
-    /**
-     * Returns a shallow copy of the recorded history.
-     *
-     * The returned array is newly allocated; mutating it does not affect
-     * the plugin. The snapshot objects inside each entry are shared by
-     * reference — treat them as immutable.
-     *
-     * @returns {Array<DevToolsEntry>}
-     */
-    getHistory(): Array<DevToolsEntry>;
-    /**
-     * Returns the index of the entry the plugin is currently positioned at.
-     *
-     * Entry `0` is the baseline; higher indices correspond to completed
-     * actions in order. Returns `-1` if the plugin has not been installed
-     * yet.
-     *
-     * @returns {number}
-     */
-    getCurrentIndex(): number;
-    /**
-     * Returns the entry at the current history index, or `null` if the
-     * history is empty.
-     *
-     * After `jumpTo(index)`, the returned entry is the one at that index,
-     * not the most recent one. Use `getHistory()` to inspect the full
-     * history.
-     *
-     * @returns {DevToolsEntry | null}
-     */
-    getCurrentEntry(): DevToolsEntry | null;
-    /**
-     * Travels to a specific history index.
-     *
-     * Restores the state captured at that entry by calling
-     * `context.hydrate(snapshot, { timeTravel: true })`. Plugin hooks are
-     * suppressed for the duration of the hydration, so the jump does not
-     * appear as a new action. Subscribers still run — the UI updates.
-     *
-     * No-op if the index is out of range or already current.
-     *
-     * @param {number} index
-     */
-    jumpTo(index: number): void;
-    /**
-     * Clears the history and records a fresh baseline.
-     *
-     * Called by the plugin itself in response to a `RESET` message from the
-     * Redux DevTools Extension, or directly by user code. After this call,
-     * the history contains exactly one entry: the new baseline.
-     */
-    reset(): void;
-    /**
-     * Subscribes a listener called whenever the current index or the
-     * history changes.
-     *
-     * The listener receives the current entry (or `null` if the history is
-     * empty) and its index. Errors thrown by the listener are caught and
-     * logged, so one faulty listener cannot break others.
-     *
-     * @param {(entry: DevToolsEntry | null, index: number) => void} fn
-     * @returns {() => void} An unsubscribe function.
-     */
-    subscribe(fn: (entry: DevToolsEntry | null, index: number) => void): () => void;
-    /**
-     * Detaches from the Redux DevTools Extension, if connected.
-     *
-     * Safe to call when no extension is connected or after the plugin was
-     * installed with `connectToExtension: false`. Idempotent.
-     */
-    disconnect(): void;
-    #private;
-}
-
-/**
  * Engine is the core reactive engine for a single reactive item.
  * It manages dependencies, updates, lifecycle, and plugin notifications.
  *
@@ -790,154 +579,109 @@ export declare class DevToolsPlugin {
  * All coordination with the id service, mode controller, and changed-items
  * controller goes through that context, so multiple isolated roots can
  * coexist in one process.
+ *
+ * The public surface of this class is intentionally narrow: only the
+ * fields an ecosystem package (DevTools, diagnostics, structural sharing)
+ * needs to inspect. Everything else is marked `@internal` and is not part
+ * of the supported API.
+ *
+ * @public
  */
-declare class Engine {
+export declare class Engine {
     /**
      * @param {import('../reactives/ReactiveItem.js').ReactiveItem} reactiveItem
      * @param {import('../types.js').ReactiveItemType} type
      */
     constructor(reactiveItem: ReactiveItem, type: ReactiveItemType);
-    /** @type {import('./context.js').Store2Context} */
-    context: Store2Context;
-    /** @type {Set<import('../reactives/ReactiveItem.js').ReactiveItem>} */
-    dependencies: Set<ReactiveItem>;
-    /** @type {Set<import('../reactives/ReactiveItem.js').ReactiveItem>} */
-    dependents: Set<ReactiveItem>;
-    /** @type {number} */
-    id: number;
-    /** @type {number} */
-    version: number;
-    /** @type {import('../reactives/ReactiveItem.js').ReactiveItem} */
-    reactiveItem: ReactiveItem;
-    /** @type {boolean} */
-    shouldRecalc: boolean;
-    /** @type {boolean} */
-    isDestroyed: boolean;
-    /** @type {SubscribeController} */
-    subscribeController: SubscribeController;
-    /** @type {import('../types.js').ReactiveItemType} */
-    type: ReactiveItemType;
-    /** @type {Map<string, import('./UpdateDataRecord.js').UpdateDataRecord>} */
-    updates: Map<string, UpdateDataRecord>;
-    /** @type {import('../types.js').CompareFunction | null} */
-    compareFn: CompareFunction | null;
-    /** @type {boolean} */
-    suppressNotifications: boolean;
     /**
-     * @returns {Error | null}
+     * The context this engine belongs to. Captured once at construction and
+     * never changes.
+     * @type {import('./context.js').Store2Context}
+     */
+    context: Store2Context;
+    /**
+     * The set of items this engine depends on. Populated by `Computed`
+     * during dependency collection and by explicit `addDependency` calls.
+     * @type {Set<import('../reactives/ReactiveItem.js').ReactiveItem>}
+     */
+    dependencies: Set<ReactiveItem>;
+    /**
+     * The set of items that depend on this engine's reactive item. Maintained
+     * in sync with each dependency's `dependencies` set.
+     * @type {Set<import('../reactives/ReactiveItem.js').ReactiveItem>}
+     */
+    dependents: Set<ReactiveItem>;
+    /**
+     * Monotonic numeric id, assigned by the owning context's id service.
+     * Used for deterministic ordering of subscriber notifications.
+     * @type {number}
+     */
+    id: number;
+    /**
+     * Monotonic version counter, bumped on every effective change.
+     * @type {number}
+     */
+    version: number;
+    /**
+     * The reactive item this engine drives.
+     * @type {import('../reactives/ReactiveItem.js').ReactiveItem}
+     */
+    reactiveItem: ReactiveItem;
+    /**
+     * Set to `true` when a dependency has notified a change and the
+     * computed value must be recalculated on the next read.
+     * @type {boolean}
+     */
+    shouldRecalc: boolean;
+    /**
+     * Set to `true` after `destroy()` completes. Subsequent reads and
+     * writes throw.
+     * @type {boolean}
+     */
+    isDestroyed: boolean;
+    /**
+     * Pending updates, keyed by property path. Read by plugins via
+     * `onSubscriberRun` and by `Store` to build notification payloads.
+     * @type {Map<string, import('./UpdateDataRecord.js').UpdateDataRecord>}
+     */
+    updates: Map<string, UpdateDataRecord>;
+    /* Excluded from this release type: subscribeController */
+    /**
+     * The numeric type tag of the reactive item.
+     * @type {import('../types.js').ReactiveItemType}
+     */
+    type: ReactiveItemType;
+    /* Excluded from this release type: compareFn */
+    /* Excluded from this release type: suppressNotifications */
+    /**
+     * Returns the last error produced by this engine, or `null`.
+     *
+     * For `Computed`, this is the error thrown during the most recent
+     * evaluation. The error is preserved until a dependency changes.
+     *
+     * @type {Error | null}
      */
     get error(): Error;
-    /**
-     * Records a change attempt and emits `onUpdate` when the change is
-     * effective.
-     * @param {string} property
-     * @param {"set" | "delete"} type
-     * @param {any} oldValue
-     * @param {any} value
-     * @returns {boolean}
-     */
-    addUpdate(property: string, type: "set" | "delete", oldValue: any, value: any): boolean;
-    /**
-     * @param {import('../reactives/ReactiveItem.js').ReactiveItem} dependency
-     */
-    addDependency(dependency: ReactiveItem): void;
-    /**
-     * @param {Set<import('../reactives/ReactiveItem.js').ReactiveItem>} dependencies
-     */
-    addDependencies(dependencies: Set<ReactiveItem>): void;
-    /**
-     * @param {import('../reactives/ReactiveItem.js').ReactiveItem} dependent
-     * @returns {boolean}
-     */
-    addDependent(dependent: ReactiveItem): boolean;
-    /**
-     * @param {import('../reactives/ReactiveItem.js').ReactiveItem} dependent
-     */
-    removeDependent(dependent: ReactiveItem): void;
-    /**
-     * @returns {Set<import('../reactives/ReactiveItem.js').ReactiveItem>}
-     */
-    getDeepDependents(): Set<ReactiveItem>;
-    /**
-     * @returns {Array<import('../reactives/ReactiveItem.js').ReactiveItem>}
-     */
-    getDeepDependentsArray(): Array<ReactiveItem>;
-    /**
-     * @param {number} message
-     * @param {{ sender: import('../reactives/ReactiveItem.js').ReactiveItem, recipients: Set<import('../reactives/ReactiveItem.js').ReactiveItem> }} [ctx]
-     */
-    notifyDependents(message: number, ctx?: {
-        sender: ReactiveItem;
-        recipients: Set<ReactiveItem>;
-    }): void;
-    /**
-     * @param {number} message
-     * @param {{ sender: import('../reactives/ReactiveItem.js').ReactiveItem, recipients: Set<import('../reactives/ReactiveItem.js').ReactiveItem> }} [ctx]
-     */
-    notifyDependencies(message: number, ctx?: {
-        sender: ReactiveItem;
-        recipients: Set<ReactiveItem>;
-    }): void;
-    /**
-     * @param {number} message
-     * @param {{ sender: import('../reactives/ReactiveItem.js').ReactiveItem, recipients: Set<import('../reactives/ReactiveItem.js').ReactiveItem> }} ctx
-     */
-    getMessage(message: number, ctx: {
-        sender: ReactiveItem;
-        recipients: Set<ReactiveItem>;
-    }): void;
-    /**
-     * Sets an error and notifies dependents. Emits `onError`.
-     * @param {Error | null} error
-     * @param {{ sender: import('../reactives/ReactiveItem.js').ReactiveItem, recipients: Set<import('../reactives/ReactiveItem.js').ReactiveItem> }} [ctx]
-     */
-    setError(error: Error | null, ctx?: {
-        sender: ReactiveItem;
-        recipients: Set<ReactiveItem>;
-    }): void;
-    /**
-     * Clears the current error.
-     */
-    clearError(): void;
-    /**
-     * Destroys the engine. Emits `onDestroy` after teardown.
-     * @param {{ sender: import('../reactives/ReactiveItem.js').ReactiveItem, recipients: Set<import('../reactives/ReactiveItem.js').ReactiveItem> }} [ctx]
-     */
-    destroy(ctx?: {
-        sender: ReactiveItem;
-        recipients: Set<ReactiveItem>;
-    }): void;
-    /**
-     * Clears all pending updates.
-     */
-    clearUpdates(): void;
-    /**
-     * @returns {boolean}
-     */
-    hasUpdates(): boolean;
-    /**
-     * @returns {boolean}
-     */
-    checkChangesTemporary(): boolean;
-    /**
-     * @param {Set<import('../reactives/ReactiveItem.js').ReactiveItem>} newDeps
-     */
-    updateDependencies(newDeps: Set<ReactiveItem>): void;
-    /**
-     * @throws {Error} If destroyed or in subscribers mode.
-     */
-    prepareSetValue(): void;
-    /**
-     * Called after a value change to schedule notifications.
-     */
-    valueChangedCallback(): void;
-    /**
-     * @param {string} property
-     * @param {any} oldValue
-     * @param {any} newValue
-     * @returns {boolean}
-     */
-    isEffectiveChangeWithOld(property: string, oldValue: any, newValue: any): boolean;
+    /* Excluded from this release type: addUpdate */
+    /* Excluded from this release type: addDependency */
+    /* Excluded from this release type: addDependencies */
+    /* Excluded from this release type: addDependent */
+    /* Excluded from this release type: removeDependent */
+    /* Excluded from this release type: getDeepDependents */
+    /* Excluded from this release type: getDeepDependentsArray */
+    /* Excluded from this release type: notifyDependents */
+    /* Excluded from this release type: notifyDependencies */
+    /* Excluded from this release type: getMessage */
+    /* Excluded from this release type: setError */
+    /* Excluded from this release type: clearError */
+    /* Excluded from this release type: destroy */
+    /* Excluded from this release type: clearUpdates */
+    /* Excluded from this release type: hasUpdates */
+    /* Excluded from this release type: checkChangesTemporary */
+    /* Excluded from this release type: updateDependencies */
+    /* Excluded from this release type: prepareSetValue */
+    /* Excluded from this release type: valueChangedCallback */
+    /* Excluded from this release type: isEffectiveChangeWithOld */
     #private;
 }
 
@@ -988,6 +732,11 @@ export declare function getAllPropertyDescriptors(obj: object | null | undefined
 
 /**
  * Returns the currently installed context, or the default one.
+ *
+ * On runtimes with `AsyncLocalStorage`, returns the context associated
+ * with the current async chain — safe to call from server-render
+ * components after an `await`.
+ *
  * @returns {Store2Context}
  */
 export declare function getCurrentContext(): Store2Context;
@@ -1031,6 +780,56 @@ export declare function getNow(interval?: number): Atom<number>;
  * @returns {Array<import('../reactives/ReactiveItem.js').ReactiveItem>}
  */
 export declare function getSortedReactiveItems(...items: (ReactiveItem | Set<ReactiveItem>)[]): Array<ReactiveItem>;
+
+/**
+ * Serializable snapshot of the dependency graph for every live reactive
+ * item registered with a context.
+ *
+ * @public
+ */
+export declare interface GraphDump {
+    items: GraphDumpItem[];
+    edges: GraphDumpEdge[];
+}
+
+/**
+ * A directed edge in the dependency graph.
+ *
+ * `{ from: A, to: B, kind: 'dep' }` means A depends on B.
+ *
+ * @public
+ */
+export declare interface GraphDumpEdge {
+    from: number;
+    to: number;
+    kind: 'dep' | 'sub';
+}
+
+/**
+ * A single node in the dependency graph returned by
+ * `Store2Context.dumpGraph()`.
+ *
+ * @public
+ */
+export declare interface GraphDumpItem {
+    /**
+     * Monotonic id assigned by the context's id service.
+     */
+    id: number;
+    /**
+     * Debug name of the reactive item, or `''` if not set.
+     */
+    name: string;
+    /**
+     * Reactive item type tag:
+     * `1` Atom, `2` Computed, `3` Collection, `4` ShallowReactive.
+     */
+    type: ReactiveItemType;
+    /**
+     * Current version counter of the item.
+     */
+    version: number;
+}
 
 /**
  * Service that generates unique numeric identifiers for reactive items.
@@ -1127,12 +926,18 @@ export declare class ModeControllerService {
     /* Excluded from this release type: subscribersModeEvents */
     /* Excluded from this release type: actionEvents */
     /**
-     * Subscribes to a batch lifecycle event.
-     * @param {"batchModeStart"|"batchModeEnd"|"beforeBatchModeEnd"} event
+     * Subscribes to a lifecycle event.
+     *
+     * Batch events (`batchModeStart`, `batchModeEnd`, `beforeBatchModeEnd`)
+     * and the subscribers-mode-end event (`subscribersModeEnd`) are
+     * dispatched through this single public entry point. Internally they
+     * use two different emitters, but callers should not care.
+     *
+     * @param {"batchModeStart"|"batchModeEnd"|"beforeBatchModeEnd"|"subscribersModeEnd"} event
      * @param {() => void} callback
      * @returns {() => void}
      */
-    on(event: "batchModeStart" | "batchModeEnd" | "beforeBatchModeEnd", callback: () => void): () => void;
+    on(event: "batchModeStart" | "batchModeEnd" | "beforeBatchModeEnd" | "subscribersModeEnd", callback: () => void): () => void;
     /**
      * Subscribes to an action lifecycle event.
      * @param {"actionStart"|"actionEnd"} event
@@ -1184,8 +989,10 @@ export declare class ModeControllerService {
      */
     runAfterSubscribers(callback: () => void): void;
     /**
-     * Returns the currently running action, or null if no action is in flight.
-     * @returns {import('../types.js').ActionInfo | null}
+     * Returns the currently running action, or `null` if no action is in
+     * flight.
+     *
+     * @type {import('../types.js').ActionInfo | null}
      */
     get currentAction(): ActionInfo;
     /**
@@ -1203,6 +1010,67 @@ export declare class ModeControllerService {
     endAction(action: ActionInfo, error?: Error | null): void;
     #private;
 }
+
+/**
+ * Minimal observable surface returned by `ReactiveItem.toObservable()`,
+ * `Store.toObservable()`, and `ReactiveList.toObservable()`.
+ *
+ * Ecosystem packages (`store2-react`, `store2-vue`, `store2-svelte`,
+ * `store2-solid`) wrap this into their framework-native primitive. The
+ * three methods together cover the requirements of
+ * `useSyncExternalStore` (React), `shallowRef` (Vue), `Readable`/`Writable`
+ * (Svelte), and `createSignal` (Solid).
+ *
+ * The object returned by `toObservable()` is intentionally stateless: it
+ * reads through to the underlying reactive item and subscribes to its
+ * changes. Calling `get()` does not register a dependency in any tracked
+ * scope — reads are always untracked.
+ *
+ * @public
+ */
+export declare interface ObservableValue<T = any> {
+    /**
+     * Returns the current value without registering a dependency.
+     *
+     * Safe to call at any time, including outside a tracked scope. For
+     * `Computed` items, triggers recalculation if the value is stale;
+     * otherwise returns the cached value directly.
+     *
+     * For `Store` and `ReactiveList`, returns a fresh plain-object or
+     * array snapshot on each call. Identity is not preserved between
+     * calls — use `version()` as a stable token instead.
+     */
+    get(): T;
+    /**
+     * Subscribes `fn` to effective changes.
+     *
+     * The callback receives the current value after each change. It does
+     * not receive an updates map — for fine-grained change information,
+     * subscribe to the underlying reactive item directly.
+     *
+     * The subscription fires once per batch of effective changes, matching
+     * the behaviour of `ReactiveItem.subscribe`. Returns an unsubscribe
+     * function.
+     */
+    subscribe(fn: (value: T) => void): () => void;
+    /**
+     * Returns a monotonic version number, bumped on every effective change.
+     *
+     * The value is stable between notifications: two consecutive calls
+     * return the same number unless a change occurred in between. This
+     * makes it suitable as a snapshot token for `useSyncExternalStore`
+     * and similar APIs that require a cheap, referentially-stable
+     * comparison value.
+     */
+    version(): number;
+}
+
+/**
+ * Plugin API version. Bumped whenever the plugin hook contract changes in
+ * a way that existing plugins cannot survive unchanged. Plugins that
+ * declare an `apiVersion` are rejected if it does not match.
+ */
+export declare const PLUGIN_API_VERSION: 1;
 
 /**
  * Reaction – tracks dependencies via `dataFn` and runs `effectFn` when they
@@ -1245,7 +1113,19 @@ export declare class ReactiveItem {
      * @param {import('../types.js').ReactiveItemType} type
      */
     constructor(type: ReactiveItemType);
-    /* Excluded from this release type: engine */
+    /**
+     * The reactive engine driving this item. Provides access to the
+     * dependency graph, version counter, and type tag — the machinery
+     * ecosystem packages (DevTools, diagnostics, structural sharing)
+     * need to inspect.
+     *
+     * Treat the engine as read-only from outside the library. Constructing
+     * reactive items directly (via `ReactiveItem` factories) is the only
+     * supported way to create an engine.
+     *
+     * @type {import('../core/Engine.js').Engine}
+     */
+    engine: Engine;
     /**
      * Debug name assigned at construction. Used in error messages and
      * DevTools listings. Empty string when not set.
@@ -1426,6 +1306,17 @@ export declare class ReactiveItem {
      */
     serialize(): any;
     /**
+     * Returns the current value as a plain JavaScript value, for use with
+     * `JSON.stringify()`. Subclasses override this to return their raw
+     * value without proxies.
+     *
+     * This is a debug/inspection convenience, not a persistence protocol —
+     * use `serialize()` for snapshots.
+     *
+     * @returns {any}
+     */
+    toJSON(): any;
+    /**
      * Restores state previously produced by `serialize()`.
      *
      * The base implementation is a no-op. Subclasses override this to apply
@@ -1435,6 +1326,18 @@ export declare class ReactiveItem {
      * @param {any} _data
      */
     hydrate(_data: any): void;
+    /**
+     * Returns a minimal observable facade for framework adapters.
+     *
+     * - `get()` returns the current value without tracking a dependency.
+     * - `subscribe(fn)` invokes `fn` with the current value on every
+     *   effective change.
+     * - `version()` returns the monotonic version, suitable as a token
+     *   for `useSyncExternalStore`.
+     *
+     * @returns {import('../types.js').ObservableValue<any>}
+     */
+    toObservable(): ObservableValue<any>;
 }
 
 /**
@@ -1607,6 +1510,13 @@ export declare class ReactiveList<T> {
      */
     serialize(): any;
     /**
+     * Returns the list's contents as a plain array. Enables
+     * `JSON.stringify(list)` to produce useful output.
+     *
+     * @returns {T[]}
+     */
+    toJSON(): T[];
+    /**
      * Applies data produced by `serialize()`.
      *
      * Uses `setItems` internally, so the whole replacement is batched and
@@ -1615,6 +1525,39 @@ export declare class ReactiveList<T> {
      * @param {any} data
      */
     hydrate(data: any): void;
+    /**
+     * Monotonic version counter, bumped on every effective change of the
+     * list, including changes that come from nested items.
+     *
+     * The value is stable between notifications, which makes it suitable
+     * as a snapshot token for `useSyncExternalStore`.
+     *
+     * @returns {number}
+     */
+    getVersion(): number;
+    /**
+     * Returns the version of the item at the given index, or `-1` if the
+     * index is out of bounds.
+     *
+     * Framework adapters use this to implement fine-grained list selectors
+     * without re-rendering the whole list on every change.
+     *
+     * @param {number} index
+     * @returns {number}
+     */
+    getItemVersionAt(index: number): number;
+    /**
+     * Returns a minimal observable facade for framework adapters.
+     *
+     * - `get()` returns a fresh array via `toArray()`.
+     * - `subscribe(fn)` invokes `fn` with the array on every effective
+     *   change of the list.
+     * - `version()` returns the monotonic version, suitable as a token
+     *   for `useSyncExternalStore`.
+     *
+     * @returns {import('../types.js').ObservableValue<any[]>}
+     */
+    toObservable(): ObservableValue<any[]>;
     #private;
 }
 
@@ -1628,12 +1571,33 @@ export declare function runInAction(fn: Function): void;
 
 /**
  * Runs `fn` with `context` installed as the active context.
+ *
+ * On runtimes with `AsyncLocalStorage` (Node 22.3+), the context binding
+ * survives `await` boundaries — a server-render function that awaits an
+ * async operation will still see the correct context afterwards. On older
+ * runtimes and in browsers, the binding only holds for the synchronous
+ * execution of `fn`.
+ *
  * @template T
  * @param {Store2Context} context
  * @param {() => T} fn
  * @returns {T}
  */
 export declare function runWithContext<T>(context: Store2Context, fn: () => T): T;
+
+/**
+ * Async-aware variant of `runWithContext`. On runtimes with
+ * `AsyncLocalStorage`, behaves identically to `runWithContext` for async
+ * functions. On runtimes without it, this is an explicit marker that the
+ * caller expects context propagation across `await`, and will lose it
+ * after the first `await` — the same limitation as `runWithContext`.
+ *
+ * @template T
+ * @param {Store2Context} context
+ * @param {() => Promise<T>} fn
+ * @returns {Promise<T>}
+ */
+export declare function runWithContextAsync<T>(context: Store2Context, fn: () => Promise<T>): Promise<T>;
 
 /**
  * ShallowReactive tracks assignments and deletions on the top level of an
@@ -1704,6 +1668,13 @@ export declare class ShallowReactive<T extends {
      * @returns {T}
      */
     getRawValue(): T;
+    /**
+     * Returns a shallow copy of the raw object without the reactive proxy,
+     * so that `JSON.stringify(shallowReactive)` produces a plain object.
+     *
+     * @returns {T}
+     */
+    toJSON(): T;
     #private;
 }
 
@@ -1726,6 +1697,36 @@ export declare function shallowReactive<T extends {
  * @returns {Promise<void>}
  */
 export declare function sleep(ms: number): Promise<void>;
+
+/** Current snapshot format version. */
+export declare const SNAPSHOT_VERSION: 1;
+
+/**
+ * Snapshot version migration.
+ *
+ * Migrations are applied by `context.hydrate()` before the roots are
+ * unpacked. A migration registered for `from: 1, to: 2` is invoked when
+ * the incoming snapshot has `version === 1`; the returned snapshot must
+ * declare `version === 2`. The chain continues until the snapshot version
+ * matches the current `SNAPSHOT_VERSION`.
+ *
+ * @public
+ */
+export declare interface SnapshotMigration {
+    /**
+     * Snapshot version this migration expects as input.
+     */
+    from: number;
+    /**
+     * Snapshot version this migration produces as output.
+     */
+    to: number;
+    /**
+     * Returns a new snapshot compatible with version `to`. Must not
+     * mutate the input.
+     */
+    migrate(snapshot: ContextSnapshot): ContextSnapshot;
+}
 
 /**
  * Minimal interface a context root must satisfy to be snapshotted.
@@ -1799,6 +1800,27 @@ export declare class Store {
      * @returns {string}
      */
     getPath(): string;
+    /**
+     * Monotonic version counter, bumped on every store-level notification.
+     *
+     * The value is stable between notifications, which makes it suitable
+     * as a snapshot token for `useSyncExternalStore` and similar APIs.
+     *
+     * @returns {number}
+     */
+    getVersion(): number;
+    /**
+     * Returns a minimal observable facade for framework adapters.
+     *
+     * - `get()` returns a fresh plain-object snapshot via `toJSON()`.
+     * - `subscribe(fn)` invokes `fn` with the snapshot on every effective
+     *   store-level change.
+     * - `version()` returns the monotonic version, suitable as a token for
+     *   `useSyncExternalStore`.
+     *
+     * @returns {import('../types.js').ObservableValue<any>}
+     */
+    toObservable(): ObservableValue<any>;
     /**
      * Adds reactive items or child stores to the store under the given keys.
      *
@@ -1922,7 +1944,8 @@ export declare class Store {
      *
      * The callback receives a `Map` of dot-separated update paths to
      * `UpdateDataRecord` instances, plus this store as the second
-     * argument. It is invoked once per batch of effective changes.
+     * argument. It is invoked once per child change propagated up to this
+     * store.
      *
      * @param {(update: Map<string, import('../core/UpdateDataRecord.js').UpdateDataRecord>, store: Store) => void} fn
      * @returns {() => void} An unsubscribe function.
@@ -2016,31 +2039,107 @@ export declare class Store2Context {
      */
     unregisterRoot(name: string): boolean;
     /**
-     * Returns the names of all roots currently registered with registerRoot()
+     * Registers a snapshot migration. Only one migration per `from`
+     * version is allowed — a second registration for the same `from`
+     * overwrites the first.
+     *
+     * @param {import('../types.js').SnapshotMigration} migration
+     * @returns {this}
+     */
+    registerMigration(migration: SnapshotMigration): this;
+    /**
+     * Returns the root registered under `name`, or `null` if it is not
+     * registered.
+     *
+     * Persistence adapters and SSR transports use this to inspect or
+     * serialize individual roots.
+     *
+     * @param {string} name
+     * @returns {import('../types.js').SnapshotRoot | null}
+     */
+    getRoot(name: string): SnapshotRoot | null;
+    /**
+     * Returns the names of all roots currently registered with
+     * `registerRoot()`.
      *
      * @returns {Array<string>}
      */
     getRootNames(): Array<string>;
     /**
-     * Returns a copy of the plugins installed via use().
+     * Returns a copy of the plugins installed via `use()`.
      *
      * @returns {Array<import('../types.js').Store2Plugin>}
      */
     get plugins(): Store2Plugin[];
     /**
-     * Returns a copy of the middleware chain installed via addMiddleware()
+     * Returns a copy of the middleware chain installed via
+     * `addMiddleware()`.
      *
      * @returns {Array<import('../types.js').ActionMiddleware>}
      */
     get middlewares(): ActionMiddleware[];
     /**
+     * Subscribes a callback invoked after every round of change
+     * propagation that ran subscribers.
+     *
+     * Persistence adapters use this as a "state is dirty, consider
+     * saving" hook without having to install a full plugin.
+     *
+     * @param {() => void} callback
+     * @returns {() => void} An unsubscribe function.
+     */
+    onAnyUpdate(callback: () => void): () => void;
+    /**
+     * Registers a reactive item with this context. Called by `Engine` at
+     * construction. Idempotent — registering the same item twice is a
+     * no-op.
+     *
+     * This registry is what powers `dumpGraph()` and any future
+     * context-wide diagnostics. It is not exposed as a public API for
+     * iteration; use `dumpGraph()` if you need to enumerate items.
+     *
+     * @param {import('../reactives/ReactiveItem.js').ReactiveItem} item
+     */
+    registerItem(item: ReactiveItem): void;
+    /**
+     * Removes a reactive item from this context's registry. Called by
+     * `Engine.destroy()`.
+     *
+     * @param {import('../reactives/ReactiveItem.js').ReactiveItem} item
+     */
+    unregisterItem(item: ReactiveItem): void;
+    /**
+     * Returns a serializable snapshot of the dependency graph for every
+     * live reactive item registered with this context.
+     *
+     * Edges are directed: `{ from: A, to: B, kind: 'dep' }` means A
+     * depends on B. Each dependency relation appears exactly once,
+     * derived from the source item's `dependencies` set.
+     *
+     * Items whose `isDestroyed` is `true` are skipped.
+     *
+     * @returns {import('../types.js').GraphDump}
+     */
+    dumpGraph(): GraphDump;
+    /**
      * Invokes a lifecycle hook on every installed plugin. Plugin errors are
      * caught and logged. When plugins are suspended (e.g. during time-travel),
      * calls are ignored.
+     *
      * @param {string} hook
      * @param {...any} args
      */
     emitPlugin(hook: string, ...args: any[]): void;
+    /**
+     * Same as `emitPlugin`, but ignores the suspension flag. Used for
+     * hooks that must fire regardless of time-travel state — notably
+     * `onHydrateStart` / `onHydrateEnd`, which persistence adapters rely
+     * on to observe every hydration.
+     *
+     * @param {string} hook
+     * @param {...any} args
+     */
+    emitPluginDirect(hook: string, ...args: any[]): void;
     /**
      * Runs `fn` inside a batch. Supports two signatures:
      *
@@ -2054,6 +2153,12 @@ export declare class Store2Context {
     batch(nameOrFn: string | Function, fn?: Function): any;
     /**
      * Runs `fn` as a named action. Supports async bodies and middleware.
+     *
+     * The action body is executed inside `runWithContext(this, ...)` so
+     * that reactive items created synchronously inside the body bind to
+     * this context. On runtimes with `AsyncLocalStorage`, the binding
+     * survives `await` boundaries — the correct behaviour for SSR.
+     *
      * @param {string} name
      * @param {(action: import('../types.js').ActionInfo) => any} fn
      * @param {any} [payload]
@@ -2062,8 +2167,18 @@ export declare class Store2Context {
     action(name: string, fn: (action: ActionInfo) => any, payload?: any): Promise<any>;
     /**
      * Flushes pending subscribers synchronously.
+     *
+     * Safe to call inside a batch — the batch snapshot is intentionally
+     * consumed at that point. Framework adapters that expect a
+     * `flushSync`-named method (e.g. React's `act()`) may call
+     * `flushSync()` instead.
      */
     flush(): void;
+    /**
+     * Semantic alias for `flush()`. Named to match framework conventions
+     * (React `act`, Vue `nextTick`).
+     */
+    flushSync(): void;
     /**
      * Captures a serializable snapshot of every registered root.
      * @returns {import('../types.js').ContextSnapshot}
@@ -2073,10 +2188,17 @@ export declare class Store2Context {
      * Applies a snapshot to every registered root. The whole operation runs
      * in one batch.
      *
+     * Before unpacking, the snapshot is migrated to the current format
+     * version using migrations registered via `registerMigration()`. If a
+     * migration is missing for the incoming version, `hydrate()` throws —
+     * silently accepting an incompatible snapshot is worse than failing
+     * loudly.
+     *
      * When `timeTravel` is `true`, plugin hooks are suppressed for the
      * duration of the hydration so that a DevTools-style plugin does not
-     * re-record the rehydration as a new action. Subscribers still run so
-     * the UI updates.
+     * re-record the rehydration as a new action. `onHydrateStart` and
+     * `onHydrateEnd` still fire — persistence adapters need to observe
+     * every hydration, including time-travel rewinds.
      *
      * Roots present in the snapshot but not registered here are ignored.
      * Roots registered here but missing from the snapshot are left untouched.
@@ -2088,7 +2210,8 @@ export declare class Store2Context {
         timeTravel?: boolean;
     }): void;
     /**
-     * Releases the context and forgets all installed plugins and roots.
+     * Releases the context and forgets all installed plugins, roots, and
+     * migrations.
      */
     dispose(): void;
     #private;
@@ -2107,6 +2230,12 @@ export declare interface Store2Plugin {
      * Debug name, used in error logs. Should be unique per context.
      */
     name: string;
+    /**
+     * Plugin API version this plugin was written against. Optional for
+     * backward compatibility. When present, the context rejects plugins
+     * whose version does not match the core's `PLUGIN_API_VERSION`.
+     */
+    apiVersion?: number;
     /**
      * Called once when the plugin is installed. Receives the context the
      * plugin will observe.
@@ -2151,6 +2280,21 @@ export declare interface Store2Plugin {
      * Called when a computed throws during evaluation.
      */
     onError?(item: ReactiveItem, error: Error): void;
+    /**
+     * Called before `context.hydrate()` unpacks the snapshot. Fires even
+     * during time-travel, so persistence adapters can react to any
+     * hydration.
+     */
+    onHydrateStart?(snapshot: ContextSnapshot, opts: {
+        timeTravel: boolean;
+    }): void;
+    /**
+     * Called after `context.hydrate()` has applied the snapshot and the
+     * hydration batch has closed. Fires even during time-travel.
+     */
+    onHydrateEnd?(snapshot: ContextSnapshot, opts: {
+        timeTravel: boolean;
+    }): void;
 }
 
 /**
