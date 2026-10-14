@@ -1,29 +1,52 @@
 // @ts-check
 
 import { Computed } from '../reactives/Computed.js';
-import { debounce, getAllPropertyDescriptors, isPlainObject } from '../helpers/tools.js';
-import { modeController } from '../services/modeController.js';
-import { getSetOfUsedReactiveItems } from '../services/dependencyTracker.js';
 import { Atom } from '../reactives/Atom.js';
 import { Collection } from '../reactives/Collection.js';
 import { ShallowReactive } from '../reactives/ShallowReactive.js';
+import { debounce, getAllPropertyDescriptors, isPlainObject } from '../helpers/tools.js';
+import { getCurrentContext } from '../core/context.js';
+
+/**
+ * Runs `fn` with the current context's dependency tracker enabled and
+ * returns the set of items read during the call.
+ * @param {() => void} fn
+ * @returns {Set<import('../reactives/ReactiveItem.js').ReactiveItem>}
+ */
+function collectDependencies(fn) {
+    const tracker = getCurrentContext().dependencyTracker;
+    tracker.enable();
+    /** @type {Set<import('../reactives/ReactiveItem.js').ReactiveItem>} */
+    let deps;
+    try {
+        fn();
+        // Snapshot must be taken before disable(), which restores the
+        // previous (outer) tracking scope.
+        deps = tracker.data;
+    } finally {
+        tracker.disable();
+    }
+    return deps;
+}
 
 /**
  * Creates a reactive subscription with configurable dependency tracking.
  *
- * @param {() => any} dataFn - Function whose reactive dependencies are tracked.
- * @param {(updates?: Map<string, import('../types.d.ts').UpdateDataRecord>) => void} effectFn - Effect to run when dependencies change.
- * @param {object} options - Configuration.
- * @param {string} [options.name] - Debug name.
- * @param {number} [options.delay] - Debounce delay (ms).
- * @param {AbortSignal} [options.signal] - AbortSignal for cancellation.
- * @param {Function} [options.onError] - Error handler.
- * @param {boolean} [options.recomputeDependencies=true] - Re‑collect dependencies on every run.
- * @param {boolean} [options.isAutorun=false] - Whether this is an autorun (dataFn === effectFn).
- * @param {boolean} [options.passUpdates=false] - Whether to pass collected updates to effectFn.
- * @returns {() => void} Unsubscribe function.
+ * @param {() => any} dataFn
+ * @param {(updates?: Map<string, import('../core/UpdateDataRecord.js').UpdateDataRecord>) => void} effectFn
+ * @param {object} options
+ * @param {string} [options.name]
+ * @param {number} [options.delay]
+ * @param {AbortSignal} [options.signal]
+ * @param {Function} [options.onError]
+ * @param {boolean} [options.recomputeDependencies=true]
+ * @param {boolean} [options.isAutorun=false]
+ * @param {boolean} [options.passUpdates=false]
+ * @returns {() => void}
  */
 function createReactiveSubscription(dataFn, effectFn, options = {}) {
+    const ctx = getCurrentContext();
+
     const {
         name = '',
         delay = 0,
@@ -34,9 +57,11 @@ function createReactiveSubscription(dataFn, effectFn, options = {}) {
         passUpdates = false,
     } = options;
 
-    if (modeController.untrackMode) {
+    if (ctx.modeController.untrackMode) {
         throw new Error(
-            `Cannot initialize reactive subscription${name ? ` (${name})` : ''} when untrackMode is on.`
+            `Cannot initialize reactive subscription${
+                name ? ` (${name})` : ''
+            } when untrackMode is on.`
         );
     }
 
@@ -48,16 +73,14 @@ function createReactiveSubscription(dataFn, effectFn, options = {}) {
     let isActive = true;
     let isRunning = false;
 
-    /** @type {Set<import('../types.d.ts').ReactiveItem> | null} */
+    /** @type {Set<import('../reactives/ReactiveItem.js').ReactiveItem> | null} */
     let staticDependencies = null;
 
-    /** @type {Map<string, import('../types.d.ts').UpdateDataRecord>} */
+    /** @type {Map<string, import('../core/UpdateDataRecord.js').UpdateDataRecord>} */
     const collectedUpdates = new Map();
 
-    // Single shared change handler – enables deduplication by changedItemsController
     /**
-     *
-     * @param {Map<string, import('../types.d.ts').UpdateDataRecord>} updates
+     * @param {Map<string, import('../core/UpdateDataRecord.js').UpdateDataRecord>} updates
      * @returns {void}
      */
     const onChange = updates => {
@@ -70,8 +93,7 @@ function createReactiveSubscription(dataFn, effectFn, options = {}) {
     };
 
     /**
-     * Subscribes to a set of dependencies using the shared onChange handler.
-     * @param {Set<import('../types.d.ts').ReactiveItem>} deps
+     * @param {Set<import('../reactives/ReactiveItem.js').ReactiveItem>} deps
      * @returns {Array<() => void>}
      */
     function subscribeTo(deps) {
@@ -84,9 +106,7 @@ function createReactiveSubscription(dataFn, effectFn, options = {}) {
     }
 
     /**
-     * The main runner – called when any dependency changes.
-     * In dynamic mode, it re‑subscribes to fresh dependencies.
-     * In static mode, it just runs the effect.
+     * The main runner.
      */
     function run() {
         if (!isActive || isRunning) {
@@ -96,7 +116,6 @@ function createReactiveSubscription(dataFn, effectFn, options = {}) {
 
         try {
             if (recomputeDependencies) {
-                // Unsubscribe from old dependencies
                 for (const unsub of unsubscribers) {
                     try {
                         unsub();
@@ -106,35 +125,40 @@ function createReactiveSubscription(dataFn, effectFn, options = {}) {
                 }
                 unsubscribers = [];
 
-                // Collect fresh dependencies (this executes dataFn)
-                const deps = getSetOfUsedReactiveItems(dataFn);
+                const deps = collectDependencies(dataFn);
                 if (deps.size === 0) {
                     throw new Error(`No reactive items found${name ? ` (${name})` : ''}.`);
                 }
                 unsubscribers = subscribeTo(deps);
             }
 
-            // Run the effect only if this is NOT an autorun (because for autorun,
-            // the effect already ran inside dataFn during dependency collection).
-            // For reaction, dataFn is separate, so we need to run the effect.
-            if (!isAutorun) {
-                modeController.enterBatch();
-                try {
-                    if (passUpdates && collectedUpdates.size > 0) {
-                        finalEffect(collectedUpdates);
-                    } else {
-                        finalEffect(undefined);
-                    }
-                } finally {
-                    modeController.exitBatch();
-                }
+            // For autorun with recomputeDependencies=true, dataFn === effectFn
+            // and the effect already ran during dependency collection above.
+            // Otherwise we must run the effect explicitly here.
+            const shouldRunEffect = !isAutorun || !recomputeDependencies;
+
+            if (shouldRunEffect) {
+                // Snapshot the collected updates before clearing. The effect
+                // owns this Map; the internal accumulator is reset for the
+                // next cycle immediately.
+                const updatesForEffect =
+                    passUpdates && collectedUpdates.size > 0
+                        ? new Map(collectedUpdates)
+                        : undefined;
+
                 collectedUpdates.clear();
+
+                ctx.modeController.enterBatch();
+                try {
+                    finalEffect(updatesForEffect);
+                } finally {
+                    ctx.modeController.exitBatch();
+                }
             }
         } catch (error) {
             if (onError) {
                 onError(error);
             }
-            // Re-throw the error so it propagates to the subscriber handler
             throw error;
         } finally {
             isRunning = false;
@@ -142,15 +166,11 @@ function createReactiveSubscription(dataFn, effectFn, options = {}) {
     }
 
     // ----- Initialization -----
-    // Collect initial dependencies (this executes dataFn once).
-    // For autorun, dataFn === effectFn, so the effect runs once.
-    // For reaction, dataFn !== effectFn, so the effect does NOT run.
-    const initialDeps = getSetOfUsedReactiveItems(dataFn);
+    const initialDeps = collectDependencies(dataFn);
     if (initialDeps.size === 0) {
         throw new Error(`No reactive items found${name ? ` (${name})` : ''}.`);
     }
 
-    // Subscribe to the initial dependencies using the shared handler
     if (recomputeDependencies) {
         unsubscribers = subscribeTo(initialDeps);
     } else {
@@ -158,10 +178,6 @@ function createReactiveSubscription(dataFn, effectFn, options = {}) {
         unsubscribers = subscribeTo(staticDependencies);
     }
 
-    // For autorun, the effect already ran inside getSetOfUsedReactiveItems above.
-    // For reaction, we do NOT want to run the effect yet.
-
-    // Return the final unsubscribe function
     return function unsubscribe() {
         isActive = false;
         for (const unsub of unsubscribers) {
@@ -178,100 +194,78 @@ function createReactiveSubscription(dataFn, effectFn, options = {}) {
 }
 
 /**
- * Autorun – runs the effect immediately (during initial dependency collection)
- * and re‑runs it on any dependency change.
- * Dependencies are re‑collected on every run by default.
+ * Autorun – runs the effect immediately and re-runs it on any dependency
+ * change.
  *
- * @param {() => void} fn - The effect function.
- * @param {object} [options] - Options.
- * @param {string} [options.name] - Debug name.
- * @param {number} [options.delay] - Debounce delay (ms).
- * @param {AbortSignal} [options.signal] - AbortSignal.
- * @param {Function} [options.onError] - Error handler.
- * @param {boolean} [options.recomputeDependencies=true] - Re‑collect dependencies each run.
- * @returns {() => void} Unsubscribe function.
+ * @param {() => void} fn
+ * @param {object} [options]
+ * @param {string} [options.name]
+ * @param {number} [options.delay]
+ * @param {AbortSignal} [options.signal]
+ * @param {Function} [options.onError]
+ * @param {boolean} [options.recomputeDependencies=true]
+ * @returns {() => void}
  */
 function autorun(fn, options = {}) {
     return createReactiveSubscription(fn, fn, {
         ...options,
         recomputeDependencies: options.recomputeDependencies ?? true,
         isAutorun: true,
+        passUpdates: false,
     });
 }
 
 /**
- * Reaction – tracks dependencies via dataFn and runs effectFn when they change.
- * The effect is NOT run immediately; it only runs after the first change.
- * Dependencies are re‑collected on every run by default.
+ * Reaction – tracks dependencies via `dataFn` and runs `effectFn` when they
+ * change. The effect is NOT run at setup time.
  *
- * @param {() => any} dataFn - Function whose dependencies are tracked.
- * @param {(updates?: Map<string, import('../types.d.ts').UpdateDataRecord>) => void} effectFn - Effect to run.
- * @param {object} [options] - Options.
- * @param {string} [options.name] - Debug name.
- * @param {number} [options.delay] - Debounce delay (ms).
- * @param {AbortSignal} [options.signal] - AbortSignal.
- * @param {Function} [options.onError] - Error handler.
- * @param {boolean} [options.recomputeDependencies=true] - Re‑collect dependencies each run.
- * @param {boolean} [options.passUpdates=true] - Pass collected updates to effectFn.
- * @returns {() => void} Unsubscribe function.
+ * @param {() => any} dataFn
+ * @param {(updates?: Map<string, import('../core/UpdateDataRecord.js').UpdateDataRecord>) => void} effectFn
+ * @param {object} [options]
+ * @param {string} [options.name]
+ * @param {number} [options.delay]
+ * @param {AbortSignal} [options.signal]
+ * @param {Function} [options.onError]
+ * @param {boolean} [options.recomputeDependencies=true]
+ * @param {boolean} [options.passUpdates=true]
+ * @returns {() => void}
  */
 function reaction(dataFn, effectFn, options = {}) {
     return createReactiveSubscription(dataFn, effectFn, {
         ...options,
         recomputeDependencies: options.recomputeDependencies ?? true,
+        passUpdates: options.passUpdates ?? true,
         isAutorun: false,
     });
 }
 
 /**
- * Automatically calls the given function whenever the given predicate evaluates to true.
- * @param {()=>boolean} predicate - The predicate that should be evaluated.
- * @param {()=>void} fn - The function to be called when the predicate evaluates to true.
- * @param {object} [options] - Optional options.
- * @param {number} [options.timeout] - The number of milliseconds to wait before timing out.
- * @param {number} [options.delay] - The number of milliseconds to wait before calling the function.
- * @param {AbortSignal} [options.signal] - An AbortSignal to cancel the function call.
- * @returns {()=>void} A function that can be called to unsubscribe the callback function from changes in the tracked dependencies.
- * @example
- * ```js
- * const a = atom(0, { name: "a" });
- * let foo = 0;
- *
- * when(
- *     () => a.value > 3,
- *     () => {
- *         foo++;
- *     }
- * );
- *
- * a.value = 2; // foo = 0
- * a.value = 3; // foo = 0
- * a.value = 4; // foo = 1
- * a.value = 5; // foo = 1
- * a.value = 3; // foo = 1
- * a.value = 4; // foo = 2
- * a.value = 5; // foo = 2
- * ```
+ * Waits for `predicate` to become true, then runs `fn` once.
+ * @param {() => boolean} predicate
+ * @param {() => void} fn
+ * @param {object} [options]
+ * @param {number} [options.timeout]
+ * @param {number} [options.delay]
+ * @param {AbortSignal} [options.signal]
+ * @returns {() => void}
  */
 function when(predicate, fn, options) {
-    const computed = new Computed(predicate);
+    const computed = new Computed(predicate, { name: 'when' });
     const timeout = options?.timeout || 0;
-    /** @type {ReturnType<typeof setTimeout>|null} */
-    let timer;
+    /** @type {ReturnType<typeof setTimeout> | null} */
+    let timer = null;
 
     const mainUnsubscriber = function () {
         if (timer) {
             clearTimeout(timer);
             timer = null;
         }
-
         unsubscribe();
         computed.destroy();
     };
 
     const unsubscribe = computed.subscribe(() => {
         if (computed.value) {
-            //mainUnsubscriber();
             fn();
         }
     }, options);
@@ -286,38 +280,24 @@ function when(predicate, fn, options) {
 }
 
 /**
- * Waits until the given predicate evaluates to true.
- * @param {()=>boolean} predicate - The predicate that should be evaluated.
- * @param {object} [options] - Optional options.
- * @param {number} [options.timeout] - The number of milliseconds to wait before timing out.
- * @returns {Promise<void>} A promise that resolves when the predicate evaluates to true.
- * @example
- * ```js
- * const a = atom(0, { name: "a" });
- * let foo = 0;
- *
- * waitUntil(() => a.value > 3).then(() => {
- *     foo++;
- * });
- *
- * a.value = 2; // foo = 0
- * a.value = 3; // foo = 0
- * a.value = 4; // foo = 1
- * ```
+ * Returns a promise that resolves when `predicate` becomes true.
+ * @param {() => boolean} predicate
+ * @param {object} [options]
+ * @param {number} [options.timeout]
+ * @returns {Promise<void>}
  */
 function waitUntil(predicate, options) {
     return new Promise(resolve => {
-        const computed = new Computed(predicate);
+        const computed = new Computed(predicate, { name: 'waitUntil' });
         const timeout = options?.timeout || 0;
-        /** @type {ReturnType<typeof setTimeout>|null} */
-        let timer;
+        /** @type {ReturnType<typeof setTimeout> | null} */
+        let timer = null;
 
         const mainUnsubscriber = function () {
             if (timer) {
                 clearTimeout(timer);
                 timer = null;
             }
-
             unsubscribe();
             computed.destroy();
         };
@@ -338,215 +318,126 @@ function waitUntil(predicate, options) {
 }
 
 /**
- * Runs the given function in an action, i.e. when there are no active
- * subscribers. This is useful for making changes to reactive items without
- * triggering subscribers.
- * @param {Function} fn - The function to be run in an action.
+ * Defers mutations until after subscribers finish, so it is safe to call
+ * from inside a subscriber callback.
+ * @param {Function} fn
  * @returns {void}
- * @example
- * ```js
- * let a = atom(0, { name: "a" });
- * let b = atom(0, { name: "b" });
- *
- * let count = 0;
- *
- * a.subscribe(() => {
- *     count++;
- *     runInAction(() => {
- *         b.value = a.value;
- *     });
- * });
- *
- * a.value++;
- * console.log(a.value, b.value, count); // 1 1 1
- * ```
  */
 function runInAction(fn) {
-    if (modeController.subscribersMode) {
-        modeController.runAfterSubscribers(() => {
-            batch(fn);
+    const ctx = getCurrentContext();
+    if (ctx.modeController.subscribersMode) {
+        ctx.modeController.runAfterSubscribers(() => {
+            ctx.batch(fn);
         });
     } else {
-        batch(fn);
+        ctx.batch(fn);
     }
 }
 
 /**
- * Executes the specified function while batching notifications to reactive items.
- * This is useful for operations that make multiple changes to reactive items, as
- * it prevents the notifications from being sent until all changes have been made.
- * Supports nested batch calls.
+ * Groups multiple updates into a single notification round.
  *
- * @param {Function} fn - The function to execute while batching notifications.
- * @returns {void}
- * @example
- * ```js
- * const a = atom(0);
- * const b = atom(0);
+ *     batch(() => { ... })
+ *     batch('update todos', () => { ... })
  *
- * let foo = 0;
- *
- * autorun(() => {
- *     a.value;
- *     b.value;
- *     foo++;
- * });
- *
- * console.log(a.value, b.value, foo); // 0 0 1
- *
- * batch(() => {
- *     a.value++;
- *     b.value++;
- * });
- *
- * console.log(a.value, b.value, foo); // 1 1 2
- * ```
+ * @param {string | Function} nameOrFn
+ * @param {Function} [fn]
+ * @returns {any}
  */
-function batch(fn) {
-    modeController.enterBatch();
-    try {
-        fn();
-    } finally {
-        modeController.exitBatch();
-    }
+function batch(nameOrFn, fn) {
+    return getCurrentContext().batch(nameOrFn, fn);
 }
 
 /**
- * Executes the specified function while not tracking reactive items.
- * This is useful for operations that access reactive items without
- * actually depending on them.
+ * Runs `fn` as a named, optionally asynchronous action. Middleware installed
+ * on the current context is applied around the body.
+ *
+ * @param {string} name
+ * @param {(action: import('../types.js').ActionInfo) => any} fn
+ * @param {any} [payload]
+ * @returns {Promise<any>}
+ */
+function action(name, fn, payload) {
+    return getCurrentContext().action(name, fn, payload);
+}
+
+/**
+ * Runs `fn` without tracking reactive reads. Nesting is safe: the previous
+ * state is restored on exit even if `fn` throws.
  * @template T
- * @param {()=>T} fn - The function to execute while not tracking reactive items.
- * @returns {T} The result of executing the function.
- * @example
- * ```js
- * const a = atom(0);
- * const b = atom(0);
- *
- * let foo = 0;
- *
- * autorun(() => {
- *     a.value;
- *     untrack(() => {
- *         b.value;
- *     });
- *     foo++;
- * });
- * console.log(a.value, b.value, foo); // 0 0 1
- *
- * a.value++;
- * console.log(a.value, b.value, foo); // 1 0 2
- * b.value++;
- * console.log(a.value, b.value, foo); // 1 1 2
- * ```
+ * @param {() => T} fn
+ * @returns {T}
  */
 function untrack(fn) {
-    const untrackMode = modeController.untrackMode;
-    let result;
+    const modeController = getCurrentContext().modeController;
+    const previous = modeController.untrackMode;
     modeController.untrackMode = true;
     try {
-        result = fn();
-    } catch (e) {
-        modeController.untrackMode = untrackMode;
-        throw e;
+        return fn();
+    } finally {
+        modeController.untrackMode = previous;
     }
-    modeController.untrackMode = untrackMode;
-    return result;
 }
 
 /**
- * Returns an Atom that automatically updates its value to the current time
- * at the given interval. The interval is specified in milliseconds and
- * defaults to 1000. When there are subscribers, the Atom updates its value
- * at the specified interval. When there are no subscribers, the interval
- * is cleared and the Atom's value is reset to 0.
- *
- * @param {number} [interval=1000] - The interval in milliseconds at which the Atom should update its value.
- * @returns {Atom<number>} An Atom that automatically updates its value to the current time at the given interval.
- * @example
- * ```js
- * const now = getNow();
- * console.log(now.value); // 0
- *
- * const unsubscribe = now.subscribe(() => {
- *     console.log(now.value); // Current time in milliseconds
- * });
- * ```
+ * Returns an Atom that ticks at the given interval while it has subscribers.
+ * @param {number} [interval=1000]
+ * @returns {Atom<number>}
  */
 function getNow(interval = 1000) {
-    const atom = new Atom(0, { name: 'now' });
-    /** @type {ReturnType<typeof setTimeout>} */
+    const nowAtom = new Atom(0, { name: 'now' });
+    /** @type {ReturnType<typeof setInterval> | undefined} */
     let intervalId;
 
-    atom.onHasSubscribers(() => {
+    nowAtom.onHasSubscribers(() => {
         intervalId = setInterval(() => {
             runInAction(() => {
-                atom.value = Date.now();
+                nowAtom.value = Date.now();
             });
         }, interval);
     });
 
-    atom.onNoSubscribers(() => {
-        clearInterval(intervalId);
+    nowAtom.onNoSubscribers(() => {
+        if (intervalId !== undefined) {
+            clearInterval(intervalId);
+        }
         runInAction(() => {
-            atom.value = 0;
+            nowAtom.value = 0;
         });
     });
 
-    atom.onDestroy(() => {
-        clearInterval(intervalId);
+    nowAtom.onDestroy(() => {
+        if (intervalId !== undefined) {
+            clearInterval(intervalId);
+        }
     });
 
-    return atom;
+    return nowAtom;
 }
 
 /**
- * Creates an object that provides a way to handle the result of a Promise.
- * The object has a single method called `case` which takes an object with
- * three optional methods: `resolved`, `rejected`, and `pending`. The appropriate
- * method will be called based on the state of the promise.
+ * Observes a promise's state. The returned object exposes a single method
+ * `case({ pending, resolved, rejected })`.
  * @template T
- * @param {Promise<T>} promise - The promise to handle.
- * @returns {{case: (param0: {resolved?:(value: T)=>void, rejected?:(error: Error)=>void, pending?:()=>void})=>Promise<void>}} An object with a single method called `case`.
- * @example
- * ```js
- * const promise = new Promise((resolve, reject) => {
- *     setTimeout(() => {
- *         resolve("Hello, world!");
- *     }, 1000);
- * });
- *
- * const fromPromiseResult = fromPromise(promise);
- *
- * await fromPromiseResult.case({
- *     resolved: (value) => {
- *         console.log("Resolved:", value); // Resolved: Hello, world!
- *     },
- *     rejected: () => {
- *         console.log("Rejected");
- *     },
- *     pending: () => {
- *         console.log("Pending"); // Pending
- *     },
- * });
- * ```
+ * @param {Promise<T>} promise
+ * @returns {{ case: (param0: { resolved?: (value: T) => void, rejected?: (error: Error) => void, pending?: () => void }) => Promise<void> }}
  */
 function fromPromise(promise) {
-    /** @type {Atom<"pending"|"resolved"|"rejected">} */
+    /** @type {Atom<"pending" | "resolved" | "rejected">} */
     const stateAtom = new Atom('pending', { name: 'fromPromise' });
+
     /** @type {T} */
     let promiseResult;
-
     /** @type {Error} */
     let promiseError;
 
     /**
-     * Executes the appropriate function based on the current state of the promise.
-     * @param {object} param0 - An object containing the functions to execute for each state.
-     * @param {(value: T)=>void} [param0.resolved] - The function to execute when the promise is resolved.
-     * @param {(error: Error)=>void} [param0.rejected] - The function to execute when the promise is rejected.
-     * @param {()=>void} [param0.pending] - The function to execute when the promise is pending.
-     * @returns {Promise<void>} A Promise that resolves when the appropriate function has been executed.
+     * @param {{
+     *   resolved?: (value: T) => void,
+     *   rejected?: (error: Error) => void,
+     *   pending?: () => void,
+     * }} param0
+     * @returns {Promise<void>}
      */
     async function caseMethod(param0) {
         if (param0.pending) {
@@ -593,217 +484,90 @@ function fromPromise(promise) {
             });
     }
 
-    return {
-        case: caseMethod,
-    };
+    return { case: caseMethod };
 }
 
 /**
- * Creates a new Atom instance. An Atom is a reactive item that holds a value. Same as `atom` but
- * returns a new Atom instance.
+ * Creates a new reactive Atom holding the given value.
+ *
+ * An Atom is the base unit of reactive state — a single mutable cell. Reads
+ * inside tracked contexts register a dependency; writes schedule a change.
+ *
  * @template T
- * @param {T} value - The initial value of the Atom.
- * @param {object} [options] - Options
- * @param {string} [options.name] - The name of Atom.
- * @param {(a:T, b:T)=>boolean} [options.compareFunction] - A function that compares two values to determine if they are equal.
- * @returns {Atom<T>} A new Atom instance with the given value and options.
- * @example
- * ```js
- * const count = atom(0);
- *
- * count.subscribe(() => {
- *     console.log(count.value);
- * });
- *
- * count.value = 1;
- * ```
+ * @param {T} value
+ * @param {object} [options]
+ * @param {string} [options.name]
+ * @param {(a: T, b: T) => boolean} [options.compareFunction]
+ * @returns {Atom<T>}
  */
 function atom(value, options) {
     return new Atom(value, options);
 }
 
 /**
- * Creates a new Computed instance. Computed is a reactive item that holds a value that is computed from other reactive values.
+ * Creates a new reactive Computed whose value is derived from other
+ * reactive sources.
+ *
+ * The function passed as `fn` runs once at construction, then again
+ * whenever one of its dependencies changes and the recomputed value
+ * differs.
+ *
  * @template T
- * @param {()=>T} fn - The function that returns the value of the Computed
- * @param {object} [options] - Options
- * @param {string} [options.name] - The name of Computed.
- * @param {(a:T, b:T)=>boolean} [options.compareFunction] - A function that compares two values to determine if they are equal.
- * @param {boolean} [options.smartRecompute] - Whether the function is a hard function. If true, it prevents calling the function by comparing the string representation of the dependencies.
- * @returns {Computed<T>} A new Computed instance with the given function and options.
- * @example
- * ```js
- * const a = atom(0);
- * const b = computed(() => a.value + 1);
- *
- * b.subscribe(() => {
- *     console.log(b.value);
- * });
- *
- * a.value = 1;
- * // b = 2
- * ```
+ * @param {() => T} fn
+ * @param {object} [options]
+ * @param {string} [options.name]
+ * @param {(a: T, b: T) => boolean} [options.compareFunction]
+ * @param {boolean} [options.smartRecompute]
+ * @returns {Computed<T>}
  */
 function computed(fn, options) {
     return new Computed(fn, options);
 }
 
 /**
- * Creates a new reactive Collection instance that holds an array.
- * The Collection provides reactivity for array mutations (push, pop, splice, etc.)
- * and allows subscribing to changes.
+ * Creates a new reactive Collection wrapping an array.
  *
- * Unlike the `Atom` and `Computed` factories, this function returns the actual
- * `Collection` instance, not just the proxied array. To access the reactive array,
- * use the `.value` property.
+ * Array mutations (`push`, `pop`, `splice`, index assignment) trigger
+ * reactivity. The `.value` property returns a Proxy; direct mutations
+ * through it are tracked.
  *
  * @template T
- * @param {T[]} value - The initial array to observe.
- * @param {object} [options] - Configuration options.
- * @param {string} [options.name] - The name of the Collection (used for debugging).
- * @param {(a:T, b:T)=>boolean} [options.compareFunction] - Custom equality function.
- * @returns {Collection<T>} The Collection instance.
- *
- * @example
- * ```js
- * const coll = collection([1, 2, 3]);
- *
- * // Subscribe to changes
- * coll.subscribe(() => console.log('changed'));
- *
- * // Mutate the array via .value
- * coll.value.push(4); // triggers subscriber
- * console.log(coll.value); // [1, 2, 3, 4]
- *
- * // Direct property access also works (proxied)
- * coll.value[0] = 10; // triggers subscriber
- * ```
+ * @param {T[]} value
+ * @param {object} [options]
+ * @param {string} [options.name]
+ * @param {(a: T, b: T) => boolean} [options.compareFunction]
+ * @returns {Collection<T>}
  */
 function collection(value, options) {
     return new Collection(value, options);
 }
 
 /**
- * Creates a new reactive ShallowReactive instance that wraps an object.
- * The ShallowReactive provides reactivity for property assignments and deletions
- * on the top level of the object (shallow reactivity).
- *
- * This function returns the actual `ShallowReactive` instance, not just the proxy.
- * To access the reactive object, use the `.value` property.
- *
- * @template T
- * @param {T} value - The object to observe (must be a plain object or an instance).
- * @param {object} [options] - Configuration options.
- * @param {string} [options.name] - The name of the ShallowReactive (used for debugging).
- * @returns {ShallowReactive<T>} The ShallowReactive instance.
- *
- * @example
- * ```js
- * const reactive = shallowReactive({ a: 1, b: 2 });
- *
- * // Subscribe to changes
- * reactive.subscribe(() => console.log('changed'));
- *
- * // Modify the object via .value
- * reactive.value.a = 3; // triggers subscriber
- * console.log(reactive.value); // { a: 3, b: 2 }
- *
- * // Direct property access also works (proxied)
- * reactive.value.b = 5; // triggers subscriber
- * ```
+ * @template {{[key: string]: any}} T
+ * @param {T} value
+ * @param {object} [options]
+ * @param {string} [options.name]
+ * @returns {ShallowReactive<T>}
  */
 function shallowReactive(value, options) {
-    // @ts-ignore
     return new ShallowReactive(value, options);
 }
 
 /**
- * Enhances an object to make its properties observable using specified annotations.
+ * Enhances an object with reactive properties using explicit annotations.
+ *
+ * Each key maps to one of `"atom"`, `"computed"`, `"collection"`,
+ * `"shallowReactive"`, or `false` to leave the property untouched.
  *
  * @template T
- * @param {T} obj - The object to be observed.
- * @param {{[key:string]:"atom"|"computed"|"collection"|"shallowReactive"|false}} annotations -
- *        Annotations defining the type of reactivity for each property. Properties with a
- *        'false' annotation will be ignored.
- * @param {object} [options] - Options to configure the observable behavior.
- * @param {string} [options.name] - The name of the observable object. Defaults to an empty string. Using as prefix for reactive property names.
- * @returns {T} The input object with enhanced reactive properties.
- *
- * @example
- * ```js
- * class List {
- *     data = [];
- *
- *     constructor(data) {
- *         this.data = data;
- *         makeObservable(this, { data: "collection" });
- *     }
- *
- *     // not reactive property
- *     get length() {
- *         return this.data.length;
- *     }
- * }
- *
- * const list = new List([1, 2, 3]);
- *
- * let foo = 0;
- *
- * autorun((updates) => {
- *     console.log(`list.length = ${list.length}`);
- *     foo++;
- * });
- * // Outputs: list.length = 3
- *
- * console.log(foo);
- * // Outputs: 1
- *
- * list.data.push(4);
- * // Outputs: list.length = 4
- * console.log(foo);
- * // Outputs: 2
- *
- * list.data.pop();
- * // set last element to undefined. foo++
- * // Outputs: list.length = 4
- * // set new value of length/ foo++
- * // Outputs: list.length = 3
- *
- * console.log(foo);
- * // Outputs: 4
- * ```
- *
- * @example
- * ```js
- * let object = {
- *     value: 0,
- *     get double() {
- *         return this.value * 2;
- *     },
- *     increment() {
- *         this.value++;
- *     },
- * };
- *
- * makeObservable(object, { value: "atom", double: "computed" });
- *
- * let foo = 0;
- *
- * autorun(() => {
- *     foo++;
- *     object.double;
- * });
- * console.log(foo); // 1
- *
- * object.increment();
- * console.log(foo); // 2
- *
- * object.increment();
- * console.log(foo); // 3
- * ```
+ * @param {T} obj
+ * @param {{[key: string]: "atom" | "computed" | "collection" | "shallowReactive" | false}} annotations
+ * @param {object} [options]
+ * @param {string} [options.name]
+ * @returns {T}
  */
 function makeObservable(obj, annotations, options) {
-    /** @type {{[key:string]:import('../types.d.ts').ReactiveItem}} */
+    /** @type {{[key: string]: import('../reactives/ReactiveItem.js').ReactiveItem}} */
     const reactiveStore = {};
     const _options = Object.assign({ name: '' }, options);
 
@@ -813,7 +577,7 @@ function makeObservable(obj, annotations, options) {
         }
 
         if (
-            /** @type {Array<string|boolean>} */ ([
+            /** @type {Array<string | boolean>} */ ([
                 'atom',
                 'collection',
                 'shallowReactive',
@@ -853,14 +617,13 @@ function makeObservable(obj, annotations, options) {
             });
         }
     }
+
     // @ts-ignore
     const allDescriptors = getAllPropertyDescriptors(obj);
 
     for (const key in annotations) {
         if (annotations[key] === 'computed') {
-            // if class or plain object
             const descriptor = allDescriptors[key];
-            //Object.getOwnPropertyDescriptor(obj.prototype || obj, key) || obj[key];  //
 
             if (descriptor && typeof descriptor.get === 'function') {
                 const f = descriptor.get;
@@ -886,42 +649,14 @@ function makeObservable(obj, annotations, options) {
 }
 
 /**
- * Extends an object with new properties and makes them observable.
- *
  * @template T
- * @template {{[key:string]:any}} R
- * @param {T} target - The object to be extended and observed.
- * @param {R} properties - The properties to add to the target object.
- * @param {{[key:string]:"atom"|"computed"|"collection"|"shallowReactive"|false}} [overrides] - Optional overrides to define the type of the reactive property. If an override is false, the key will be ignored.
- * @param {object} [options] - Options to configure the observable behavior.
- * @param {string} [options.name] - The name of the observable object. Defaults to an empty string. Using as prefix for reactive property names.
- * @returns {T & R} The extended object with observable properties.
- * @example
- * ```js
- * let object = {
- *     value: 0,
- *     get double() {
- *         return this.value * 2;
- *     },
- *     increment() {
- *         this.value++;
- *     },
- * };
- *
- * makeObservable(object, { value: "atom", double: "computed" });
- * extendObservable(object, {a: 1, b: 2});
- *
- * let foo = 0;
- *
- * autorun(() => {
- *     foo++;
- *     object.a;
- * });
- *
- * console.log(foo); // 1
- * object.a++;
- * console.log(foo); // 2
- * ```
+ * @template {{[key: string]: any}} R
+ * @param {T} target
+ * @param {R} properties
+ * @param {{[key: string]: "atom" | "computed" | "collection" | "shallowReactive" | false}} [overrides]
+ * @param {object} [options]
+ * @param {string} [options.name]
+ * @returns {T & R}
  */
 function extendObservable(target, properties, overrides, options) {
     Object.assign(/** @type {T & R} */ (/** @type {unknown} */ (target)), properties);
@@ -930,42 +665,19 @@ function extendObservable(target, properties, overrides, options) {
 }
 
 /**
- * Makes existing object properties observable. Same as {@link makeObservable} but infers all the properties.
+ * Same as `makeObservable` but infers annotations automatically.
+ *
+ * Plain objects become `shallowReactive`, arrays become `collection`,
+ * getters become `computed`, and everything else becomes `atom`. Pass
+ * `overrides` to correct the inference or disable a property with `false`.
+ *
  * @template T
- * @param {T} obj - The object to observe.
- * @param {{[key:string]:"atom"|"computed"|"collection"|"shallowReactive"|false}} [overrides] - The overrides to use to define type of the reactive property. If an override is false, the key will be ignored.
- * @param {object} [options] - Options to configure the observable behavior.
- * @param {string} [options.name] - The name of the observable object. Defaults to an empty string. Using as prefix for reactive property names.
- * @param {Set<string>} [filter] - A set of property keys to selectively apply annotations.
+ * @param {T} obj
+ * @param {{[key: string]: "atom" | "computed" | "collection" | "shallowReactive" | false}} [overrides]
+ * @param {object} [options]
+ * @param {string} [options.name]
+ * @param {Set<string>} [filter]
  * @returns {T}
- * @example
- * ```js
- * let object = {
- *     value: 0,
- *     get double() {
- *         return this.value * 2;
- *     },
- *     increment() {
- *         this.value++;
- *     },
- * };
- *
- * makeAutoObservable(object);
- *
- * let foo = 0;
- *
- * autorun(() => {
- *     foo++;
- *     object.double;
- * });
- * console.log(foo); // 1
- *
- * object.increment();
- * console.log(foo); // 2
- *
- * object.increment();
- * console.log(foo); // 3
- * ```
  */
 function makeAutoObservable(obj, overrides = {}, options, filter) {
     const _options = Object.assign({ name: '' }, options);
@@ -975,7 +687,6 @@ function makeAutoObservable(obj, overrides = {}, options, filter) {
 
     /** @type {Set<string>} */
     const atomKeys = new Set();
-
     /** @type {Set<string>} */
     const computedKeys = new Set();
 
@@ -1000,7 +711,7 @@ function makeAutoObservable(obj, overrides = {}, options, filter) {
         }
     });
 
-    /** @type {{[key:string]:"atom"|"computed"|"collection"|"shallowReactive"|false}} */
+    /** @type {{[key: string]: "atom" | "computed" | "collection" | "shallowReactive" | false}} */
     let annotations = {};
 
     let keys = [...atomKeys];
@@ -1054,6 +765,7 @@ export {
     shallowReactive,
     autorun,
     batch,
+    action,
     reaction,
     when,
     waitUntil,

@@ -70,7 +70,7 @@ a.value = 3;
 
 - [#currentValue](Computed.md##currentvalue)
 - [#fn](Computed.md##fn)
-- [\_\_cachedDependentsVersionString](Computed.md#__cacheddependentsversionstring)
+- [\_\_cachedDependentsVersionString](Computed.md##cachedDependentsVersionString)
 - [engine](Computed.md#engine)
 - [name](Computed.md#name)
 - [options](Computed.md#options)

@@ -1,47 +1,74 @@
 // @ts-check
 
 import { EventEmitterLite } from '@supercat1337/event-emitter';
-import { sortReactiveItems } from '../helpers/tools.js';
 import { modeController } from './modeController.js';
 
+/**
+ * Records reactive items read during a tracked execution (inside `Computed`,
+ * `autorun`, or `reaction`).
+ *
+ * Scopes are nested: each `enable()` pushes a fresh store and each
+ * `disable()` restores the previous one. This makes nested computed
+ * construction and re-entrant tracking safe.
+ */
 class Tracker {
+    /** @type {boolean} */
     #isActive = false;
-    /** @type {Set<import('../types.d.ts').ReactiveItem>} */
+
+    /** @type {Set<import('../reactives/ReactiveItem.js').ReactiveItem>} */
     #store = new Set();
+
+    /** @type {Array<{ store: Set<import('../reactives/ReactiveItem.js').ReactiveItem>, ctx: object, isActive: boolean }>} */
+    #stack = [];
+
+    /** @type {EventEmitterLite<"add">} */
     #eventEmitter = new EventEmitterLite();
+
+    /** @type {import('../services/modeController.js').ModeControllerService | null} */
+    #modeController;
 
     /** @type {object} */
     ctx = {};
 
     /**
-     * Returns the current contents of the tracker's store, which is a set of all reactive items that have been
-     * accessed since the tracker was last turned on. This is useful for debugging and testing purposes.
-     * @returns {Set<import('../types.d.ts').ReactiveItem>} The current contents of the tracker's store.
+     * @param {import('../services/modeController.js').ModeControllerService} [modeController]
+     *        Used to honour `untrackMode`. Optional so that the tracker can be
+     *        constructed in isolation for tests.
+     */
+    constructor(modeController) {
+        this.#modeController = modeController ?? null;
+    }
+
+    /**
+     * Returns a copy of the currently tracked items.
+     * @returns {Set<import('../reactives/ReactiveItem.js').ReactiveItem>}
      */
     get data() {
-        return new Set([...this.#store]);
+        return new Set(this.#store);
     }
 
     /**
-     * Returns a sorted array of all reactive items in the tracker's store. The items are sorted by their internal id,
-     * ensuring consistent processing order when notified of changes.
-     * @returns {Array<import('../types.d.ts').ReactiveItem>} A sorted array of reactive items.
+     * Returns the currently tracked items sorted by engine id.
+     * @returns {Array<import('../reactives/ReactiveItem.js').ReactiveItem>}
      */
     getAsSortedArray() {
-        return Array.from(this.#store).sort(sortReactiveItems);
+        return Array.from(this.#store).sort((a, b) => {
+            const idA = a.engine.id;
+            const idB = b.engine.id;
+            return idA < idB ? -1 : idA > idB ? 1 : 0;
+        });
     }
 
     /**
-     * Adds a reactive item to the tracker's store if the tracker is turned on. If the tracker is not turned on, this
-     * method does nothing.
-     * @param {import('../types.d.ts').ReactiveItem} item - The reactive item to add to the tracker's store.
-     * @param {string} [_key=""]
+     * Records a reactive item if tracking is active and untracked reads are
+     * not currently suppressed.
+     * @param {import('../reactives/ReactiveItem.js').ReactiveItem} item
+     * @param {string} [_key]
      */
     add(item, _key = '') {
-        if (modeController.untrackMode) {
+        if (this.#modeController?.untrackMode) {
             return;
         }
-
         if (this.#isActive) {
             this.#store.add(item);
             this.#eventEmitter.emit('add', item);
@@ -49,83 +76,96 @@ class Tracker {
     }
 
     /**
-     *
-     * @param {(reactiveItem:import('../types.d.ts').ReactiveItem)=>void} callback
-     * @returns {()=>void}
+     * Registers a listener called for every tracked item.
+     * @param {(item: import('../reactives/ReactiveItem.js').ReactiveItem) => void} callback
+     * @returns {() => void}
      */
     onAdd(callback) {
         return this.#eventEmitter.on('add', callback);
     }
 
     /**
-     * Returns whether the tracker is currently turned on or not.
-     * @returns {boolean} true if the tracker is on, false if it is off.
+     * Returns true while tracking is active.
+     * @returns {boolean}
      */
     isActive() {
         return this.#isActive;
     }
 
     /**
-     * Turns the tracker on and clears its store. If the tracker is already turned on, an error is thrown.
-     * @param {object} [ctx={}] - The context to use when the tracker is turned on.
-     * are tracked. If filter is a function, it is called with each reactive item as its argument, and if it returns false, the
-     * reactive item is not tracked.
+     * Pushes a new tracking scope.
+     * @param {object} [ctx]
      */
     enable(ctx = {}) {
-        if (this.#isActive) {
-            throw new Error('The tracker is already turned on');
-        }
-
+        this.#stack.push({
+            store: this.#store,
+            ctx: this.ctx,
+            isActive: this.#isActive,
+        });
+        this.#store = new Set();
         this.ctx = ctx;
         this.#isActive = true;
-        this.#store.clear();
     }
 
     /**
-     * Disables the tracker. When the tracker is disabled, it will not watch any set operations and will not report
-     * anything to any registered listeners. The tracker is off by default.
+     * Pops the current tracking scope and restores the previous one.
      */
     disable() {
-        this.#isActive = false;
+        const previous = this.#stack.pop();
+        if (previous) {
+            this.#store = previous.store;
+            this.ctx = previous.ctx;
+            this.#isActive = previous.isActive;
+        } else {
+            this.#store = new Set();
+            this.ctx = {};
+            this.#isActive = false;
+        }
     }
 }
 
 /**
- * The dependencyTracker is a utility instance that monitors reactive items that are used when a computed item is created. It is used
- * to track the dependencies of a computed item, so that it can be recalculated when any of the dependencies change.
+ * Process-wide singleton, bound to the default mode controller so that
+ * `untrack()` behaves identically for direct imports and the default context.
  */
-export const dependencyTracker = new Tracker();
+const dependencyTracker = new Tracker(modeController);
 
 /**
- * Executes the specified function and tracks reactive items.
- * Returns a sorted array of used reactive items.
- * @param {Function} fn - The function to execute and track.
- * @param {...any} args - Arguments to pass to the function.
- * @returns {Array<import('../types.d.ts').ReactiveItem>} Sorted array of reactive items accessed.
+ * Runs `fn` with tracking enabled and returns the tracked items as a set.
+ * @param {Function} fn
+ * @param {...any} args
+ * @returns {Set<import('../reactives/ReactiveItem.js').ReactiveItem>}
  */
-export function getArrayOfUsedReactiveItems(fn, ...args) {
+function getSetOfUsedReactiveItems(fn, ...args) {
     dependencyTracker.enable();
+    /** @type {Set<import('../reactives/ReactiveItem.js').ReactiveItem>} */
+    let result;
     try {
         fn(...args);
+        result = dependencyTracker.data;
     } finally {
         dependencyTracker.disable();
     }
-    return dependencyTracker.getAsSortedArray();
+    return result;
 }
 
 /**
- * Executes the specified function and tracks reactive items.
- * Returns a Set of used reactive items.
- * @param {Function} fn - The function to execute and track.
- * @param {...any} args - Arguments to pass to the function.
- * @returns {Set<import('../types.d.ts').ReactiveItem>} Set of reactive items accessed.
+ * Runs `fn` with tracking enabled and returns the tracked items as a sorted array.
+ * @param {Function} fn
+ * @param {...any} args
+ * @returns {Array<import('../reactives/ReactiveItem.js').ReactiveItem>}
  */
-export function getSetOfUsedReactiveItems(fn, ...args) {
+function getArrayOfUsedReactiveItems(fn, ...args) {
     dependencyTracker.enable();
+    /** @type {Array<import('../reactives/ReactiveItem.js').ReactiveItem>} */
+    let result;
     try {
         fn(...args);
+        result = dependencyTracker.getAsSortedArray();
     } finally {
         dependencyTracker.disable();
     }
-    return dependencyTracker.data;
+    return result;
 }
+
+export { Tracker, dependencyTracker, getSetOfUsedReactiveItems, getArrayOfUsedReactiveItems };

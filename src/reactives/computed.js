@@ -2,82 +2,53 @@
 
 import { COMPUTED } from '../core/Engine.js';
 import { clone, getError } from '../helpers/tools.js';
-import { dependencyTracker } from '../services/dependencyTracker.js';
-import { modeController } from '../services/modeController.js';
 import { ReactiveItem } from './ReactiveItem.js';
 
 /**
- * Computed is a reactive item that holds a value that is computed from other reactive values.
- * It is the base unit of reactive state.
+ * Computed is a reactive item whose value is derived from other reactive
+ * sources.
+ *
+ * The function passed to the constructor runs once at construction time to
+ * establish dependencies and compute the initial value. It runs again
+ * whenever a dependency changes and the recomputed value differs from the
+ * cached one. Because equality is checked before notifying subscribers, a
+ * computed whose dependencies change but whose output stays the same does
+ * not cause any downstream work.
+ *
+ * `Computed` is derived state and is never persisted — `serialize()`
+ * returns `null`, and the value is recalculated from its dependencies on
+ * hydration.
+ *
  * @augments ReactiveItem
  * @template {unknown} T
- * @example
- * ```js
- * const a = new Atom(0); // same as const a = atom(0);
- * const b = new Atom(0);
- *
- * const c = new Computed(() => a.value + b.value);
- *
- * c.subscribe(() => {
- *     console.log("c", c.value);
- * });
- *
- * a.subscribe(() => {
- *     console.log("a", a.value);
- * });
- *
- * b.subscribe(() => {
- *     console.log("b", b.value);
- * });
- *
- * a.value = 1;
- * // Output:
- * //a 1
- * //c 1
- *
- * a.value = 2;
- * // Output:
- * //a 2
- * //c 2
- * b.value = 2;
- * // Output:
- * //b 2
- * //c 4
- *
- * a.value = 3;
- * // Output:
- * //a 3
- * //c 5
- *
- * a.value = 3;
- * // Output: nothing
- * ```
+ * @public
  */
 class Computed extends ReactiveItem {
     /** @type {T} */
     #currentValue;
 
-    /** @type {function():T} */
+    /** @type {() => T} */
     #fn;
 
     /** @type {string} */
-    __cachedDependentsVersionString = '';
+    #cachedDependentsVersionString = '';
 
+    /**
+     * Read-only view of the options passed to the constructor. Currently
+     * exposes `smartRecompute`.
+     */
     options = {
         smartRecompute: false,
     };
 
     /**
-     * Initializes an Atom instance with a given value.
-     * @param {function():T} fn - function that returns the value of the Computed
-     * @param {object} [options] - Options
-     * @param {string} [options.name] - The name of the Computed instance.
-     * @param {((a:T, b:T)=>boolean)|null} [options.compareFunction] - A function that compares two values for equality.
-     * @param {boolean} [options.smartRecompute] - When true, the computed value will be
-     *        recalculated only when the version string of its dependencies changes,
-     *        rather than on every dependency notification. This avoids unnecessary
-     *        recalculations when dependencies change but their final values remain
-     *        the same (e.g., toggling back and forth). Defaults to false.
+     * Creates a new Computed.
+     *
+     * @param {() => T} fn - The derivation function. Must read at least one reactive value.
+     * @param {object} [options]
+     * @param {string} [options.name] - Debug name used in error messages.
+     * @param {((a: T, b: T) => boolean) | null} [options.compareFunction] - Custom equality function. Defaults to shallow comparison.
+     * @param {boolean} [options.smartRecompute] - When `true`, the value is recalculated only if the version of a dependency actually changed, avoiding recomputation when dependencies toggled back to their previous values within a batch.
      */
     constructor(
         fn,
@@ -100,12 +71,11 @@ class Computed extends ReactiveItem {
         this.#currentValue = this.#collectDependenciesAndInitValue();
 
         if (this.options.smartRecompute) {
-            this.__cachedDependentsVersionString = this.#getDependenciesVersionString();
+            this.#cachedDependentsVersionString = this.#getDependenciesVersionString();
         }
     }
 
     /**
-     * Returns a string representation of the dependencies of the Computed value.
      * @returns {string}
      */
     #getDependenciesVersionString() {
@@ -114,24 +84,33 @@ class Computed extends ReactiveItem {
         const engine = this.engine;
 
         engine.dependencies.forEach(dependency => {
-            // If a dependency is stale (shouldRecalc = true), we must recalculate it
-            // to get its most recent version. This is necessary for smartRecompute
-            // to correctly detect changes in the dependency graph.
             if (dependency.engine.shouldRecalc) {
-                dependency.getValue(); // side effect: forces recomputation
+                dependency.getValue();
             }
-
             result.push(dependency.engine.id.toString() + ':' + dependency.engine.version);
         });
 
         return result.join(';');
     }
 
+    /**
+     * @returns {T}
+     */
     #collectDependenciesAndInitValue() {
-        dependencyTracker.enable();
+        const engine = this.engine;
+        const tracker = engine.context.dependencyTracker;
+        const modeController = engine.context.modeController;
+
+        tracker.enable();
         modeController.isComputing = true;
+
         /** @type {T} */
-        let value;
+        let value = /** @type {any} */ (undefined);
+        /** @type {Set<ReactiveItem>} */
+        let newDeps;
+        /** @type {Error | null} */
+        let thrownError = null;
+
         try {
             value = this.#fn();
             if (value instanceof ReactiveItem) {
@@ -142,29 +121,35 @@ class Computed extends ReactiveItem {
                 );
             }
         } catch (e) {
-            this.engine.setError(getError(e));
+            thrownError = getError(e);
+        } finally {
+            newDeps = tracker.data;
+            tracker.disable();
+            modeController.isComputing = false;
         }
 
-        modeController.isComputing = false;
-        dependencyTracker.disable();
-
-        if (this.engine.error) {
-            throw this.engine.error;
+        if (thrownError) {
+            engine.setError(thrownError);
+            throw engine.error;
         }
 
-        if (dependencyTracker.data.size === 0) {
+        if (newDeps.size === 0) {
             throw new Error(`Computed${this.name ? ` (${this.name})` : ''}: No dependencies`);
         }
 
-        this.engine.addDependencies(dependencyTracker.data);
-        // @ts-ignore
-        return value;
+        engine.addDependencies(newDeps);
+
+        return /** @type {T} */ (value);
     }
 
     /**
-     * Checks whether the Computed value needs to be recalculated. A recalculation is needed if the engine's shouldRecalc
-     * property is true, if the engine has an error, or if the version string of the dependencies has changed.
-     * @returns {boolean} true if the Computed value needs to be recalculated, false if it does not.
+     * Returns `true` if the cached value is out of date and a read would
+     * trigger recalculation.
+     *
+     * A computed is stale if one of its dependencies notified a change, or
+     * if its last evaluation threw an error.
+     *
+     * @returns {boolean}
      */
     isStale() {
         const engine = this.engine;
@@ -172,22 +157,22 @@ class Computed extends ReactiveItem {
         if (engine.error !== null) {
             return true;
         }
-
         if (engine.shouldRecalc) {
             return true;
         }
-
         return false;
     }
 
+    /**
+     * @returns {boolean}
+     */
     #areDependenciesStale() {
         const engine = this.engine;
-
         const dependentsVersionString = this.#getDependenciesVersionString();
-        if (dependentsVersionString !== this.__cachedDependentsVersionString) {
-            this.__cachedDependentsVersionString = dependentsVersionString;
-            engine.shouldRecalc = true;
 
+        if (dependentsVersionString !== this.#cachedDependentsVersionString) {
+            this.#cachedDependentsVersionString = dependentsVersionString;
+            engine.shouldRecalc = true;
             return true;
         }
 
@@ -195,20 +180,29 @@ class Computed extends ReactiveItem {
     }
 
     /**
-     * @param {{untracked?: boolean}} [options] - Optional options. If `untracked` is `false`, the Computed value will be added to the dependencyTracker.
-     * @returns {T} The current value of the Computed value.
+     * Returns the computed value, recalculating first if any dependency
+     * changed.
+     *
+     * When `options.untracked` is `false` (the default), registers this
+     * computed as a dependency of the enclosing tracked scope. Pass
+     * `{ untracked: true }` to read without creating a dependency.
+     *
+     * Throws if the derivation function throws, or if the item has been
+     * destroyed.
+     *
+     * @param {{ untracked?: boolean }} [options]
+     * @returns {T}
      */
     getValue(options) {
         super.getValue(options);
 
         const engine = this.engine;
 
-        // If there's an error and dependencies haven't changed, rethrow the same error without recalculating
         if (engine.error !== null && !engine.shouldRecalc) {
             throw engine.error;
         }
 
-        if (modeController.isComputing) {
+        if (engine.context.modeController.isComputing) {
             if (this.isStale()) {
                 throw new Error(
                     `Computed${this.name ? ` (${this.name})` : ''}: Dependencies cannot be stale`,
@@ -233,122 +227,114 @@ class Computed extends ReactiveItem {
     }
 
     /**
-     * Returns the current value of the Computed value.
-     * @returns {T} The current value of the Computed value.
+     * The computed value.
+     *
+     * Reading this property recalculates if a dependency changed and
+     * registers a dependency in the enclosing tracked scope.
+     *
+     * @returns {T}
      */
     get value() {
         return this.getValue();
     }
 
     /**
-     * Returns the current cached value of the computed without triggering a recalculation
-     * and without tracking dependencies.
+     * Returns the last cached value without triggering recalculation.
      *
-     * Unlike the `value` getter, this method does not check if dependencies have changed
-     * and does not recompute the value if it's stale. It simply returns the last
-     * computed value. This is useful for debugging or for accessing the value
-     * without causing side effects (e.g., inside an untracked context).
+     * If the computed is stale, this returns the previous value — not a
+     * fresh one. Useful for debugging and for reading without causing side
+     * effects, but the value may be out of date.
      *
-     * If the computed has an error, this method will still return the last cached
-     * value (which may be undefined or a previous value) without rethrowing the error.
-     *
-     * @override
-     * @returns {T} The cached value.
-     *
-     * @example
-     * ```js
-     * const a = atom(1);
-     * const b = computed(() => a.value * 2);
-     *
-     * console.log(b.peekValue()); // 2 (without tracking dependencies)
-     * a.value = 2;
-     * console.log(b.peekValue()); // still 2 (stale, not recomputed)
-     * console.log(b.value);       // 4 (recomputed now)
-     * ```
+     * @returns {T}
      */
     peekValue() {
         return this.#currentValue;
     }
 
     /**
-     * Returns the current value of the Computed value without tracking it for dependency management.
-     * This is useful when you want to access the value without affecting its reactive state.
-     * @returns {T} The current value of the Computed value.
-     * @example
-     * ```js
-     * const a = atom(0);
-     * const b = atom(0);
-     * const c = computed(() => a.value + 1);
-     * const d = computed(() => c.valueUntracked + b.value);
+     * Returns the computed value without registering a dependency.
      *
-     * d.subscribe(() => {
-     *     console.log(`d = ${d.value}`);
-     * });
+     * Shorthand for `getValue({ untracked: true })`. The value is still
+     * recalculated if stale — only dependency registration is skipped.
      *
-     * console.log(`c = ${c.value}`);
-     * // Outputs: c = 1
-     * a.value++;
-     * // a = 1
-     * // Outputs: nothing
-     * console.log(`c = ${c.value}`);
-     * // Outputs: c = 2
-     *
-     * b.value++;
-     * // Outputs: d = 3
-     * ```
+     * @returns {T}
      */
     get valueUntracked() {
         return this.getValue({ untracked: true });
     }
 
+    /**
+     * @returns {T}
+     */
     #calc() {
         const engine = this.engine;
+        const tracker = engine.context.dependencyTracker;
 
         engine.shouldRecalc = false;
         engine.clearError();
 
-        // Collect new dependencies if dynamic mode is enabled
+        tracker.enable();
+
+        /** @type {T} */
+        let value = /** @type {any} */ (undefined);
         /** @type {Set<ReactiveItem>} */
-        const newDeps = new Set();
-        const unsubscribe = dependencyTracker.onAdd(item => {
-            newDeps.add(item);
-        });
+        let newDeps;
+        /** @type {Error | null} */
+        let thrownError = null;
 
-        let value;
-
-        //console.log("calc", this.name);
         try {
             value = this.#fn();
         } catch (e) {
-            const error = getError(e);
+            thrownError = getError(e);
+        } finally {
+            newDeps = tracker.data;
+            tracker.disable();
+        }
+
+        if (thrownError) {
             engine.setError(
-                new Error(`Computed${this.name ? ` (${this.name})` : ''}: ` + error.message, {
+                new Error(`Computed${this.name ? ` (${this.name})` : ''}: ` + thrownError.message, {
                     cause: this,
                 })
             );
             throw engine.error;
-        } finally {
-            unsubscribe();
         }
 
+        if (newDeps.size > 0) {
+            engine.updateDependencies(newDeps);
+        }
+
+        // Compare against the CURRENT cached value, not a value captured
+        // before #fn() ran. If #calc was re-entered during #fn() (nested
+        // computed recalculation), #currentValue is already up to date and
+        // we must not fire subscribers a second time.
         if (this.equals(this.#currentValue, value)) {
-            // Value didn't actually change – remove any pending update
-            this.engine.clearUpdates();
+            engine.clearUpdates();
             return this.#currentValue;
         }
 
         const oldValue = this.#currentValue;
-        this.#currentValue = clone(value);
-
+        this.#currentValue = clone(/** @type {any} */ (value));
         const newValue = this.#currentValue;
-
-        //console.log(`[Computed] ${this.name} calc: old=${this.#currentValue}, new=${value}`);
 
         if (engine.addUpdate('', 'set', oldValue, newValue)) {
             engine.valueChangedCallback();
         }
 
+        engine.context.emitPlugin('onComputedRecalc', this, oldValue, newValue);
+
         return this.#currentValue;
+    }
+
+    /**
+     * Always returns `null`. Computed items are derived state and are never
+     * persisted — they are recalculated from their dependencies on
+     * hydration.
+     *
+     * @returns {null}
+     */
+    serialize() {
+        return null;
     }
 }
 

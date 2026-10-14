@@ -7,17 +7,17 @@ import { sortReactiveItems } from '../helpers/tools.js';
  * Handles adding/removing dependencies and dependents, and propagating messages through the graph.
  */
 export class DependencyGraph {
-    /** @type {Set<import('../types.d.ts').ReactiveItem>} */
+    /** @type {Set<import('../reactives/ReactiveItem.js').ReactiveItem>} */
     #dependencies;
-    /** @type {Set<import('../types.d.ts').ReactiveItem>} */
+    /** @type {Set<import('../reactives/ReactiveItem.js').ReactiveItem>} */
     #dependents;
-    /** @type {import('../types.d.ts').ReactiveItem} */
+    /** @type {import('../reactives/ReactiveItem.js').ReactiveItem} */
     #reactiveItem;
 
     /**
-     * @param {Set<import('../types.d.ts').ReactiveItem>} dependencies - The engine's dependencies set.
-     * @param {Set<import('../types.d.ts').ReactiveItem>} dependents - The engine's dependents set.
-     * @param {import('../types.d.ts').ReactiveItem} reactiveItem - The owning reactive item.
+     * @param {Set<import('../reactives/ReactiveItem.js').ReactiveItem>} dependencies - The engine's dependencies set.
+     * @param {Set<import('../reactives/ReactiveItem.js').ReactiveItem>} dependents - The engine's dependents set.
+     * @param {import('../reactives/ReactiveItem.js').ReactiveItem} reactiveItem - The owning reactive item.
      */
     constructor(dependencies, dependents, reactiveItem) {
         this.#dependencies = dependencies;
@@ -27,7 +27,7 @@ export class DependencyGraph {
 
     /**
      * Adds a single dependency.
-     * @param {import('../types.d.ts').ReactiveItem} dependency
+     * @param {import('../reactives/ReactiveItem.js').ReactiveItem} dependency
      */
     addDependency(dependency) {
         if (!this.#dependencies.has(dependency)) {
@@ -37,7 +37,7 @@ export class DependencyGraph {
 
     /**
      * Adds multiple dependencies, sorted by id, and registers this reactive item as a dependent on each.
-     * @param {Set<import('../types.d.ts').ReactiveItem>} deps - Set of dependencies to add.
+     * @param {Set<import('../reactives/ReactiveItem.js').ReactiveItem>} deps - Set of dependencies to add.
      */
     addDependencies(deps) {
         const array = [];
@@ -55,7 +55,7 @@ export class DependencyGraph {
 
     /**
      * Removes a dependent from the dependents set.
-     * @param {import('../types.d.ts').ReactiveItem} dependent
+     * @param {import('../reactives/ReactiveItem.js').ReactiveItem} dependent
      */
     removeDependent(dependent) {
         this.#dependents.delete(dependent);
@@ -63,7 +63,7 @@ export class DependencyGraph {
 
     /**
      * Adds a dependent to the dependents set.
-     * @param {import('../types.d.ts').ReactiveItem} dependent
+     * @param {import('../reactives/ReactiveItem.js').ReactiveItem} dependent
      * @returns {boolean} True if the dependent was added (i.e., not already present).
      */
     addDependent(dependent) {
@@ -76,7 +76,7 @@ export class DependencyGraph {
 
     /**
      * Returns all dependents of this reactive item (direct and indirect).
-     * @returns {Set<import('../types.d.ts').ReactiveItem>}
+     * @returns {Set<import('../reactives/ReactiveItem.js').ReactiveItem>}
      */
     getDeepDependents() {
         const result = new Set();
@@ -98,7 +98,7 @@ export class DependencyGraph {
 
     /**
      * Returns sorted array of deep dependents.
-     * @returns {Array<import('../types.d.ts').ReactiveItem>}
+     * @returns {Array<import('../reactives/ReactiveItem.js').ReactiveItem>}
      */
     getDeepDependentsArray() {
         const array = Array.from(this.getDeepDependents());
@@ -109,7 +109,7 @@ export class DependencyGraph {
     /**
      * Notifies all dependents of a message.
      * @param {number} message - The message code (EngineMessages).
-     * @param {{ sender: import('../types.d.ts').ReactiveItem, recipients: Set<import('../types.d.ts').ReactiveItem> }} ctx - Context containing sender and recipient set.
+     * @param {{ sender: import('../reactives/ReactiveItem.js').ReactiveItem, recipients: Set<import('../reactives/ReactiveItem.js').ReactiveItem> }} ctx - Context containing sender and recipient set.
      */
     notifyDependents(message, ctx) {
         for (const dependent of this.#dependents) {
@@ -121,7 +121,7 @@ export class DependencyGraph {
     /**
      * Notifies all dependencies of a message.
      * @param {number} message - The message code.
-     * @param {{ sender: import('../types.d.ts').ReactiveItem, recipients: Set<import('../types.d.ts').ReactiveItem> }} ctx
+     * @param {{ sender: import('../reactives/ReactiveItem.js').ReactiveItem, recipients: Set<import('../reactives/ReactiveItem.js').ReactiveItem> }} ctx
      */
     notifyDependencies(message, ctx) {
         for (const dependency of this.#dependencies) {
@@ -132,7 +132,7 @@ export class DependencyGraph {
 
     /**
      * Updates the dependency set to a new set.
-     * @param {Set<import('../types.d.ts').ReactiveItem>} newDeps - New set of dependencies.
+     * @param {Set<import('../reactives/ReactiveItem.js').ReactiveItem>} newDeps - New set of dependencies.
      */
     updateDependencies(newDeps) {
         // Remove old dependencies no longer needed

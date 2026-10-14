@@ -2,64 +2,20 @@
 
 import { SHALLOW_REACTIVE } from '../core/Engine.js';
 import { isPlainObject } from '../helpers/tools.js';
-import { modeController } from '../services/modeController.js';
 import { ReactiveItem } from './ReactiveItem.js';
 
 /**
- * ShallowReactive is a reactive item that holds a shallow object. It is the base unit of reactive state.
- * It is a shallow reactive object, meaning that it only tracks changes to the properties of the object itself, not its nested properties.
+ * ShallowReactive tracks assignments and deletions on the top level of an
+ * object.
+ *
+ * Nested objects are stored by reference and are not made reactive —
+ * mutating a property of a nested object does not trigger an update. For
+ * deep reactivity, either use immutable updates on the top level or split
+ * the state across multiple reactive items.
+ *
  * @augments ReactiveItem
- * @template {{[key:string]:any}} T
- *  * @example
- * ```js
- * const b = new ShallowReactive({ foo: 1 });
- *
- * let bar = 0;
- *
- * b.subscribe(() => {
- *     bar += 1;
- * });
- *
- * const props = b.value;
- * props.foo = 2;
- *
- * console.log(bar);
- * // Outputs: 1
- * ```
- *
- * @example
- * ```js
- * class A {
- *     foo = 1;
- *
- *     inc() {
- *         this.foo++;
- *     }
- * }
- *
- * let bar = 0;
- * const b = new ShallowReactive(new A(), { name: "b" });
- *
- * b.subscribe(() => {
- *     bar++;
- * });
- *
- * console.log(b.value.foo);
- * // Outputs: 1
- *
- * b.value.foo = 2;
- * console.log(b.value.foo);
- * // Outputs: 2
- *
- * console.log(bar);
- * // Outputs: 1
- *
- * b.value.inc();
- * console.log(b.value.foo);
- * // Outputs: 3
- * console.log(bar);
- * // Outputs: 2
- * ```
+ * @template {{[key: string]: any}} T
+ * @public
  */
 class ShallowReactive extends ReactiveItem {
     /** @type {T} */
@@ -72,17 +28,13 @@ class ShallowReactive extends ReactiveItem {
     #handler;
 
     /**
-     * Initializes a ShallowReactive instance with a given value.
-     * @param {T} value - The initial value of the ShallowReactive.
-     * @param {object} [options] - Options.
-     * @param {string} [options.name] - The name of the ShallowReactive.
+     * Creates a new ShallowReactive wrapping the given object.
+     *
+     * @param {T} value - The object to wrap. Must be a plain object.
+     * @param {object} [options]
+     * @param {string} [options.name] - Debug name used in error messages.
      */
-    constructor(
-        value,
-        options = {
-            name: '',
-        }
-    ) {
+    constructor(value, options = { name: '' }) {
         super(SHALLOW_REACTIVE);
 
         this.name = options.name || '';
@@ -94,96 +46,73 @@ class ShallowReactive extends ReactiveItem {
 
         this.#handler = this.#initHandler();
         this.#target = value;
-
         this.#proxy = new Proxy(this.#target, this.#handler);
     }
 
+    /**
+     * @returns {ProxyHandler<T>}
+     */
     #initHandler() {
         const that = this;
 
-        /** @type {ProxyHandler<T>} */
         return {
-            /**
-             * Sets a property on the ShallowReactive. If the property already exists, its value is updated. If not, a new property is added.
-             * @param {T} target - The ShallowReactive to set the property on.
-             * @param {string} key - The key of the property to set.
-             * @param {any} value - The value to set for the property.
-             * @returns {boolean} true if the property was successfully set.
-             */
             set: (target, key, value) => {
                 if (typeof key === 'symbol') {
-                    // @ts-ignore
-                    target[key] = value;
+                    /** @type {any} */ (target)[key] = value;
                     return true;
                 }
 
                 const engine = that.engine;
                 engine.prepareSetValue();
 
-                const oldValue = target[key];
-
+                const oldValue = /** @type {any} */ (target)[key];
                 if (that.equals(oldValue, value)) {
                     return true;
                 }
 
-                // @ts-ignore
-                target[key] = value;
+                /** @type {any} */ (target)[key] = value;
 
                 if (engine.addUpdate(key, 'set', oldValue, value)) {
                     engine.valueChangedCallback();
                 }
-
                 return true;
             },
-
-            /**
-             * Gets a property from the ShallowReactive. If the property is not found, undefined is returned.
-             * @param {T} target - The ShallowReactive to get the property from.
-             * @param {string} key - The key of the property to get.
-             * @returns {any} The value of the property, or undefined if it was not found.
-             */
             get: (target, key) => {
                 that.getValue();
-                return target[key];
+                return /** @type {any} */ (target)[key];
             },
-
-            /**
-             * Deletes a property from the ShallowReactive. If the property is not found, an error is thrown.
-             * @param {T} target - The ShallowReactive to delete the property from.
-             * @param {string} key - The key of the property to delete.
-             * @returns {boolean} true if the property was deleted, false if it was not.
-             */
             deleteProperty: (target, key) => {
                 if (typeof key === 'symbol') {
-                    delete target[key];
+                    delete (/** @type {any} */ (target)[key]);
                     return true;
                 }
-                
-                if (modeController.subscribersMode) {
+
+                if (that.engine.context.modeController.subscribersMode) {
                     throw new Error(
                         `ShallowReactive${
-                            this.name ? ` (${this.name})` : ''
+                            that.name ? ` (${that.name})` : ''
                         }: Cannot delete property while subscribers are running`
                     );
                 }
 
                 const engine = that.engine;
-
-                if (engine.addUpdate(key, 'delete', target[key], undefined)) {
-                    delete target[key];
+                if (engine.addUpdate(key, 'delete', /** @type {any} */ (target)[key], undefined)) {
+                    delete (/** @type {any} */ (target)[key]);
                     engine.valueChangedCallback();
                 }
-
                 return true;
             },
         };
     }
 
     /**
-     * Retrieves the proxied value of the ShallowReactive. If the engine is destroyed, an error is thrown.
-     * Tracks the ShallowReactive for dependency management.
-     * @param {{untracked?: boolean}} [options] - Optional options. If `untracked` is `false`, the ShallowReactive value will be added to the dependencyTracker.
-     * @returns {T} The proxied value of the ShallowReactive.
+     * Returns the proxied object.
+     *
+     * When `options.untracked` is `false` (the default), registers this
+     * item as a dependency of the enclosing tracked scope.
+     *
+     * @param {{ untracked?: boolean }} [options]
+     * @returns {T}
      */
     getValue(options) {
         super.getValue(options);
@@ -191,8 +120,13 @@ class ShallowReactive extends ReactiveItem {
     }
 
     /**
-     * Sets the value of the ShallowReactive. If the value is an object, it will be proxied and reactive.
-     * @param {T} value - The new value of the ShallowReactive.
+     * Replaces the object's properties wholesale.
+     *
+     * Keys absent from `value` are deleted from the target; new keys are
+     * added. The entire operation is batched and produces a single
+     * notification.
+     *
+     * @param {T} value
      */
     setValue(value) {
         this.getValue({ untracked: true });
@@ -205,7 +139,6 @@ class ShallowReactive extends ReactiveItem {
 
         for (let i = 0; i < newKeys.length; i++) {
             const key = newKeys[i];
-
             // @ts-ignore
             this.#proxy[key] = value[key];
         }
@@ -214,29 +147,60 @@ class ShallowReactive extends ReactiveItem {
         this.engine.valueChangedCallback();
     }
 
-    /**
-     * Sets the value of the ShallowReactive. If the value is an object, it will be proxied and reactive.
-     * @param {T} value - The new value of the ShallowReactive.
-     */
     set value(value) {
         this.setValue(value);
     }
 
     /**
-     * Retrieves the proxied value of the ShallowReactive. If the engine is destroyed, an error is thrown.
-     * Tracks the ShallowReactive for dependency management.
-     * @returns {T} The proxied value of the ShallowReactive.
+     * The proxied object.
+     *
+     * Reading a top-level property registers a dependency on this item.
+     * Writing a top-level property schedules an update. Nested properties
+     * are not tracked.
+     *
+     * @returns {T}
      */
     get value() {
         return this.getValue();
     }
 
     /**
-     * Returns the raw, unproxied value of the ShallowReactive. This is generally not recommended as it breaks reactivity.
-     * @returns {T} The raw, unproxied value of the ShallowReactive.
+     * Returns the underlying object without the proxy.
+     *
+     * Mutations on the returned object do not trigger reactivity. Use for
+     * inspection or for passing to APIs that must receive a plain object —
+     * not for state changes.
+     *
+     * @returns {T}
      */
     getRawValue() {
         return this.#target;
+    }
+
+    /**
+     * Returns a serializable representation of the object's own enumerable
+     * properties.
+     *
+     * @returns {any}
+     */
+    serialize() {
+        return {
+            type: 'shallowReactive',
+            value: { ...this.#target },
+        };
+    }
+
+    /**
+     * Applies data previously produced by `serialize()`.
+     *
+     * Silently ignores malformed input.
+     *
+     * @param {any} data
+     */
+    hydrate(data) {
+        if (data && typeof data === 'object' && isPlainObject(data.value)) {
+            this.value = /** @type {T} */ (data.value);
+        }
     }
 }
 

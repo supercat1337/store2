@@ -1,5 +1,13 @@
 // @ts-check
 
+/**
+ * A single mutation state passed to subscribers.
+ *
+ * Every entry in the `updates` map received by a subscriber is an instance
+ * of this class.
+ *
+ * @public
+ */
 export class UpdateDataRecord {
     /** @type {"set"|"delete"} */
     type;
@@ -10,15 +18,16 @@ export class UpdateDataRecord {
     /** @type {any} */
     oldValue;
 
-    /** @type {import('../types.d.ts').ReactiveItem|undefined} */
+    /** @type {import('../reactives/ReactiveItem.js').ReactiveItem|undefined} */
     reactiveItem;
 
     /**
-     * Initializes an instance of UpdateDataRecord with the provided type, old value, and new value.
-     * @param {"set"|"delete"} type - The action performed, either "set" or "delete".
-     * @param {any} oldValue - The previous value before the update.
-     * @param {any} value - The new value after the update.
-     * @param {import('../types.d.ts').ReactiveItem} [reactiveItem] - The reactive item that triggered the update.
+     * Creates a new update record.
+     *
+     * @param {"set"|"delete"} type - The operation that produced the change.
+     * @param {any} oldValue - Value before the change.
+     * @param {any} value - Value after the change.
+     * @param {import('../reactives/ReactiveItem.js').ReactiveItem} [reactiveItem] - The reactive item that triggered the update.
      */
     constructor(type, oldValue, value, reactiveItem) {
         this.type = type;
@@ -44,21 +53,18 @@ export class UpdateDataRecordManager {
      */
     removeItem(itemName) {
         //this.data.delete(itemName);
-        this.data.set(
-            itemName,
-            new UpdateDataRecord("delete", undefined, undefined, undefined)
-        );
+        this.data.set(itemName, new UpdateDataRecord('delete', undefined, undefined, undefined));
 
         /** @type {string[]} */
         const keysToDelete = [];
 
         this.data.forEach((item, key) => {
-            if (key.startsWith(itemName + ".")) {
+            if (key.startsWith(itemName + '.')) {
                 keysToDelete.push(key);
             }
         });
 
-        keysToDelete.forEach((key) => {
+        keysToDelete.forEach(key => {
             this.data.delete(key);
         });
     }

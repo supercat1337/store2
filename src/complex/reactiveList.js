@@ -11,7 +11,7 @@ import { isPlainObject } from '../helpers/tools.js';
  */
 
 /**
- * Type guard to check if an item is a reactive wrapper with a `value` property.
+ * Type guard for reactive wrappers with a `value` property.
  * @param {any} item
  * @returns {item is Atom<any> | ShallowReactive<any>}
  */
@@ -20,31 +20,29 @@ function isReactiveWrapper(item) {
 }
 
 /**
- * ReactiveList is a reactive array-like structure that stores values of any type.
- * It automatically chooses the appropriate reactive item:
- * - Objects and arrays are wrapped with `ShallowReactive` (shallow property tracking).
- * - Primitives (numbers, strings, booleans, etc.) are wrapped with `Atom`.
+ * ReactiveList is a reactive array-like structure that stores values of any
+ * type.
  *
- * The list supports adding, removing, updating, and splicing items while maintaining
- * full reactivity. Subscribers are notified only once per batch of changes.
+ * Primitives (numbers, strings, booleans) are wrapped in `Atom`; objects
+ * and arrays are wrapped in `ShallowReactive`. Every mutation — adding,
+ * removing, replacing, reordering — is batched into a single notification.
+ *
+ * Internally the list is backed by a `Store` indexed by string positions,
+ * plus a separate `Atom` tracking the list length. This is not part of the
+ * public contract; treat the list as an opaque reactive array.
  *
  * @template T
- *
- * @example
- * ```js
- * const list = new ReactiveList();
- *
- * list.subscribe(() => {
- *     console.log('List changed:', list.toArray());
- * });
- *
- * list.add(1, 2, 3);                // numbers -> stored as Atom
- * list.setItem(1, 42);
- * list.removeRange(0, 1);
- * list.setItems([{ a: 1 }, { b: 2 }]); // objects -> stored as ShallowReactive
- * ```
+ * @public
  */
 export class ReactiveList {
+    /**
+     * Local path of this list. Empty unless set by the user. Used by
+     * snapshot tooling to build dotted paths when the list is nested inside
+     * a `Store`.
+     * @type {string}
+     */
+    path = '';
+
     /** @type {Atom<number>} */
     #lengthAtom;
 
@@ -64,38 +62,40 @@ export class ReactiveList {
     }
 
     /**
-     * Creates a reactive wrapper for the given value.
-     * Uses ShallowReactive for objects/arrays, Atom for items.
-     *
-     * @param {any} value - The value to wrap.
-     * @param {string} name - The name to assign to the reactive item (used for debugging).
-     * @returns {ReactiveWrapper<any>} The reactive wrapper.
+     * @param {any} value
+     * @param {string} name
+     * @returns {ReactiveWrapper<any>}
      */
     #createReactiveItem(value, name) {
+        /** @type {ReactiveWrapper<any>} */
+        let item;
         if (isPlainObject(value) || Array.isArray(value)) {
-            return new ShallowReactive(value, { name });
+            item = new ShallowReactive(value, { name });
+        } else {
+            // @ts-ignore
+            item = new Atom(value, { name });
         }
-        // @ts-ignore
-        return new Atom(value, { name });
+        item.path = name;
+        return item;
     }
 
     /**
-     * Updates the value of a reactive wrapper.
-     * Works for both Atom and ShallowReactive.
-     *
-     * @param {ReactiveWrapper<any>} wrapper - The reactive wrapper.
-     * @param {any} newValue - The new value to set.
+     * @param {ReactiveWrapper<any>} wrapper
+     * @param {any} newValue
      */
     #updateReactiveItem(wrapper, newValue) {
-        // Both Atom and ShallowReactive have a `value` setter.
         wrapper.value = newValue;
     }
 
     /**
-     * Adds one or more items to the end of the list.
+     * Appends one or more values to the end of the list.
      *
-     * @param {...T} values - The values to add. Primitives are wrapped in `Atom`,
-     *                        objects and arrays are wrapped in `ShallowReactive`.
+     * Each value is wrapped according to its type — primitives become
+     * `Atom`, objects and arrays become `ShallowReactive`. The whole
+     * operation produces a single notification, regardless of how many
+     * values are added.
+     *
+     * @param {...T} values
      */
     add(...values) {
         if (this.isDestroyed) {
@@ -109,12 +109,11 @@ export class ReactiveList {
         const alreadyMuted = this.#store.isMuted();
         this.#store.muteUpdates();
 
-        /** @type {{[key:string]: ReactiveWrapper<any>}} */
+        /** @type {{[key: string]: ReactiveWrapper<any>}} */
         const wrappers = {};
         for (let i = 0; i < values.length; i++) {
             const idx = startIndex + i;
-            const wrapper = this.#createReactiveItem(values[i], idx.toString());
-            wrappers[idx] = wrapper;
+            wrappers[idx] = this.#createReactiveItem(values[i], idx.toString());
         }
 
         this.#store.addItems(wrappers);
@@ -130,10 +129,14 @@ export class ReactiveList {
     }
 
     /**
-     * Retrieves the value at the given index.
+     * Returns the value at the given index, or `undefined` if the index is
+     * out of bounds.
      *
-     * @param {number} index - The index of the item to retrieve.
-     * @returns {T | undefined} The value, or undefined if the index is out of bounds.
+     * Reads through the reactive wrapper, so a call inside a tracked scope
+     * registers a dependency on the item at that index.
+     *
+     * @param {number} index
+     * @returns {T | undefined}
      */
     getItem(index) {
         if (this.isDestroyed) {
@@ -149,7 +152,11 @@ export class ReactiveList {
     /**
      * Returns a shallow copy of all items in the list as a plain array.
      *
-     * @returns {T[]} An array containing all values.
+     * The array is newly allocated on each call; mutating it does not
+     * affect the list. Elements that are reactive objects are returned as
+     * their underlying values, not as wrappers.
+     *
+     * @returns {T[]}
      */
     toArray() {
         if (this.isDestroyed) {
@@ -166,10 +173,13 @@ export class ReactiveList {
     }
 
     /**
-     * Updates the value at the specified index.
+     * Replaces the value at the specified index.
      *
-     * @param {number} index - The index to update.
-     * @param {T} value - The new value. Primitives become `Atom`, objects/arrays become `ShallowReactive`.
+     * The whole operation produces a single notification. No-op if `index`
+     * is out of bounds.
+     *
+     * @param {number} index
+     * @param {T} value
      */
     setItem(index, value) {
         if (this.isDestroyed) {
@@ -188,7 +198,10 @@ export class ReactiveList {
     }
 
     /**
-     * Returns the current length of the list.
+     * The current number of items in the list.
+     *
+     * Reading this property inside a tracked scope registers a dependency,
+     * so the enclosing effect re-runs whenever items are added or removed.
      *
      * @returns {number}
      */
@@ -202,7 +215,11 @@ export class ReactiveList {
     /**
      * Replaces the entire content of the list with the given array.
      *
-     * @param {T[]} values - The new array of values. Wrapping follows the same rules as `add()`.
+     * Existing positions are updated in place; positions beyond the new
+     * length are destroyed; new positions are created. The whole operation
+     * produces a single notification.
+     *
+     * @param {T[]} values
      */
     setItems(values) {
         if (this.isDestroyed) {
@@ -215,12 +232,10 @@ export class ReactiveList {
         const newLen = values.length;
 
         if (newLen < currentLen) {
-            // Remove tail items
             for (let i = newLen; i < currentLen; i++) {
                 this.#store.destroyItem(i.toString());
             }
             this.#lengthAtom.value = newLen;
-            // Update remaining items
             for (let i = 0; i < newLen; i++) {
                 const wrapper = this.#store.getItem(i.toString());
                 if (isReactiveWrapper(wrapper)) {
@@ -228,15 +243,13 @@ export class ReactiveList {
                 }
             }
         } else {
-            // Update existing items
             for (let i = 0; i < currentLen; i++) {
                 const wrapper = this.#store.getItem(i.toString());
                 if (isReactiveWrapper(wrapper)) {
                     wrapper.value = values[i];
                 }
             }
-            // Create and add new items
-            /** @type {{[key:string]: ReactiveWrapper<any>}} */
+            /** @type {{[key: string]: ReactiveWrapper<any>}} */
             const wrappers = {};
             for (let i = currentLen; i < newLen; i++) {
                 wrappers[i] = this.#createReactiveItem(values[i], i.toString());
@@ -254,11 +267,17 @@ export class ReactiveList {
     }
 
     /**
-     * Removes elements from the list starting at `startIndex` and removing `count` items.
-     * Remaining elements are shifted left. The operation is batched to emit only one notification.
+     * Removes `count` items starting at `startIndex`.
      *
-     * @param {number} startIndex - The index at which to start removal.
-     * @param {number} count - The number of elements to remove.
+     * Remaining items shift left to fill the gap; the tail positions are
+     * destroyed. The whole operation produces a single notification.
+     *
+     * No-op if `count <= 0`, `startIndex < 0`, or `startIndex >= length`.
+     * If `count` exceeds the number of items from `startIndex` to the end,
+     * it is clamped.
+     *
+     * @param {number} startIndex
+     * @param {number} count
      */
     removeRange(startIndex, count) {
         if (this.isDestroyed) {
@@ -282,7 +301,6 @@ export class ReactiveList {
         const alreadyMuted = this.#store.isMuted();
         this.#store.muteUpdates();
 
-        // Shift elements left
         for (let i = startIndex; i < newLen; i++) {
             const srcIndex = i + actualCount;
             const srcItem = this.#store.getItem(srcIndex.toString());
@@ -294,7 +312,6 @@ export class ReactiveList {
             }
         }
 
-        // Destroy tail items
         for (let i = newLen; i < oldLen; i++) {
             this.#store.destroyItem(i.toString());
         }
@@ -309,21 +326,24 @@ export class ReactiveList {
     /**
      * Removes the item at the given index.
      *
-     * @param {number} index - The index of the item to remove.
+     * Shorthand for `removeRange(index, 1)`. No-op if `index` is out of
+     * bounds.
+     *
+     * @param {number} index
      */
     removeItem(index) {
         this.removeRange(index, 1);
     }
 
     /**
-     * Removes the last item of the list.
+     * Removes the last item. No-op if the list is empty.
      */
     removeLastItem() {
         this.removeRange(this.#lengthAtom.value - 1, 1);
     }
 
     /**
-     * Removes the first item of the list.
+     * Removes the first item. No-op if the list is empty.
      */
     removeFirstItem() {
         this.removeRange(0, 1);
@@ -331,25 +351,31 @@ export class ReactiveList {
 
     /**
      * Removes all items from the list.
+     *
+     * The length becomes `0` and every item is destroyed.
      */
     clear() {
         this.removeRange(0, this.#lengthAtom.value);
     }
 
     /**
-     * Destroys the list, releasing all internal resources.
-     * After destruction, any method call (except `isDestroyed`) will throw an error.
+     * Destroys the list and releases its internal store.
+     *
+     * After this call, all mutating methods throw. Idempotent — subsequent
+     * calls are no-ops.
      */
     destroy() {
         if (this.isDestroyed) {
             return;
         }
         this.#store.destroy();
-        // No need to nullify #lengthAtom; it will be inaccessible because isDestroyed becomes true.
     }
 
     /**
-     * Indicates whether the list has been destroyed.
+     * Returns `true` after `destroy()` has been called.
+     *
+     * After destruction, all mutating methods throw and only this getter
+     * remains safe to call.
      *
      * @returns {boolean}
      */
@@ -358,16 +384,48 @@ export class ReactiveList {
     }
 
     /**
-     * Subscribes a callback to be invoked whenever the list changes.
-     * The callback receives a Map of updates with details about changed items.
+     * Subscribes a function to changes of the list.
      *
-     * @param {(updates: Map<string, import('../types.d.ts').UpdateDataRecord>) => void} fn - The callback function.
-     * @returns {() => void} A function to unsubscribe the callback.
+     * The callback receives a `Map` of update paths to `UpdateDataRecord`
+     * instances. It is invoked once per batch of effective changes,
+     * regardless of how many items were affected.
+     *
+     * @param {(updates: Map<string, import('../core/UpdateDataRecord.js').UpdateDataRecord>) => void} fn
+     * @returns {() => void} An unsubscribe function.
      */
     subscribe(fn) {
         if (this.isDestroyed) {
             throw new Error('ReactiveList has been destroyed');
         }
         return this.#store.subscribe(fn);
+    }
+
+    /**
+     * Returns a serializable representation of the list's contents.
+     *
+     * The shape is `{ type: 'list', value: [...] }`, matching the
+     * serialization protocol used by reactive items.
+     *
+     * @returns {any}
+     */
+    serialize() {
+        return {
+            type: 'list',
+            value: this.toArray(),
+        };
+    }
+
+    /**
+     * Applies data produced by `serialize()`.
+     *
+     * Uses `setItems` internally, so the whole replacement is batched and
+     * subscribers fire once. Silently ignores malformed input.
+     *
+     * @param {any} data
+     */
+    hydrate(data) {
+        if (data && typeof data === 'object' && data.type === 'list' && Array.isArray(data.value)) {
+            this.setItems(data.value);
+        }
     }
 }

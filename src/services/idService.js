@@ -1,8 +1,10 @@
 // @ts-check
 
 /**
- * A service that generates unique numeric identifiers for reactive items.
- * Ensures deterministic ordering based on creation time.
+ * Service that generates unique numeric identifiers for reactive items.
+ *
+ * Each context owns its own instance so that ordering stays deterministic
+ * inside one store tree and isolated between contexts (SSR, tests, etc.).
  */
 class IdService {
     /** @type {number} */
@@ -10,7 +12,7 @@ class IdService {
 
     /**
      * Generates a new unique numeric identifier.
-     * @returns {number} A new unique number.
+     * @returns {number} A monotonic unique number.
      */
     generateId() {
         return this.#counter++;
@@ -18,22 +20,32 @@ class IdService {
 
     /**
      * Compares two numeric identifiers.
-     * @param {number} a - First identifier.
-     * @param {number} b - Second identifier.
-     * @returns {number} Negative if a < b, positive if a > b, zero if equal.
+     * @param {number} a
+     * @param {number} b
+     * @returns {number} -1 if a < b, 1 if a > b, 0 if equal.
      */
     compareIds(a, b) {
-        if (a < b) {return -1;}
-        if (a > b) {return 1;}
+        if (a < b) {
+            return -1;
+        }
+        if (a > b) {
+            return 1;
+        }
         return 0;
     }
 
     /**
-     * Resets the counter to zero (useful for testing).
+     * Resets the internal counter. Useful in tests.
      */
     reset() {
         this.#counter = 0;
     }
 }
 
-export const idService = new IdService();
+/**
+ * Default process-wide instance. Kept for backward compatibility; new code
+ * should obtain an instance via a `Store2Context`.
+ */
+const idService = new IdService();
+
+export { IdService, idService };

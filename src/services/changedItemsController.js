@@ -1,135 +1,120 @@
 // @ts-check
 
-import { getError, sortReactiveItems } from '../helpers/tools.js';
+import { getError } from '../helpers/tools.js';
 import { modeController } from './modeController.js';
 
 /**
- * Controller that manages changed reactive items and coordinates subscriber notifications.
- * Handles batching, dependency recalculation, and error aggregation.
+ * Sorts reactive items by their numeric engine id.
+ * @param {import('../reactives/ReactiveItem.js').ReactiveItem} a
+ * @param {import('../reactives/ReactiveItem.js').ReactiveItem} b
+ * @returns {number}
+ */
+function sortById(a, b) {
+    const idA = a.engine.id;
+    const idB = b.engine.id;
+    return idA < idB ? -1 : idA > idB ? 1 : 0;
+}
+
+/**
+ * Coordinates notification of changed reactive items: collects them,
+ * recalculates stale computed values in a deterministic order, and invokes
+ * subscribers.
+ *
+ * One instance per `Store2Context`. The class receives the owning
+ * `ModeControllerService` in its constructor so that batching and subscriber
+ * modes can be controlled independently for each context.
  */
 class ChangedItemsController {
-    /** @type {Set<import('../types.d.ts').ReactiveItem>} */
+    /** @type {Set<import('../reactives/ReactiveItem.js').ReactiveItem>} */
     items = new Set();
 
+    /** @type {import('../services/modeController.js').ModeControllerService} */
+    #modeController;
+
     /**
-     * Adds a reactive item to the set of changed items.
-     * If not in batch mode, immediately runs subscribers and clears the set.
-     * @param {import('../types.d.ts').ReactiveItem} item - The reactive item that changed.
+     * @param {import('../services/modeController.js').ModeControllerService} modeController
+     */
+    constructor(modeController) {
+        this.#modeController = modeController;
+    }
+
+    /**
+     * Marks an item as changed. Outside a batch, immediately runs subscribers
+     * and clears the pending set.
+     * @param {import('../reactives/ReactiveItem.js').ReactiveItem} item
      */
     addItem(item) {
-        //console.log('[addItem]addItem:', item.name);
-        //console.log('[addItem]modeController.batchMode', modeController.batchMode);
-
         this.items.add(item);
-        if (!modeController.batchMode) {
+        if (!this.#modeController.batchMode) {
             this.runSubscribers();
             this.clear();
         }
     }
 
     /**
-     * @param {import('../types.d.ts').ReactiveItem} item
+     * Removes an item from the pending set.
+     * @param {import('../reactives/ReactiveItem.js').ReactiveItem} item
      */
     removeItem(item) {
         this.items.delete(item);
     }
 
     /**
-     * Removes all items from the changed items set.
+     * Clears the pending set.
      */
     clear() {
         this.items.clear();
     }
 
     /**
-     * Runs all subscribers for the changed items.
-     * Processes dependency trees, recalculates stale computed values,
-     * and invokes subscriber callbacks with update records.
-     * Handles errors and aggregates them if multiple occur.
+     * Runs all pending subscribers.
      *
-     * The while-loop ensures that any new changes that are added
-     * (via changedItemsController.addItem) during subscriber execution
-     * are processed in the next iteration, preventing lost updates.
+     * The outer loop re-checks `this.items` after each notification round so
+     * that updates added during subscriber execution (e.g. via `runInAction`)
+     * are processed in the same call.
      */
     runSubscribers() {
-        /*
-        console.log(
-            '[runSubscribers] itemsToProcess:',
-            Array.from(this.items).map(i => i.name)
-        );
-        */
-
-        /** @type {Set<import('../types.d.ts').ReactiveItem>} */
+        /** @type {Set<import('../reactives/ReactiveItem.js').ReactiveItem>} */
         const changedItemsWithUpdates = new Set();
 
-        // Continue processing as long as there are items pending
         while (this.items.size > 0) {
-            // 1. Take a snapshot of the current pending items and clear the queue
             const itemsToProcess = new Set(this.items);
-            /*
-            console.log(
-                '[runSubscribers] itemsToProcess:',
-                Array.from(this.items).map(i => i.name)
-            );
-            */
             this.items.clear();
 
-            // 2. Determine which items actually have effective updates
             itemsToProcess.forEach(item => {
-                if (modeController.batchMode === true) {
-                    // In batch mode, check if the item still has changes after possible reverts
+                if (this.#modeController.batchMode) {
                     if (item.engine.checkChangesTemporary()) {
                         changedItemsWithUpdates.add(item);
                     }
-                } else {
-                    // Outside batch, simply check for pending updates
-                    if (item.engine.hasUpdates()) {
-                        changedItemsWithUpdates.add(item);
-                    }
+                } else if (item.engine.hasUpdates()) {
+                    changedItemsWithUpdates.add(item);
                 }
             });
 
-            /*
-            console.log(
-                '[runSubscribers] changedItemsWithUpdates:',
-                Array.from(changedItemsWithUpdates).map(i => i.name)
-            );
-            */
-
-            // 3. Collect all deep dependents that have subscribers and need recalculation
-            /** @type {Set<import('../types.d.ts').ReactiveItem>} */
+            /** @type {Set<import('../reactives/ReactiveItem.js').ReactiveItem>} */
             const itemsToRecalc = new Set();
             changedItemsWithUpdates.forEach(item => {
-                item.engine.getDeepDependents().forEach(dep => {
-                    if (dep.hasSubscribers()) {
-                        // Если у dep уже есть updates, не пересчитываем его повторно
-                        if (!dep.engine.hasUpdates()) {
-                            itemsToRecalc.add(dep);
-                        }
+                /**
+                 * @param {import('../reactives/ReactiveItem.js').ReactiveItem} dep
+                 */
+                const visitDependent = dep => {
+                    if (dep.hasSubscribers() && !dep.engine.hasUpdates()) {
+                        itemsToRecalc.add(dep);
                     }
-                });
+                };
+                item.engine.getDeepDependents().forEach(visitDependent);
             });
 
-            /*
-            console.log(
-                '[runSubscribers] itemsToRecalc:',
-                Array.from(itemsToRecalc).map(i => i.name)
-            );
-            */
-
-            // 4. Recalculate the stale computed values in a deterministic order
             Array.from(itemsToRecalc)
-                .sort(sortReactiveItems)
+                .sort(sortById)
                 .forEach(item => {
                     item.getValue();
                 });
 
-            // Clear temporary sets to prepare for the next iteration
             itemsToRecalc.clear();
             changedItemsWithUpdates.clear();
 
-            // 5. Re-evaluate updates after potential recalculation (some updates may have been cleared)
-            if (modeController.batchMode === true) {
+            if (this.#modeController.batchMode) {
                 itemsToProcess.forEach(item => {
                     if (item.engine.checkChangesTemporary()) {
                         changedItemsWithUpdates.add(item);
@@ -143,104 +128,71 @@ class ChangedItemsController {
                 });
             }
 
-            /*
-            console.log(
-                '[runSubscribers] after step 5, changedItemsWithUpdates:',
-                Array.from(changedItemsWithUpdates).map(i => i.name)
-            );
-            */
-
-            // 6. Sort the items by creation order and filter those with active subscribers
-            /*
-            console.log(
-                '[runSubscribers] hasSubscribers before filter:',
-                Array.from(changedItemsWithUpdates).map(i => ({
-                    name: i.name,
-                    has: i.hasSubscribers(),
-                }))
-            );
-            */
-            const changedItemsWithUpdatesSorted = Array.from(changedItemsWithUpdates)
+            const sorted = Array.from(changedItemsWithUpdates)
                 .filter(item => item.hasSubscribers())
-                .sort(sortReactiveItems);
+                .sort(sortById);
 
-            /*
-            console.log(
-                '[runSubscribers] changedItemsWithUpdatesSorted:',
-                changedItemsWithUpdatesSorted.map(i => i.name)
-            );
-            */
+            this.#modeController.startSubscribersMode();
 
-            // 7. Notify all subscribers while preventing nested mutations
-            modeController.startSubscribersMode();
-
+            /** @type {Set<Function>} */
             const usedSubscribers = new Set();
+
+            /** @type {Array<Error>} */
             const errors = [];
 
-            for (let i = 0; i < changedItemsWithUpdatesSorted.length; i++) {
-                const item = changedItemsWithUpdatesSorted[i];
+            for (const item of sorted) {
                 const itemSubscribers = item.engine.subscribeController.getSubscribers();
-
-                /*
-                console.log(
-                    `[runSubscribers] Calling subscribers for ${item.name}, updates:`,
-                    Array.from(item.engine.updates.entries())
-                );
-                */
                 for (const subscriber of itemSubscribers) {
-                    // Avoid calling the same subscriber function multiple times
                     if (usedSubscribers.has(subscriber)) {
                         continue;
                     }
                     usedSubscribers.add(subscriber);
                     try {
-                        //console.log(`[runSubscribers] Subscriber called for ${item.name}`);
+                        item.engine.context.emitPlugin(
+                            'onSubscriberRun',
+                            item,
+                            item.engine.updates
+                        );
                         subscriber(item.engine.updates);
                     } catch (e) {
                         const err = getError(e);
-                        const error = new Error(`Error in ${item.name}: ${err.message}`, {
-                            cause: item,
-                        });
+                        const error = new Error(
+                            `Error in ${item.name}: ${err.message}`,
+                            { cause: item }
+                        );
                         error.stack = err.stack;
                         errors.push(error);
                     }
                 }
-                // Clear updates for this item after notifying its subscribers
                 item.engine.clearUpdates();
             }
 
-            // 8. Clear any remaining updates from all processed items
             itemsToProcess.forEach(item => {
                 item.engine.clearUpdates();
             });
 
             usedSubscribers.clear();
-            // itemsToProcess is cleared automatically, but we also clear the main set if anything was added during processing
-            // Note: this.items was already cleared at the beginning, and any new items added during subscriber execution
-            // will be processed in the next while iteration.
 
-            modeController.endSubscribersMode();
+            this.#modeController.endSubscribersMode();
 
-            // 9. Throw collected errors if configured to do so
-            if (modeController.throwErrorInSubscribers) {
-                for (let i = 0; i < errors.length; i++) {
-                    const error = errors[i];
+            if (this.#modeController.throwErrorInSubscribers) {
+                for (const error of errors) {
                     throw error;
                 }
             }
-
-            // The while-loop continues if any new items were added to this.items
-            // during the subscriber notifications (e.g., via runInAction or batch).
-            // This ensures that no updates are lost.
         }
     }
 }
 
-// Hook into batch mode lifecycle
+/**
+ * Process-wide singleton, wired to the default mode controller.
+ * The default `Store2Context` adopts this instance so that direct imports
+ * continue to share state with the context-aware engine.
+ */
+const changedItemsController = new ChangedItemsController(modeController);
 modeController.on('beforeBatchModeEnd', () => {
     changedItemsController.runSubscribers();
     changedItemsController.clear();
 });
 
-const changedItemsController = new ChangedItemsController();
-export { changedItemsController };
+export { ChangedItemsController, changedItemsController };

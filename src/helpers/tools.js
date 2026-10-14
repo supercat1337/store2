@@ -1,18 +1,17 @@
 // @ts-check
 
-import { ReactiveItem } from '../reactives/ReactiveItem.js';
-import { idService } from '../services/idService.js';
-
 /**
  * Sorts reactive items by their internal id. This is used to
  * ensure that reactive items are processed in a consistent order
  * when they are notified of changes.
- * @param {ReactiveItem} a - The first item to compare
- * @param {ReactiveItem} b - The second item to compare
+ * @param {import('../reactives/ReactiveItem.js').ReactiveItem} a
+ * @param {import('../reactives/ReactiveItem.js').ReactiveItem} b
  * @returns {number} -1 if a should come before b, 0 if a and b are equal, 1 if a should come after b
  */
 export function sortReactiveItems(a, b) {
-    return idService.compareIds(a.engine.id, b.engine.id);
+    const idA = a.engine.id;
+    const idB = b.engine.id;
+    return idA < idB ? -1 : idA > idB ? 1 : 0;
 }
 
 /**
@@ -20,10 +19,9 @@ export function sortReactiveItems(a, b) {
  * ensuring that each item appears only once. The combined set is then converted
  * to an array and sorted by the internal id of the reactive items.
  *
- * @param {...(ReactiveItem|Set<ReactiveItem>)} items - Reactive items or sets of reactive items to combine and sort.
- * @returns {Array<ReactiveItem>} A sorted array of unique reactive items.
+ * @param {...(import('../reactives/ReactiveItem.js').ReactiveItem | Set<import('../reactives/ReactiveItem.js').ReactiveItem>)} items
+ * @returns {Array<import('../reactives/ReactiveItem.js').ReactiveItem>}
  */
-
 export function getSortedReactiveItems(...items) {
     const all = new Set();
     items.forEach(item => {
@@ -39,7 +37,7 @@ export function getSortedReactiveItems(...items) {
 
 /**
  * Checks if a given value is a plain object.
- * @param {*} obj - The value to check.
+ * @param {*} obj
  * @returns {boolean} true if the value is a plain object, false otherwise.
  */
 export function isPlainObject(obj) {
@@ -49,9 +47,9 @@ export function isPlainObject(obj) {
 /**
  * Checks if two arrays are equal. If the arrays are not the same length, then this function returns false.
  * Otherwise, this function checks if each element of the two arrays is equal, using the compareAny function.
- * @param {any[]} a - The first array to compare.
- * @param {any[]} b - The second array to compare.
- * @returns {boolean} True if the two arrays are equal, false otherwise.
+ * @param {any[]} a
+ * @param {any[]} b
+ * @returns {boolean}
  */
 function compareArrays(a, b) {
     if (a.length !== b.length) {
@@ -68,11 +66,10 @@ function compareArrays(a, b) {
 }
 
 /**
- * Checks if two plain objects are equal. If the objects do not have the same set of keys, then this function returns false.
- * Otherwise, this function checks if each value of the two objects is equal, using the compareAny function.
- * @param {object} a - The first object to compare.
- * @param {object} b - The second object to compare.
- * @returns {boolean} True if the two objects are equal, false otherwise.
+ * Checks if two plain objects are equal.
+ * @param {object} a
+ * @param {object} b
+ * @returns {boolean}
  */
 export function comparePlainObjects(a, b) {
     if (a === b) {
@@ -106,8 +103,7 @@ export function comparePlainObjects(a, b) {
 }
 
 /**
- * Checks if two objects are equal. If objects are arrays, then check if stringified versions of them are equal.
- * If objects are not arrays, then check if sorted stringified versions of them are equal.
+ * Checks if two values are equal.
  * @param {unknown} a
  * @param {unknown} b
  * @returns {boolean}
@@ -133,17 +129,16 @@ export function compareAny(a, b) {
         return compareArrays(a, b);
     }
 
+    // @ts-ignore
     return comparePlainObjects(a, b);
 }
 
 /**
- * Debounce function that, as long as it continues to be invoked, will not be triggered.
+ * Debounce function.
  * @template {Function} T
- * @param {T} func - Function to be debounced
- * @param {number} wait - Time in milliseconds to wait before the function gets called.
+ * @param {T} func
+ * @param {number} wait
  * @returns {T}
- * @example
-   window.addEventListener('resize', debounce((evt) => console.log(evt), 250));
  */
 export function debounce(func, wait) {
     /** @type {ReturnType<typeof setTimeout>|null} */
@@ -165,12 +160,10 @@ export function debounce(func, wait) {
 }
 
 /**
- * Clones an object. If the object is an array, the function returns a shallow copy of the array.
- * If the object is a plain object, the function returns a shallow copy of the object.
- * If the object is not an array or a plain object, the function returns the object as is.
+ * Clones an object shallowly.
  * @template T
- * @param {T} obj - The object to clone
- * @returns {T} A shallow copy of the object
+ * @param {T} obj
+ * @returns {T}
  */
 export function clone(obj) {
     if (Array.isArray(obj)) {
@@ -185,7 +178,7 @@ export function clone(obj) {
 
 /**
  * A Promise-based sleep function.
- * @param {number} ms - The amount of milliseconds to sleep for.
+ * @param {number} ms
  * @returns {Promise<void>}
  */
 export function sleep(ms) {
@@ -195,10 +188,10 @@ export function sleep(ms) {
 /**
  * Gets all property descriptors of an object, including its prototype and all its ancestors.
  * The descriptors are returned as a plain object.
- * @param {object} obj - The object to get the property descriptors from.
+ * @param {object | null | undefined} obj
  * @param {number} [depth=0]
  * @param {number} [maxDepth=100]
- * @returns {{[x: string]: TypedPropertyDescriptor<any>;} & { [x: string]: PropertyDescriptor;}} A plain object with all property descriptors of the object.
+ * @returns {{[x: string]: PropertyDescriptor}}
  */
 export function getAllPropertyDescriptors(obj, depth = 0, maxDepth = 100) {
     if (!obj || depth > maxDepth) {
@@ -213,29 +206,8 @@ export function getAllPropertyDescriptors(obj, depth = 0, maxDepth = 100) {
 
 /**
  * Converts any value to an Error object.
- *
- * If the given value is already an instance of Error, it is returned unchanged.
- * Otherwise, a new Error object is created using the string representation of the value.
- *
- * @param {unknown} e - The value to convert into an Error.
- * @returns {Error} An Error object derived from the input value.
- *
- * @example
- * // Returns the original Error
- * const originalError = new Error('Something went wrong');
- * getError(originalError) === originalError; // true
- *
- * @example
- * // Converts a string to an Error
- * const error = getError('Network failure');
- * error.message; // 'Network failure'
- * error instanceof Error; // true
- *
- * @example
- * // Converts numbers or other types
- * getError(42).message; // '42'
- * getError(null).message; // 'null'
- * getError(undefined).message; // 'undefined'
+ * @param {unknown} e
+ * @returns {Error}
  */
 export function getError(e) {
     return e instanceof Error ? e : new Error(String(e));
@@ -243,25 +215,13 @@ export function getError(e) {
 
 /**
  * Extracts names (and optionally ids) from a Set of reactive items.
- * Returns an array of strings, one per item.
  *
- * @param {Set<ReactiveItem>|Iterable<ReactiveItem>} items - Collection of reactive items.
- * @param {{includeId:boolean, fallback:string, sorted:boolean}} [options] - Formatting options.
- * @returns {string[]} Array of item representations.
+ * Uses duck typing (`item.engine && item.name`) to avoid importing from
+ * `reactives/` — that keeps `tools.js` free of circular dependencies.
  *
- * @example
- * const a = new Atom(0, { name: 'counter' });
- * const b = new Computed(() => a.value * 2, { name: 'double' });
- * const set = new Set([a, b]);
- * getItemNamesFromSet(set);
- * // ['counter', 'double']
- *
- * @example
- * getItemNamesFromSet(set, { includeId: true });
- * // ['counter:5', 'double:7']
- *
- * @example
- * getItemNamesFromSet(set, { fallback: '?', sorted: false });
+ * @param {Set<import('../reactives/ReactiveItem.js').ReactiveItem> | Iterable<import('../reactives/ReactiveItem.js').ReactiveItem>} items
+ * @param {{includeId?: boolean, fallback?: string, sorted?: boolean}} [options]
+ * @returns {string[]}
  */
 export function getItemNamesFromSet(
     items,
@@ -272,7 +232,7 @@ export function getItemNamesFromSet(
     const result = [];
 
     for (const item of items) {
-        if (!(item instanceof ReactiveItem)) {
+        if (!item || !item.engine) {
             continue;
         }
 

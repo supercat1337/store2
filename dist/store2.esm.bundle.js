@@ -4,16 +4,16 @@ var IdService = class {
   #counter = 0;
   /**
    * Generates a new unique numeric identifier.
-   * @returns {number} A new unique number.
+   * @returns {number} A monotonic unique number.
    */
   generateId() {
     return this.#counter++;
   }
   /**
    * Compares two numeric identifiers.
-   * @param {number} a - First identifier.
-   * @param {number} b - Second identifier.
-   * @returns {number} Negative if a < b, positive if a > b, zero if equal.
+   * @param {number} a
+   * @param {number} b
+   * @returns {number} -1 if a < b, 1 if a > b, 0 if equal.
    */
   compareIds(a, b) {
     if (a < b) {
@@ -25,7 +25,7 @@ var IdService = class {
     return 0;
   }
   /**
-   * Resets the counter to zero (useful for testing).
+   * Resets the internal counter. Useful in tests.
    */
   reset() {
     this.#counter = 0;
@@ -594,9 +594,299 @@ var EventEmitter = class extends EventEmitterLite {
   }
 };
 
+// src/services/modeController.js
+var ModeControllerService = class {
+  /** @type {boolean} */
+  isComputing = false;
+  /** @type {boolean} */
+  throwErrorInSubscribers = true;
+  /**
+   * When `true`, tracked reads are suppressed. `untrack()` saves and
+   * restores this value, so nesting is safe.
+   * @type {boolean}
+   */
+  untrackMode = false;
+  /** @type {number} */
+  #batchDepth = 0;
+  /** @type {string} */
+  #currentBatchName = "";
+  /** @type {boolean} */
+  #subscribersMode = false;
+  /** @type {Array<import('../types.js').ActionInfo>} */
+  #actionStack = [];
+  /** @type {number} */
+  #actionCounter = 0;
+  /** @type {EventEmitterLite<"batchModeStart"|"batchModeEnd"|"beforeBatchModeEnd">} @internal */
+  batchModeEvents;
+  /** @type {EventEmitterLite<"subscribersModeEnd">} @internal */
+  subscribersModeEvents;
+  /** @type {EventEmitterLite<"actionStart"|"actionEnd">} @internal */
+  actionEvents;
+  constructor() {
+    this.batchModeEvents = new EventEmitterLite();
+    this.subscribersModeEvents = new EventEmitterLite();
+    this.actionEvents = new EventEmitterLite();
+  }
+  /**
+   * Subscribes to a batch lifecycle event.
+   * @param {"batchModeStart"|"batchModeEnd"|"beforeBatchModeEnd"} event
+   * @param {() => void} callback
+   * @returns {() => void}
+   */
+  on(event, callback) {
+    return this.batchModeEvents.on(event, callback);
+  }
+  /**
+   * Subscribes to an action lifecycle event.
+   * @param {"actionStart"|"actionEnd"} event
+   * @param {(action: import('../types.js').ActionInfo) => void} callback
+   * @returns {() => void}
+   */
+  onAction(event, callback) {
+    return this.actionEvents.on(event, callback);
+  }
+  /**
+   * Returns true while the controller is inside a batch.
+   * @returns {boolean}
+   */
+  get batchMode() {
+    return this.#batchDepth > 0;
+  }
+  /**
+   * Returns the current batch depth.
+   * @returns {number}
+   */
+  get batchDepth() {
+    return this.#batchDepth;
+  }
+  /**
+   * Returns the name of the currently running outermost batch, or ''.
+   * @returns {string}
+   */
+  get currentBatchName() {
+    return this.#currentBatchName;
+  }
+  /**
+   * Increments the batch depth. Emits `batchModeStart` on the first entry.
+   * @param {string} [name] - Optional human-readable name for the batch.
+   */
+  enterBatch(name = "") {
+    const wasInBatch = this.batchMode;
+    this.#batchDepth++;
+    if (name || !this.#currentBatchName) {
+      this.#currentBatchName = name || this.#currentBatchName;
+    }
+    if (!wasInBatch) {
+      this.batchModeEvents.emit("batchModeStart");
+    }
+  }
+  /**
+   * Decrements the batch depth. Emits `beforeBatchModeEnd`, then
+   * `batchModeEnd` when leaving the outermost batch.
+   */
+  exitBatch() {
+    if (this.#batchDepth === 0) {
+      return;
+    }
+    const isLast = this.#batchDepth === 1;
+    if (isLast) {
+      this.batchModeEvents.emit("beforeBatchModeEnd");
+    }
+    this.#batchDepth--;
+    if (isLast) {
+      this.batchModeEvents.emit("batchModeEnd");
+      this.#currentBatchName = "";
+    }
+  }
+  /**
+   * Returns true while subscribers are running.
+   * @returns {boolean}
+   */
+  get subscribersMode() {
+    return this.#subscribersMode;
+  }
+  /**
+   * Marks the start of subscriber notification.
+   */
+  startSubscribersMode() {
+    this.#subscribersMode = true;
+  }
+  /**
+   * Marks the end of subscriber notification and flushes deferred callbacks.
+   */
+  endSubscribersMode() {
+    if (!this.#subscribersMode) {
+      return;
+    }
+    this.#subscribersMode = false;
+    this.subscribersModeEvents.emit("subscribersModeEnd");
+  }
+  /**
+   * Registers a callback to run once after subscribers finish.
+   * @param {() => void} callback
+   */
+  runAfterSubscribers(callback) {
+    this.subscribersModeEvents.once("subscribersModeEnd", callback);
+  }
+  /**
+   * Returns the currently running action, or null if no action is in flight.
+   * @returns {import('../types.js').ActionInfo | null}
+   */
+  get currentAction() {
+    if (this.#actionStack.length === 0) {
+      return null;
+    }
+    const last = this.#actionStack[this.#actionStack.length - 1];
+    return (
+      /** @type {import('../types.js').ActionInfo} */
+      last
+    );
+  }
+  /**
+   * Starts a new named action.
+   * @param {string} name
+   * @param {any} [payload]
+   * @returns {import('../types.js').ActionInfo}
+   */
+  beginAction(name, payload = void 0) {
+    const parent = this.currentAction;
+    const action2 = {
+      id: String(++this.#actionCounter),
+      name,
+      payload,
+      parentId: parent ? parent.id : null,
+      startTime: Date.now(),
+      endTime: null,
+      error: null
+    };
+    this.#actionStack.push(action2);
+    this.actionEvents.emit("actionStart", action2);
+    return action2;
+  }
+  /**
+   * Ends an action previously started with `beginAction`.
+   * @param {import('../types.js').ActionInfo} action
+   * @param {Error | null} [error]
+   */
+  endAction(action2, error = null) {
+    action2.endTime = Date.now();
+    action2.error = error;
+    const index = this.#actionStack.indexOf(action2);
+    if (index !== -1) {
+      this.#actionStack.splice(index, 1);
+    }
+    this.actionEvents.emit("actionEnd", action2);
+  }
+};
+var modeController = new ModeControllerService();
+
+// src/services/dependencyTracker.js
+var Tracker = class {
+  /** @type {boolean} */
+  #isActive = false;
+  /** @type {Set<import('../reactives/ReactiveItem.js').ReactiveItem>} */
+  #store = /* @__PURE__ */ new Set();
+  /** @type {Array<{ store: Set<import('../reactives/ReactiveItem.js').ReactiveItem>, ctx: object, isActive: boolean }>} */
+  #stack = [];
+  /** @type {EventEmitterLite<"add">} */
+  #eventEmitter = new EventEmitterLite();
+  /** @type {import('../services/modeController.js').ModeControllerService | null} */
+  #modeController;
+  /** @type {object} */
+  ctx = {};
+  /**
+   * @param {import('../services/modeController.js').ModeControllerService} [modeController]
+   *        Used to honour `untrackMode`. Optional so that the tracker can be
+   *        constructed in isolation for tests.
+   */
+  constructor(modeController2) {
+    this.#modeController = modeController2 ?? null;
+  }
+  /**
+   * Returns a copy of the currently tracked items.
+   * @returns {Set<import('../reactives/ReactiveItem.js').ReactiveItem>}
+   */
+  get data() {
+    return new Set(this.#store);
+  }
+  /**
+   * Returns the currently tracked items sorted by engine id.
+   * @returns {Array<import('../reactives/ReactiveItem.js').ReactiveItem>}
+   */
+  getAsSortedArray() {
+    return Array.from(this.#store).sort((a, b) => {
+      const idA = a.engine.id;
+      const idB = b.engine.id;
+      return idA < idB ? -1 : idA > idB ? 1 : 0;
+    });
+  }
+  /**
+   * Records a reactive item if tracking is active and untracked reads are
+   * not currently suppressed.
+   * @param {import('../reactives/ReactiveItem.js').ReactiveItem} item
+   * @param {string} [_key]
+   */
+  add(item, _key = "") {
+    if (this.#modeController?.untrackMode) {
+      return;
+    }
+    if (this.#isActive) {
+      this.#store.add(item);
+      this.#eventEmitter.emit("add", item);
+    }
+  }
+  /**
+   * Registers a listener called for every tracked item.
+   * @param {(item: import('../reactives/ReactiveItem.js').ReactiveItem) => void} callback
+   * @returns {() => void}
+   */
+  onAdd(callback) {
+    return this.#eventEmitter.on("add", callback);
+  }
+  /**
+   * Returns true while tracking is active.
+   * @returns {boolean}
+   */
+  isActive() {
+    return this.#isActive;
+  }
+  /**
+   * Pushes a new tracking scope.
+   * @param {object} [ctx]
+   */
+  enable(ctx = {}) {
+    this.#stack.push({
+      store: this.#store,
+      ctx: this.ctx,
+      isActive: this.#isActive
+    });
+    this.#store = /* @__PURE__ */ new Set();
+    this.ctx = ctx;
+    this.#isActive = true;
+  }
+  /**
+   * Pops the current tracking scope and restores the previous one.
+   */
+  disable() {
+    const previous = this.#stack.pop();
+    if (previous) {
+      this.#store = previous.store;
+      this.ctx = previous.ctx;
+      this.#isActive = previous.isActive;
+    } else {
+      this.#store = /* @__PURE__ */ new Set();
+      this.ctx = {};
+      this.#isActive = false;
+    }
+  }
+};
+var dependencyTracker = new Tracker(modeController);
+
 // src/helpers/tools.js
 function sortReactiveItems(a, b) {
-  return idService.compareIds(a.engine.id, b.engine.id);
+  const idA = a.engine.id;
+  const idB = b.engine.id;
+  return idA < idB ? -1 : idA > idB ? 1 : 0;
 }
 function getSortedReactiveItems(...items) {
   const all = /* @__PURE__ */ new Set();
@@ -711,7 +1001,7 @@ function getItemNamesFromSet(items, options = { includeId: false, fallback: "unn
   const { includeId = false, fallback = "unnamed", sorted = true } = options;
   const result = [];
   for (const item of items) {
-    if (!(item instanceof ReactiveItem)) {
+    if (!item || !item.engine) {
       continue;
     }
     const namePart = item.name && item.name.trim() !== "" ? item.name : fallback;
@@ -727,13 +1017,471 @@ function getItemNamesFromSet(items, options = { includeId: false, fallback: "unn
   return result;
 }
 
+// src/services/changedItemsController.js
+function sortById(a, b) {
+  const idA = a.engine.id;
+  const idB = b.engine.id;
+  return idA < idB ? -1 : idA > idB ? 1 : 0;
+}
+var ChangedItemsController = class {
+  /** @type {Set<import('../reactives/ReactiveItem.js').ReactiveItem>} */
+  items = /* @__PURE__ */ new Set();
+  /** @type {import('../services/modeController.js').ModeControllerService} */
+  #modeController;
+  /**
+   * @param {import('../services/modeController.js').ModeControllerService} modeController
+   */
+  constructor(modeController2) {
+    this.#modeController = modeController2;
+  }
+  /**
+   * Marks an item as changed. Outside a batch, immediately runs subscribers
+   * and clears the pending set.
+   * @param {import('../reactives/ReactiveItem.js').ReactiveItem} item
+   */
+  addItem(item) {
+    this.items.add(item);
+    if (!this.#modeController.batchMode) {
+      this.runSubscribers();
+      this.clear();
+    }
+  }
+  /**
+   * Removes an item from the pending set.
+   * @param {import('../reactives/ReactiveItem.js').ReactiveItem} item
+   */
+  removeItem(item) {
+    this.items.delete(item);
+  }
+  /**
+   * Clears the pending set.
+   */
+  clear() {
+    this.items.clear();
+  }
+  /**
+   * Runs all pending subscribers.
+   *
+   * The outer loop re-checks `this.items` after each notification round so
+   * that updates added during subscriber execution (e.g. via `runInAction`)
+   * are processed in the same call.
+   */
+  runSubscribers() {
+    const changedItemsWithUpdates = /* @__PURE__ */ new Set();
+    while (this.items.size > 0) {
+      const itemsToProcess = new Set(this.items);
+      this.items.clear();
+      itemsToProcess.forEach((item) => {
+        if (this.#modeController.batchMode) {
+          if (item.engine.checkChangesTemporary()) {
+            changedItemsWithUpdates.add(item);
+          }
+        } else if (item.engine.hasUpdates()) {
+          changedItemsWithUpdates.add(item);
+        }
+      });
+      const itemsToRecalc = /* @__PURE__ */ new Set();
+      changedItemsWithUpdates.forEach((item) => {
+        const visitDependent = (dep) => {
+          if (dep.hasSubscribers() && !dep.engine.hasUpdates()) {
+            itemsToRecalc.add(dep);
+          }
+        };
+        item.engine.getDeepDependents().forEach(visitDependent);
+      });
+      Array.from(itemsToRecalc).sort(sortById).forEach((item) => {
+        item.getValue();
+      });
+      itemsToRecalc.clear();
+      changedItemsWithUpdates.clear();
+      if (this.#modeController.batchMode) {
+        itemsToProcess.forEach((item) => {
+          if (item.engine.checkChangesTemporary()) {
+            changedItemsWithUpdates.add(item);
+          }
+        });
+      } else {
+        itemsToProcess.forEach((item) => {
+          if (item.engine.hasUpdates()) {
+            changedItemsWithUpdates.add(item);
+          }
+        });
+      }
+      const sorted = Array.from(changedItemsWithUpdates).filter((item) => item.hasSubscribers()).sort(sortById);
+      this.#modeController.startSubscribersMode();
+      const usedSubscribers = /* @__PURE__ */ new Set();
+      const errors = [];
+      for (const item of sorted) {
+        const itemSubscribers = item.engine.subscribeController.getSubscribers();
+        for (const subscriber of itemSubscribers) {
+          if (usedSubscribers.has(subscriber)) {
+            continue;
+          }
+          usedSubscribers.add(subscriber);
+          try {
+            item.engine.context.emitPlugin(
+              "onSubscriberRun",
+              item,
+              item.engine.updates
+            );
+            subscriber(item.engine.updates);
+          } catch (e) {
+            const err = getError(e);
+            const error = new Error(
+              `Error in ${item.name}: ${err.message}`,
+              { cause: item }
+            );
+            error.stack = err.stack;
+            errors.push(error);
+          }
+        }
+        item.engine.clearUpdates();
+      }
+      itemsToProcess.forEach((item) => {
+        item.engine.clearUpdates();
+      });
+      usedSubscribers.clear();
+      this.#modeController.endSubscribersMode();
+      if (this.#modeController.throwErrorInSubscribers) {
+        for (const error of errors) {
+          throw error;
+        }
+      }
+    }
+  }
+};
+var changedItemsController = new ChangedItemsController(modeController);
+modeController.on("beforeBatchModeEnd", () => {
+  changedItemsController.runSubscribers();
+  changedItemsController.clear();
+});
+
+// src/core/context.js
+var SNAPSHOT_VERSION = 1;
+var Store2Context = class {
+  /** @type {IdService} */
+  idService;
+  /** @type {ModeControllerService} */
+  modeController;
+  /** @type {Tracker} */
+  dependencyTracker;
+  /** @type {ChangedItemsController} */
+  changedItemsController;
+  /** @type {string} */
+  name;
+  /** @type {Array<import('../types.js').Store2Plugin>} */
+  #plugins = [];
+  /** @type {Array<import('../types.js').ActionMiddleware>} */
+  #middlewares = [];
+  /** @type {Map<string, import('../types.js').SnapshotRoot>} */
+  #roots = /* @__PURE__ */ new Map();
+  /** @type {boolean} */
+  #pluginsSuspended = false;
+  /** @type {boolean} */
+  #disposed = false;
+  /**
+   * @param {object} [options]
+   * @param {string} [options.name]
+   * @param {IdService} [options.idService]
+   * @param {ModeControllerService} [options.modeController]
+   * @param {Tracker} [options.dependencyTracker]
+   * @param {ChangedItemsController} [options.changedItemsController]
+   */
+  constructor(options = {}) {
+    this.name = options.name || "store2";
+    this.idService = options.idService || new IdService();
+    this.modeController = options.modeController || new ModeControllerService();
+    this.dependencyTracker = options.dependencyTracker || new Tracker(this.modeController);
+    if (options.changedItemsController) {
+      this.changedItemsController = options.changedItemsController;
+    } else {
+      this.changedItemsController = new ChangedItemsController(this.modeController);
+      this.modeController.on("beforeBatchModeEnd", () => {
+        this.changedItemsController.runSubscribers();
+        this.changedItemsController.clear();
+      });
+    }
+    this.modeController.on("batchModeStart", () => {
+      this.emitPlugin("onBatchStart", {
+        depth: this.modeController.batchDepth,
+        name: this.modeController.currentBatchName,
+        action: this.modeController.currentAction
+      });
+    });
+    this.modeController.on("batchModeEnd", () => {
+      this.emitPlugin("onBatchEnd", {
+        depth: this.modeController.batchDepth,
+        name: this.modeController.currentBatchName,
+        action: this.modeController.currentAction
+      });
+    });
+    this.modeController.onAction("actionStart", (action2) => {
+      this.emitPlugin("onActionStart", action2);
+    });
+    this.modeController.onAction("actionEnd", (action2) => {
+      this.emitPlugin("onActionEnd", action2);
+    });
+  }
+  /**
+   * Installs a plugin into this context.
+   * @param {import('../types.js').Store2Plugin} plugin
+   * @returns {this}
+   */
+  use(plugin) {
+    if (this.#disposed) {
+      throw new Error("Context has been disposed");
+    }
+    if (!plugin || typeof plugin.install !== "function") {
+      throw new Error("Plugin must implement install(context)");
+    }
+    plugin.install(this);
+    this.#plugins.push(plugin);
+    return this;
+  }
+  /**
+   * Registers an action middleware.
+   * @param {import('../types.js').ActionMiddleware} middleware
+   * @returns {this}
+   */
+  addMiddleware(middleware) {
+    if (this.#disposed) {
+      throw new Error("Context has been disposed");
+    }
+    this.#middlewares.push(middleware);
+    return this;
+  }
+  /**
+   * Registers a root for snapshot/hydrate. The root must implement
+   * `serialize()` and `hydrate(data)`.
+   * @param {string} name
+   * @param {import('../types.js').SnapshotRoot} root
+   * @returns {this}
+   */
+  registerRoot(name, root) {
+    if (this.#disposed) {
+      throw new Error("Context has been disposed");
+    }
+    if (!root || typeof root.serialize !== "function" || typeof root.hydrate !== "function") {
+      throw new Error("Root must implement serialize() and hydrate(data)");
+    }
+    this.#roots.set(name, root);
+    return this;
+  }
+  /**
+   * Unregisters a previously registered root.
+   * @param {string} name
+   * @returns {boolean}
+   */
+  unregisterRoot(name) {
+    return this.#roots.delete(name);
+  }
+  /**
+   * Returns the names of all roots currently registered with registerRoot()
+   * 
+   * @returns {Array<string>}
+   */
+  getRootNames() {
+    return Array.from(this.#roots.keys());
+  }
+  /**
+   * Returns a copy of the plugins installed via use().
+   * 
+   * @returns {Array<import('../types.js').Store2Plugin>}
+   */
+  get plugins() {
+    return [...this.#plugins];
+  }
+  /**
+   * Returns a copy of the middleware chain installed via addMiddleware()
+   * 
+   * @returns {Array<import('../types.js').ActionMiddleware>}
+   */
+  get middlewares() {
+    return [...this.#middlewares];
+  }
+  /**
+   * Invokes a lifecycle hook on every installed plugin. Plugin errors are
+   * caught and logged. When plugins are suspended (e.g. during time-travel),
+   * calls are ignored.
+   * @param {string} hook
+   * @param {...any} args
+   */
+  emitPlugin(hook, ...args) {
+    if (this.#pluginsSuspended) {
+      return;
+    }
+    for (const plugin of this.#plugins) {
+      const fn = (
+        /** @type {any} */
+        plugin[hook]
+      );
+      if (typeof fn === "function") {
+        try {
+          fn.apply(plugin, args);
+        } catch (e) {
+          console.error(`[store2] plugin "${plugin.name}" threw in ${hook}:`, e);
+        }
+      }
+    }
+  }
+  /**
+   * Runs `fn` inside a batch. Supports two signatures:
+   *
+   *     ctx.batch(() => { ... })
+   *     ctx.batch('update todos', () => { ... })
+   *
+   * @param {string | Function} nameOrFn
+   * @param {Function} [fn]
+   * @returns {any}
+   */
+  batch(nameOrFn, fn) {
+    const callback = typeof nameOrFn === "function" ? nameOrFn : fn;
+    const name = typeof nameOrFn === "string" ? nameOrFn : "";
+    if (typeof callback !== "function") {
+      throw new Error("batch() requires a function to run");
+    }
+    this.modeController.enterBatch(name);
+    try {
+      return callback();
+    } finally {
+      this.modeController.exitBatch();
+    }
+  }
+  /**
+   * Runs `fn` as a named action. Supports async bodies and middleware.
+   * @param {string} name
+   * @param {(action: import('../types.js').ActionInfo) => any} fn
+   * @param {any} [payload]
+   * @returns {Promise<any>}
+   */
+  async action(name, fn, payload = void 0) {
+    const action2 = this.modeController.beginAction(name, payload);
+    let index = -1;
+    const dispatch = async (i) => {
+      if (i <= index) {
+        throw new Error("next() called multiple times");
+      }
+      index = i;
+      const middleware = this.#middlewares[i];
+      if (!middleware) {
+        return fn(action2);
+      }
+      return middleware(action2, () => dispatch(i + 1));
+    };
+    try {
+      const result = await dispatch(0);
+      this.modeController.endAction(action2);
+      return result;
+    } catch (error) {
+      this.modeController.endAction(action2, getError(error));
+      throw error;
+    }
+  }
+  /**
+   * Flushes pending subscribers synchronously.
+   */
+  flush() {
+    this.changedItemsController.runSubscribers();
+    this.changedItemsController.clear();
+  }
+  /**
+   * Captures a serializable snapshot of every registered root.
+   * @returns {import('../types.js').ContextSnapshot}
+   */
+  snapshot() {
+    const roots = {};
+    for (const [name, root] of this.#roots) {
+      roots[name] = root.serialize();
+    }
+    return {
+      version: SNAPSHOT_VERSION,
+      timestamp: Date.now(),
+      roots
+    };
+  }
+  /**
+   * Applies a snapshot to every registered root. The whole operation runs
+   * in one batch.
+   *
+   * When `timeTravel` is `true`, plugin hooks are suppressed for the
+   * duration of the hydration so that a DevTools-style plugin does not
+   * re-record the rehydration as a new action. Subscribers still run so
+   * the UI updates.
+   *
+   * Roots present in the snapshot but not registered here are ignored.
+   * Roots registered here but missing from the snapshot are left untouched.
+   *
+   * @param {import('../types.js').ContextSnapshot} snapshot
+   * @param {{ timeTravel?: boolean }} [options]
+   */
+  hydrate(snapshot, options = {}) {
+    if (!snapshot || typeof snapshot !== "object" || !snapshot.roots) {
+      throw new Error("hydrate() requires a snapshot object with a roots field");
+    }
+    const { timeTravel = false } = options;
+    const previousSuspended = this.#pluginsSuspended;
+    if (timeTravel) {
+      this.#pluginsSuspended = true;
+    }
+    this.modeController.enterBatch(timeTravel ? "time-travel" : "hydrate");
+    try {
+      for (const [name, data] of Object.entries(snapshot.roots)) {
+        const root = this.#roots.get(name);
+        if (root) {
+          root.hydrate(data);
+        }
+      }
+    } finally {
+      this.modeController.exitBatch();
+      if (timeTravel) {
+        this.#pluginsSuspended = previousSuspended;
+      }
+    }
+  }
+  /**
+   * Releases the context and forgets all installed plugins and roots.
+   */
+  dispose() {
+    if (this.#disposed) {
+      return;
+    }
+    this.#disposed = true;
+    this.#middlewares.length = 0;
+    this.#plugins.length = 0;
+    this.#roots.clear();
+  }
+};
+var defaultContext = new Store2Context({
+  name: "default",
+  idService,
+  modeController,
+  dependencyTracker,
+  changedItemsController
+});
+var currentContext = null;
+function getCurrentContext() {
+  return currentContext || defaultContext;
+}
+function runWithContext(context, fn) {
+  const previous = currentContext;
+  currentContext = context;
+  try {
+    return fn();
+  } finally {
+    currentContext = previous;
+  }
+}
+function createStore2Context(options = {}) {
+  return new Store2Context(options);
+}
+
 // src/core/SubscribeController.js
 var SubscribeController = class {
   /** @type {EventEmitter} */
   #emitter;
   #reactiveItem;
   /**
-   * @param {import('./types.d.ts').ReactiveItem} reactiveItem
+   * @param {import('../reactives/ReactiveItem.js').ReactiveItem} reactiveItem
    */
   constructor(reactiveItem) {
     this.#emitter = new EventEmitter();
@@ -749,7 +1497,7 @@ var SubscribeController = class {
   /**
    * Subscribes a callback to the 'change' event.
    *
-   * @param {(updates: Map<string, import('./types.d.ts').UpdateDataRecord>) => void} fn
+   * @param {(updates: Map<string, import('./UpdateDataRecord.js').UpdateDataRecord>) => void} fn
    * @param {{ delay?: number, signal?: AbortSignal }} [options]
    * @returns {() => void}
    */
@@ -814,237 +1562,18 @@ var SubscribeController = class {
   }
 };
 
-// src/services/modeController.js
-var ModeControllerService = class {
-  isComputing = false;
-  untrackMode = false;
-  throwErrorInSubscribers = true;
-  #batchDepth = 0;
-  #subscribersMode = false;
-  /** @type {EventEmitterLite<"batchModeStart"|"batchModeEnd"|"beforeBatchModeEnd">} */
-  batchModeEvents;
-  /** @type {EventEmitterLite<"subscribersModeEnd">} */
-  subscribersModeEvents;
-  constructor() {
-    this.batchModeEvents = new EventEmitterLite();
-    this.subscribersModeEvents = new EventEmitterLite();
-  }
-  /**
-   * Subscribes a function to be called whenever the given event is triggered.
-   * @param {"batchModeStart"|"batchModeEnd"|"beforeBatchModeEnd"} event - The event to subscribe to.
-   * @param {function():void} callback - The function to be called.
-   * @returns {()=>void} A function that unsubscribes the given function.
-   */
-  on(event, callback) {
-    return this.batchModeEvents.on(event, callback);
-  }
-  /**
-   * Returns true if currently inside a batch (batch depth > 0).
-   * @returns {boolean}
-   */
-  get batchMode() {
-    return this.#batchDepth > 0;
-  }
-  /**
-   * Enters a batch mode. Increments the batch depth.
-   * Emits "batchModeStart" when entering the first batch.
-   */
-  enterBatch() {
-    const wasInBatch = this.batchMode;
-    this.#batchDepth++;
-    if (!wasInBatch) {
-      this.batchModeEvents.emit("batchModeStart");
-    }
-  }
-  /**
-   * Exits a batch mode. Decrements the batch depth.
-   * If exiting the last batch, emits "beforeBatchModeEnd" and then "batchModeEnd".
-   */
-  exitBatch() {
-    if (this.#batchDepth === 0) {
-      return;
-    }
-    const isLast = this.#batchDepth === 1;
-    if (isLast) {
-      this.batchModeEvents.emit("beforeBatchModeEnd");
-    }
-    this.#batchDepth--;
-    if (isLast) {
-      this.batchModeEvents.emit("batchModeEnd");
-    }
-  }
-  /**
-   * Retrieves whether any subscribers are currently running.
-   * @returns {boolean}
-   */
-  get subscribersMode() {
-    return this.#subscribersMode;
-  }
-  /**
-   * Sets the state to indicate that subscribers are currently running.
-   */
-  startSubscribersMode() {
-    this.#subscribersMode = true;
-  }
-  /**
-   * Sets the state to indicate that no subscribers are currently running.
-   */
-  endSubscribersMode() {
-    if (!this.#subscribersMode) {
-      return;
-    }
-    this.#subscribersMode = false;
-    this.subscribersModeEvents.emit("subscribersModeEnd");
-  }
-  /**
-   * Subscribes a function to be called once after all subscribers have finished running.
-   * @param {Function} callback
-   */
-  runAfterSubscribers(callback) {
-    this.subscribersModeEvents.once("subscribersModeEnd", callback);
-  }
-};
-var modeController = new ModeControllerService();
-
-// src/services/changedItemsController.js
-var ChangedItemsController = class {
-  /** @type {Set<import('./types.d.ts').ReactiveItem>} */
-  items = /* @__PURE__ */ new Set();
-  /**
-   * Adds a reactive item to the set of changed items.
-   * If not in batch mode, immediately runs subscribers and clears the set.
-   * @param {import('./types.d.ts').ReactiveItem} item - The reactive item that changed.
-   */
-  addItem(item) {
-    this.items.add(item);
-    if (!modeController.batchMode) {
-      this.runSubscribers();
-      this.clear();
-    }
-  }
-  /**
-   * @param {import('./types.d.ts').ReactiveItem} item
-   */
-  removeItem(item) {
-    this.items.delete(item);
-  }
-  /**
-   * Removes all items from the changed items set.
-   */
-  clear() {
-    this.items.clear();
-  }
-  /**
-   * Runs all subscribers for the changed items.
-   * Processes dependency trees, recalculates stale computed values,
-   * and invokes subscriber callbacks with update records.
-   * Handles errors and aggregates them if multiple occur.
-   *
-   * The while-loop ensures that any new changes that are added
-   * (via changedItemsController.addItem) during subscriber execution
-   * are processed in the next iteration, preventing lost updates.
-   */
-  runSubscribers() {
-    const changedItemsWithUpdates = /* @__PURE__ */ new Set();
-    while (this.items.size > 0) {
-      const itemsToProcess = new Set(this.items);
-      this.items.clear();
-      itemsToProcess.forEach((item) => {
-        if (modeController.batchMode === true) {
-          if (item.engine.checkChangesTemporary()) {
-            changedItemsWithUpdates.add(item);
-          }
-        } else {
-          if (item.engine.hasUpdates()) {
-            changedItemsWithUpdates.add(item);
-          }
-        }
-      });
-      const itemsToRecalc = /* @__PURE__ */ new Set();
-      changedItemsWithUpdates.forEach((item) => {
-        item.engine.getDeepDependents().forEach((dep) => {
-          if (dep.hasSubscribers()) {
-            if (!dep.engine.hasUpdates()) {
-              itemsToRecalc.add(dep);
-            }
-          }
-        });
-      });
-      Array.from(itemsToRecalc).sort(sortReactiveItems).forEach((item) => {
-        item.getValue();
-      });
-      itemsToRecalc.clear();
-      changedItemsWithUpdates.clear();
-      if (modeController.batchMode === true) {
-        itemsToProcess.forEach((item) => {
-          if (item.engine.checkChangesTemporary()) {
-            changedItemsWithUpdates.add(item);
-          }
-        });
-      } else {
-        itemsToProcess.forEach((item) => {
-          if (item.engine.hasUpdates()) {
-            changedItemsWithUpdates.add(item);
-          }
-        });
-      }
-      const changedItemsWithUpdatesSorted = Array.from(changedItemsWithUpdates).filter((item) => item.hasSubscribers()).sort(sortReactiveItems);
-      modeController.startSubscribersMode();
-      const usedSubscribers = /* @__PURE__ */ new Set();
-      const errors = [];
-      for (let i = 0; i < changedItemsWithUpdatesSorted.length; i++) {
-        const item = changedItemsWithUpdatesSorted[i];
-        const itemSubscribers = item.engine.subscribeController.getSubscribers();
-        for (const subscriber of itemSubscribers) {
-          if (usedSubscribers.has(subscriber)) {
-            continue;
-          }
-          usedSubscribers.add(subscriber);
-          try {
-            subscriber(item.engine.updates);
-          } catch (e) {
-            const err = getError(e);
-            const error = new Error(`Error in ${item.name}: ${err.message}`, {
-              cause: item
-            });
-            error.stack = err.stack;
-            errors.push(error);
-          }
-        }
-        item.engine.clearUpdates();
-      }
-      itemsToProcess.forEach((item) => {
-        item.engine.clearUpdates();
-      });
-      usedSubscribers.clear();
-      modeController.endSubscribersMode();
-      if (modeController.throwErrorInSubscribers) {
-        for (let i = 0; i < errors.length; i++) {
-          const error = errors[i];
-          throw error;
-        }
-      }
-    }
-  }
-};
-modeController.on("beforeBatchModeEnd", () => {
-  changedItemsController.runSubscribers();
-  changedItemsController.clear();
-});
-var changedItemsController = new ChangedItemsController();
-
 // src/core/DependencyGraph.js
 var DependencyGraph = class {
-  /** @type {Set<import('./types.d.ts').ReactiveItem>} */
+  /** @type {Set<import('../reactives/ReactiveItem.js').ReactiveItem>} */
   #dependencies;
-  /** @type {Set<import('./types.d.ts').ReactiveItem>} */
+  /** @type {Set<import('../reactives/ReactiveItem.js').ReactiveItem>} */
   #dependents;
-  /** @type {import('./types.d.ts').ReactiveItem} */
+  /** @type {import('../reactives/ReactiveItem.js').ReactiveItem} */
   #reactiveItem;
   /**
-   * @param {Set<import('./types.d.ts').ReactiveItem>} dependencies - The engine's dependencies set.
-   * @param {Set<import('./types.d.ts').ReactiveItem>} dependents - The engine's dependents set.
-   * @param {import('./types.d.ts').ReactiveItem} reactiveItem - The owning reactive item.
+   * @param {Set<import('../reactives/ReactiveItem.js').ReactiveItem>} dependencies - The engine's dependencies set.
+   * @param {Set<import('../reactives/ReactiveItem.js').ReactiveItem>} dependents - The engine's dependents set.
+   * @param {import('../reactives/ReactiveItem.js').ReactiveItem} reactiveItem - The owning reactive item.
    */
   constructor(dependencies, dependents, reactiveItem) {
     this.#dependencies = dependencies;
@@ -1053,7 +1582,7 @@ var DependencyGraph = class {
   }
   /**
    * Adds a single dependency.
-   * @param {import('./types.d.ts').ReactiveItem} dependency
+   * @param {import('../reactives/ReactiveItem.js').ReactiveItem} dependency
    */
   addDependency(dependency) {
     if (!this.#dependencies.has(dependency)) {
@@ -1062,7 +1591,7 @@ var DependencyGraph = class {
   }
   /**
    * Adds multiple dependencies, sorted by id, and registers this reactive item as a dependent on each.
-   * @param {Set<import('./types.d.ts').ReactiveItem>} deps - Set of dependencies to add.
+   * @param {Set<import('../reactives/ReactiveItem.js').ReactiveItem>} deps - Set of dependencies to add.
    */
   addDependencies(deps) {
     const array = [];
@@ -1079,14 +1608,14 @@ var DependencyGraph = class {
   }
   /**
    * Removes a dependent from the dependents set.
-   * @param {import('./types.d.ts').ReactiveItem} dependent
+   * @param {import('../reactives/ReactiveItem.js').ReactiveItem} dependent
    */
   removeDependent(dependent) {
     this.#dependents.delete(dependent);
   }
   /**
    * Adds a dependent to the dependents set.
-   * @param {import('./types.d.ts').ReactiveItem} dependent
+   * @param {import('../reactives/ReactiveItem.js').ReactiveItem} dependent
    * @returns {boolean} True if the dependent was added (i.e., not already present).
    */
   addDependent(dependent) {
@@ -1098,7 +1627,7 @@ var DependencyGraph = class {
   }
   /**
    * Returns all dependents of this reactive item (direct and indirect).
-   * @returns {Set<import('./types.d.ts').ReactiveItem>}
+   * @returns {Set<import('../reactives/ReactiveItem.js').ReactiveItem>}
    */
   getDeepDependents() {
     const result = /* @__PURE__ */ new Set();
@@ -1121,7 +1650,7 @@ var DependencyGraph = class {
   }
   /**
    * Returns sorted array of deep dependents.
-   * @returns {Array<import('./types.d.ts').ReactiveItem>}
+   * @returns {Array<import('../reactives/ReactiveItem.js').ReactiveItem>}
    */
   getDeepDependentsArray() {
     const array = Array.from(this.getDeepDependents());
@@ -1131,7 +1660,7 @@ var DependencyGraph = class {
   /**
    * Notifies all dependents of a message.
    * @param {number} message - The message code (EngineMessages).
-   * @param {{ sender: import('./types.d.ts').ReactiveItem, recipients: Set<import('./types.d.ts').ReactiveItem> }} ctx - Context containing sender and recipient set.
+   * @param {{ sender: import('../reactives/ReactiveItem.js').ReactiveItem, recipients: Set<import('../reactives/ReactiveItem.js').ReactiveItem> }} ctx - Context containing sender and recipient set.
    */
   notifyDependents(message, ctx) {
     for (const dependent of this.#dependents) {
@@ -1142,7 +1671,7 @@ var DependencyGraph = class {
   /**
    * Notifies all dependencies of a message.
    * @param {number} message - The message code.
-   * @param {{ sender: import('./types.d.ts').ReactiveItem, recipients: Set<import('./types.d.ts').ReactiveItem> }} ctx
+   * @param {{ sender: import('../reactives/ReactiveItem.js').ReactiveItem, recipients: Set<import('../reactives/ReactiveItem.js').ReactiveItem> }} ctx
    */
   notifyDependencies(message, ctx) {
     for (const dependency of this.#dependencies) {
@@ -1152,7 +1681,7 @@ var DependencyGraph = class {
   }
   /**
    * Updates the dependency set to a new set.
-   * @param {Set<import('./types.d.ts').ReactiveItem>} newDeps - New set of dependencies.
+   * @param {Set<import('../reactives/ReactiveItem.js').ReactiveItem>} newDeps - New set of dependencies.
    */
   updateDependencies(newDeps) {
     for (const oldDep of this.#dependencies) {
@@ -1187,12 +1716,12 @@ var BatchSnapshot = class {
   /**
    * Reference to the reactive item this snapshot belongs to.
    * Used to access the equality comparison function.
-   * @type {import('./types.d.ts').ReactiveItem}
+   * @type {import('../reactives/ReactiveItem.js').ReactiveItem}
    */
   #reactiveItem;
   /**
    * Creates a new BatchSnapshot instance.
-   * @param {import('./types.d.ts').ReactiveItem} reactiveItem - The reactive item to snapshot.
+   * @param {import('../reactives/ReactiveItem.js').ReactiveItem} reactiveItem - The reactive item to snapshot.
    */
   constructor(reactiveItem) {
     this.#reactiveItem = reactiveItem;
@@ -1262,14 +1791,15 @@ var UpdateDataRecord = class {
   value;
   /** @type {any} */
   oldValue;
-  /** @type {import('./types.d.ts').ReactiveItem|undefined} */
+  /** @type {import('../reactives/ReactiveItem.js').ReactiveItem|undefined} */
   reactiveItem;
   /**
-   * Initializes an instance of UpdateDataRecord with the provided type, old value, and new value.
-   * @param {"set"|"delete"} type - The action performed, either "set" or "delete".
-   * @param {any} oldValue - The previous value before the update.
-   * @param {any} value - The new value after the update.
-   * @param {import('./types.d.ts').ReactiveItem} [reactiveItem] - The reactive item that triggered the update.
+   * Creates a new update record.
+   *
+   * @param {"set"|"delete"} type - The operation that produced the change.
+   * @param {any} oldValue - Value before the change.
+   * @param {any} value - Value after the change.
+   * @param {import('../reactives/ReactiveItem.js').ReactiveItem} [reactiveItem] - The reactive item that triggered the update.
    */
   constructor(type, oldValue, value, reactiveItem) {
     this.type = type;
@@ -1292,10 +1822,7 @@ var UpdateDataRecordManager = class {
    * @param {string} itemName - The name of the item to be destroyed.
    */
   removeItem(itemName) {
-    this.data.set(
-      itemName,
-      new UpdateDataRecord("delete", void 0, void 0, void 0)
-    );
+    this.data.set(itemName, new UpdateDataRecord("delete", void 0, void 0, void 0));
     const keysToDelete = [];
     this.data.forEach((item, key) => {
       if (key.startsWith(itemName + ".")) {
@@ -1310,19 +1837,18 @@ var UpdateDataRecordManager = class {
 
 // src/core/UpdateTracker.js
 var UpdateTracker = class {
-  /** @type {Map<string, import('./types.d.ts').UpdateDataRecord>} */
+  /** @type {Map<string, import('./UpdateDataRecord.js').UpdateDataRecord>} */
   #updates;
-  /** @type {import('./types.d.ts').ReactiveItem} */
+  /** @type {import('../reactives/ReactiveItem.js').ReactiveItem} */
   #reactiveItem;
   /** @type {BatchSnapshot | null} */
   #batchSnapshot = null;
   /** @type {import('./Engine.js').Engine} */
   #engine;
-  // ссылка на Engine для доступа к version и batchSnapshot
   /**
-   * @param {Map<string, import('./types.d.ts').UpdateDataRecord>} updates - The engine's updates map.
-   * @param {import('./types.d.ts').ReactiveItem} reactiveItem - The owning reactive item.
-   * @param {import('./Engine.js').Engine} engine - The owning engine (for version and batch snapshot access).
+   * @param {Map<string, import('./UpdateDataRecord.js').UpdateDataRecord>} updates
+   * @param {import('../reactives/ReactiveItem.js').ReactiveItem} reactiveItem
+   * @param {import('./Engine.js').Engine} engine
    */
   constructor(updates, reactiveItem, engine) {
     this.#updates = updates;
@@ -1330,12 +1856,12 @@ var UpdateTracker = class {
     this.#engine = engine;
   }
   /**
-   * Records a change attempt. In batch mode, stores the original value in a snapshot.
-   * @param {string} property - The property key.
-   * @param {any} oldValue - The value before the change.
+   * In batch mode, stores the original value in a snapshot.
+   * @param {string} property
+   * @param {any} oldValue
    */
   #recordChange(property, oldValue) {
-    if (modeController.batchMode) {
+    if (this.#engine.context.modeController.batchMode) {
       if (!this.#batchSnapshot) {
         this.#batchSnapshot = new BatchSnapshot(this.#reactiveItem);
       }
@@ -1343,16 +1869,18 @@ var UpdateTracker = class {
     }
   }
   /**
-   * Determines if a change is effective (i.e., not reverted) considering batch snapshots.
-   * @param {string} property - The property key.
-   * @param {any} oldValue - The immediate previous value.
-   * @param {any} newValue - The new value.
-   * @param {import('./types.d.ts').CompareFunction|null} compareFn - Equality function.
+   * Determines whether a change is effective (i.e. not reverted) considering
+   * batch snapshots.
+   * @param {string} property
+   * @param {any} oldValue
+   * @param {any} newValue
+   * @param {import('../types.js').CompareFunction | null} compareFn
    * @returns {boolean}
    */
   isEffectiveChange(property, oldValue, newValue, compareFn) {
     const equals = (a, b) => compareFn ? compareFn(a, b) : this.#reactiveItem.equals(a, b);
-    if (modeController.batchMode && this.#batchSnapshot?.has(property)) {
+    const batchMode = this.#engine.context.modeController.batchMode;
+    if (batchMode && this.#batchSnapshot?.has(property)) {
       const original = this.#batchSnapshot.getOriginal(property);
       return !equals(original, newValue);
     }
@@ -1360,20 +1888,21 @@ var UpdateTracker = class {
   }
   /**
    * Adds an update record if the change is effective.
-   * @param {string} property - The property key.
-   * @param {"set"|"delete"} type - The operation type.
-   * @param {any} oldValue - The previous value (immediate).
-   * @param {any} newValue - The new value.
-   * @param {import('./types.d.ts').CompareFunction|null} compareFn - Equality function.
-   * @param {() => void} notifyDependentsCallback - Callback to notify dependents of a change.
-   * @param {() => void} addToChangedItemsCallback - Callback to add the item to the changed items controller.
-   * @returns {boolean} True if an update was added.
+   * @param {string} property
+   * @param {"set" | "delete"} type
+   * @param {any} oldValue
+   * @param {any} newValue
+   * @param {import('../types.js').CompareFunction | null} compareFn
+   * @param {() => void} notifyDependentsCallback
+   * @param {() => void} addToChangedItemsCallback
+   * @returns {boolean}
    */
   addUpdate(property, type, oldValue, newValue, compareFn, notifyDependentsCallback, addToChangedItemsCallback) {
     this.#recordChange(property, oldValue);
+    const batchMode = this.#engine.context.modeController.batchMode;
     let reportedOld = oldValue;
     let compareOld = oldValue;
-    if (modeController.batchMode && this.#batchSnapshot?.has(property)) {
+    if (batchMode && this.#batchSnapshot?.has(property)) {
       const original = this.#batchSnapshot.getOriginal(property);
       reportedOld = original;
       compareOld = original;
@@ -1396,7 +1925,6 @@ var UpdateTracker = class {
     return true;
   }
   /**
-   * Checks if there are any pending updates.
    * @returns {boolean}
    */
   hasUpdates() {
@@ -1413,10 +1941,9 @@ var UpdateTracker = class {
     }
   }
   /**
-   * Processes temporary changes after batch ends.
-   * Removes updates for properties that reverted to original values.
-   * @param {(prop: string) => any} getCurrentValue - Function to get current value for a property.
-   * @returns {boolean} True if any changes remain.
+   * Removes updates for properties that reverted to their original values.
+   * @param {(prop: string) => any} getCurrentValue
+   * @returns {boolean}
    */
   checkChangesTemporary(getCurrentValue) {
     if (!this.#batchSnapshot) {
@@ -1446,7 +1973,7 @@ var MessageHandler = class {
   /**
    * Processes an incoming message.
    * @param {number} message - The message code.
-   * @param {{ sender: import('./types.d.ts').ReactiveItem, recipients: Set<import('./types.d.ts').ReactiveItem> }} ctx - Context.
+   * @param {{ sender: import('../reactives/ReactiveItem.js').ReactiveItem, recipients: Set<import('../reactives/ReactiveItem.js').ReactiveItem> }} ctx - Context.
    * @param {_Engine} engineState - The engine's state container (provides getters/setters).
    * @param {Function} setError - Callback to set the engine's error.
    * @param {Function} setShouldRecalc - Callback to set the shouldRecalc flag.
@@ -1489,34 +2016,34 @@ var COMPUTED = 2;
 var COLLECTION = 3;
 var SHALLOW_REACTIVE = 4;
 var Engine = class {
-  // --- Public fields (for backward compatibility) ---
-  /** @type {Set<import('./types.d.ts').ReactiveItem>} */
+  /** @type {import('./context.js').Store2Context} */
+  context;
+  /** @type {Set<import('../reactives/ReactiveItem.js').ReactiveItem>} */
   dependencies = /* @__PURE__ */ new Set();
-  /** @type {Set<import('./types.d.ts').ReactiveItem>} */
+  /** @type {Set<import('../reactives/ReactiveItem.js').ReactiveItem>} */
   dependents = /* @__PURE__ */ new Set();
   /** @type {number} */
-  id = idService.generateId();
+  id;
   /** @type {number} */
   version = 0;
-  /** @type {import('./types.d.ts').ReactiveItem} */
+  /** @type {import('../reactives/ReactiveItem.js').ReactiveItem} */
   reactiveItem;
   /** @type {boolean} */
   shouldRecalc = false;
   /** @type {boolean} */
   isDestroyed = false;
-  /** @type {null|Error} */
+  /** @type {Error | null} */
   #error = null;
   /** @type {SubscribeController} */
   subscribeController;
-  /** @type {number} */
+  /** @type {import('../types.js').ReactiveItemType} */
   type;
   /** @type {Map<string, import('./UpdateDataRecord.js').UpdateDataRecord>} */
   updates = /* @__PURE__ */ new Map();
-  /** @type {import('./types.d.ts').CompareFunction|null} */
+  /** @type {import('../types.js').CompareFunction | null} */
   compareFn = null;
   /** @type {boolean} */
   suppressNotifications = false;
-  // --- Private submodules ---
   /** @type {DependencyGraph} */
   #graph;
   /** @type {UpdateTracker} */
@@ -1524,58 +2051,66 @@ var Engine = class {
   /** @type {MessageHandler} */
   #messageHandler;
   /**
-   * Creates an Engine instance.
-   * @param {import('./types.d.ts').ReactiveItem} reactiveItem - The owning reactive item.
-   * @param {1|2|3|4} type - The type of reactive item.
+   * @param {import('../reactives/ReactiveItem.js').ReactiveItem} reactiveItem
+   * @param {import('../types.js').ReactiveItemType} type
    */
   constructor(reactiveItem, type) {
     this.reactiveItem = reactiveItem;
     this.type = type;
+    this.context = getCurrentContext();
+    this.id = this.context.idService.generateId();
     this.#graph = new DependencyGraph(this.dependencies, this.dependents, reactiveItem);
     this.#updateTracker = new UpdateTracker(this.updates, reactiveItem, this);
     this.#messageHandler = new MessageHandler();
     this.subscribeController = new SubscribeController(this.reactiveItem);
   }
-  /** @type {Error|null} */
+  /**
+   * @returns {Error | null}
+   */
   get error() {
     return this.#error;
   }
   /**
-   * Records a change attempt.
-   * @param {string} property - The property key.
-   * @param {"set"|"delete"} type - The operation type.
-   * @param {any} oldValue - The previous value.
-   * @param {any} value - The new value.
-   * @returns {boolean} True if an update was added.
+   * Records a change attempt and emits `onUpdate` when the change is
+   * effective.
+   * @param {string} property
+   * @param {"set" | "delete"} type
+   * @param {any} oldValue
+   * @param {any} value
+   * @returns {boolean}
    */
   addUpdate(property, type, oldValue, value) {
-    return this.#updateTracker.addUpdate(
+    const added = this.#updateTracker.addUpdate(
       property,
       type,
       oldValue,
       value,
       this.compareFn,
       () => this.notifyDependents(EngineMessages.DEPENDENCY_CHANGED),
-      () => changedItemsController.addItem(this.reactiveItem)
+      () => this.context.changedItemsController.addItem(this.reactiveItem)
     );
+    if (added) {
+      const record = this.updates.get(property);
+      if (record) {
+        this.context.emitPlugin("onUpdate", this.reactiveItem, property, record);
+      }
+    }
+    return added;
   }
   /**
-   * Adds a single dependency.
-   * @param {import('./types.d.ts').ReactiveItem} dependency
+   * @param {import('../reactives/ReactiveItem.js').ReactiveItem} dependency
    */
   addDependency(dependency) {
     this.#graph.addDependency(dependency);
   }
   /**
-   * Adds multiple dependencies.
-   * @param {Set<import('./types.d.ts').ReactiveItem>} dependencies
+   * @param {Set<import('../reactives/ReactiveItem.js').ReactiveItem>} dependencies
    */
   addDependencies(dependencies) {
     this.#graph.addDependencies(dependencies);
   }
   /**
-   * Adds a dependent.
-   * @param {import('./types.d.ts').ReactiveItem} dependent
+   * @param {import('../reactives/ReactiveItem.js').ReactiveItem} dependent
    * @returns {boolean}
    */
   addDependent(dependent) {
@@ -1585,30 +2120,26 @@ var Engine = class {
     return this.#graph.addDependent(dependent);
   }
   /**
-   * Removes a dependent.
-   * @param {import('./types.d.ts').ReactiveItem} dependent
+   * @param {import('../reactives/ReactiveItem.js').ReactiveItem} dependent
    */
   removeDependent(dependent) {
     this.#graph.removeDependent(dependent);
   }
   /**
-   * Returns all dependents recursively.
-   * @returns {Set<import('./types.d.ts').ReactiveItem>}
+   * @returns {Set<import('../reactives/ReactiveItem.js').ReactiveItem>}
    */
   getDeepDependents() {
     return this.#graph.getDeepDependents();
   }
   /**
-   * Returns sorted array of deep dependents.
-   * @returns {Array<import('./types.d.ts').ReactiveItem>}
+   * @returns {Array<import('../reactives/ReactiveItem.js').ReactiveItem>}
    */
   getDeepDependentsArray() {
     return this.#graph.getDeepDependentsArray();
   }
   /**
-   * Notifies dependents of a message.
-   * @param {number} message - The message code.
-   * @param {{ sender: import('./types.d.ts').ReactiveItem, recipients: Set<import('./types.d.ts').ReactiveItem> }} [ctx]
+   * @param {number} message
+   * @param {{ sender: import('../reactives/ReactiveItem.js').ReactiveItem, recipients: Set<import('../reactives/ReactiveItem.js').ReactiveItem> }} [ctx]
    */
   notifyDependents(message, ctx) {
     if (!ctx) {
@@ -1617,9 +2148,8 @@ var Engine = class {
     this.#graph.notifyDependents(message, ctx);
   }
   /**
-   * Notifies dependencies (reverse direction).
-   * @param {number} message - The message code.
-   * @param {{ sender: import('./types.d.ts').ReactiveItem, recipients: Set<import('./types.d.ts').ReactiveItem> }} [ctx]
+   * @param {number} message
+   * @param {{ sender: import('../reactives/ReactiveItem.js').ReactiveItem, recipients: Set<import('../reactives/ReactiveItem.js').ReactiveItem> }} [ctx]
    */
   notifyDependencies(message, ctx) {
     if (!ctx) {
@@ -1628,9 +2158,8 @@ var Engine = class {
     this.#graph.notifyDependencies(message, ctx);
   }
   /**
-   * Handles incoming messages.
-   * @param {number} message - The message code.
-   * @param {{ sender: import('./types.d.ts').ReactiveItem, recipients: Set<import('./types.d.ts').ReactiveItem> }} ctx
+   * @param {number} message
+   * @param {{ sender: import('../reactives/ReactiveItem.js').ReactiveItem, recipients: Set<import('../reactives/ReactiveItem.js').ReactiveItem> }} ctx
    */
   getMessage(message, ctx) {
     const setError = (err) => {
@@ -1654,9 +2183,9 @@ var Engine = class {
     );
   }
   /**
-   * Sets an error and notifies dependents.
-   * @param {Error|null} error
-   * @param {{ sender: import('./types.d.ts').ReactiveItem, recipients: Set<import('./types.d.ts').ReactiveItem> }} [ctx]
+   * Sets an error and notifies dependents. Emits `onError`.
+   * @param {Error | null} error
+   * @param {{ sender: import('../reactives/ReactiveItem.js').ReactiveItem, recipients: Set<import('../reactives/ReactiveItem.js').ReactiveItem> }} [ctx]
    */
   setError(error, ctx) {
     if (error === null) {
@@ -1664,6 +2193,7 @@ var Engine = class {
     }
     this.#error = error;
     this.shouldRecalc = true;
+    this.context.emitPlugin("onError", this.reactiveItem, error);
     const c = ctx || { sender: this.reactiveItem, recipients: /* @__PURE__ */ new Set() };
     this.notifyDependents(EngineMessages.HAS_ERROR, c);
   }
@@ -1674,8 +2204,8 @@ var Engine = class {
     this.#error = null;
   }
   /**
-   * Destroys the engine.
-   * @param {{ sender: import('./types.d.ts').ReactiveItem, recipients: Set<import('./types.d.ts').ReactiveItem> }} [ctx]
+   * Destroys the engine. Emits `onDestroy` after teardown.
+   * @param {{ sender: import('../reactives/ReactiveItem.js').ReactiveItem, recipients: Set<import('../reactives/ReactiveItem.js').ReactiveItem> }} [ctx]
    */
   destroy(ctx) {
     if (this.isDestroyed) {
@@ -1689,6 +2219,7 @@ var Engine = class {
     this.#graph.clear();
     this.clearUpdates();
     this.subscribeController.destroy();
+    this.context.emitPlugin("onDestroy", this.reactiveItem);
   }
   /**
    * Clears all pending updates.
@@ -1697,15 +2228,13 @@ var Engine = class {
     this.#updateTracker.clearUpdates();
   }
   /**
-   * Checks if there are any pending updates.
    * @returns {boolean}
    */
   hasUpdates() {
     return this.#updateTracker.hasUpdates();
   }
   /**
-   * Processes temporary changes after batch ends.
-   * @returns {boolean} True if any changes remain.
+   * @returns {boolean}
    */
   checkChangesTemporary() {
     const getCurrent = (prop) => {
@@ -1718,21 +2247,19 @@ var Engine = class {
     return this.#updateTracker.checkChangesTemporary(getCurrent);
   }
   /**
-   * Updates dependencies to a new set.
-   * @param {Set<import('./types.d.ts').ReactiveItem>} newDeps
+   * @param {Set<import('../reactives/ReactiveItem.js').ReactiveItem>} newDeps
    */
   updateDependencies(newDeps) {
     this.#graph.updateDependencies(newDeps);
   }
   /**
-   * Prepares the engine for setting a new value.
    * @throws {Error} If destroyed or in subscribers mode.
    */
   prepareSetValue() {
     if (this.isDestroyed) {
       throw new Error("The reactive item has been destroyed");
     }
-    if (modeController.subscribersMode) {
+    if (this.context.modeController.subscribersMode) {
       throw new Error("Cannot set value while subscribers are running");
     }
   }
@@ -1743,156 +2270,119 @@ var Engine = class {
     if (this.suppressNotifications) {
       return;
     }
-    changedItemsController.addItem(this.reactiveItem);
+    this.context.changedItemsController.addItem(this.reactiveItem);
   }
   /**
-   * Checks if a change is effective considering batch mode and snapshots.
-   * This method is kept for backward compatibility.
-   *
-   * @param {string} property - The property key.
-   * @param {any} oldValue - The immediate previous value.
-   * @param {any} newValue - The new value.
-   * @returns {boolean} True if the change is effective (not reverted).
+   * @param {string} property
+   * @param {any} oldValue
+   * @param {any} newValue
+   * @returns {boolean}
    */
   isEffectiveChangeWithOld(property, oldValue, newValue) {
     return this.#updateTracker.isEffectiveChange(property, oldValue, newValue, this.compareFn);
   }
 };
 
-// src/services/dependencyTracker.js
-var Tracker = class {
-  #isActive = false;
-  /** @type {Set<import('./types.d.ts').ReactiveItem>} */
-  #store = /* @__PURE__ */ new Set();
-  #eventEmitter = new EventEmitterLite();
-  /** @type {object} */
-  ctx = {};
-  /**
-   * Returns the current contents of the tracker's store, which is a set of all reactive items that have been
-   * accessed since the tracker was last turned on. This is useful for debugging and testing purposes.
-   * @returns {Set<import('./types.d.ts').ReactiveItem>} The current contents of the tracker's store.
-   */
-  get data() {
-    return /* @__PURE__ */ new Set([...this.#store]);
-  }
-  /**
-   * Returns a sorted array of all reactive items in the tracker's store. The items are sorted by their internal id,
-   * ensuring consistent processing order when notified of changes.
-   * @returns {Array<import('./types.d.ts').ReactiveItem>} A sorted array of reactive items.
-   */
-  getAsSortedArray() {
-    return Array.from(this.#store).sort(sortReactiveItems);
-  }
-  /**
-   * Adds a reactive item to the tracker's store if the tracker is turned on. If the tracker is not turned on, this
-   * method does nothing.
-   * @param {import('./types.d.ts').ReactiveItem} item - The reactive item to add to the tracker's store.
-   * @param {string} [_key=""]
-   */
-  add(item, _key = "") {
-    if (modeController.untrackMode) {
-      return;
-    }
-    if (this.#isActive) {
-      this.#store.add(item);
-      this.#eventEmitter.emit("add", item);
-    }
-  }
-  /**
-   *
-   * @param {(reactiveItem:import('./types.d.ts').ReactiveItem)=>void} callback
-   * @returns {()=>void}
-   */
-  onAdd(callback) {
-    return this.#eventEmitter.on("add", callback);
-  }
-  /**
-   * Returns whether the tracker is currently turned on or not.
-   * @returns {boolean} true if the tracker is on, false if it is off.
-   */
-  isActive() {
-    return this.#isActive;
-  }
-  /**
-   * Turns the tracker on and clears its store. If the tracker is already turned on, an error is thrown.
-   * @param {object} [ctx={}] - The context to use when the tracker is turned on.
-   * are tracked. If filter is a function, it is called with each reactive item as its argument, and if it returns false, the
-   * reactive item is not tracked.
-   */
-  enable(ctx = {}) {
-    if (this.#isActive) {
-      throw new Error("The tracker is already turned on");
-    }
-    this.ctx = ctx;
-    this.#isActive = true;
-    this.#store.clear();
-  }
-  /**
-   * Disables the tracker. When the tracker is disabled, it will not watch any set operations and will not report
-   * anything to any registered listeners. The tracker is off by default.
-   */
-  disable() {
-    this.#isActive = false;
-  }
-};
-var dependencyTracker = new Tracker();
-function getSetOfUsedReactiveItems(fn, ...args) {
-  dependencyTracker.enable();
-  try {
-    fn(...args);
-  } finally {
-    dependencyTracker.disable();
-  }
-  return dependencyTracker.data;
-}
-
 // src/reactives/ReactiveItem.js
 var ReactiveItem = class {
-  /** @type {Engine} */
+  /**
+   * The reactive engine driving this item. Internal coordination only.
+   * @type {Engine}
+   * @internal
+   */
   engine;
+  /**
+   * Debug name assigned at construction. Used in error messages and
+   * DevTools listings. Empty string when not set.
+   * @type {string}
+   */
   name = "";
   /**
+   * Local path assigned by the immediate container. Top-level items get a
+   * path equal to their key in the root store; standalone items keep `''`.
+   * @type {string}
+   */
+  path = "";
+  /**
+   * Creates a new reactive item. Subclasses pass their own type tag.
    *
-   * @param {1|2|3|4} type
+   * @param {import('../types.js').ReactiveItemType} type
    */
   constructor(type) {
     this.engine = new Engine(this, type);
   }
   /**
-   * Subscribes a function to be called whenever the value of this reactive item changes.
-   * @param {(updates: Map<string, import('./types.d.ts').UpdateDataRecord>)=>void} fn - The function to be called whenever the value of this reactive item changes.
-   * @param {object} [options] - Optional options.
-   * @param {number} [options.delay] - The delay in milliseconds before the function is called.
-   * @param {AbortSignal} [options.signal] - The signal to abort the subscription.
-   * @returns {()=>void}
+   * The numeric type tag of this item: `1` for `Atom`, `2` for `Computed`,
+   * `3` for `Collection`, `4` for `ShallowReactive`.
+   *
+   * @returns {import('../types.js').ReactiveItemType}
+   */
+  get type() {
+    return this.engine.type;
+  }
+  /**
+   * Monotonic version counter, bumped on every effective change.
+   *
+   * Useful as a stable token for `useSyncExternalStore` and for cache
+   * invalidation: comparing two `getVersion()` results tells you whether
+   * the value changed, without reading it.
+   *
+   * @returns {number}
+   */
+  getVersion() {
+    return this.engine.version;
+  }
+  /**
+   * Subscribes a function to changes of this item.
+   *
+   * The callback receives a `Map` of property paths to
+   * `UpdateDataRecord` instances. It is invoked once per batch of
+   * effective changes.
+   *
+   * @param {(updates: Map<string, import('../core/UpdateDataRecord.js').UpdateDataRecord>) => void} fn
+   * @param {object} [options]
+   * @param {number} [options.delay] - Debounce delay in milliseconds.
+   * @param {AbortSignal} [options.signal] - Cancels the subscription when aborted.
+   * @returns {() => void} An unsubscribe function.
    */
   subscribe(fn, options) {
     return this.engine.subscribeController.subscribe(fn, options);
   }
   /**
-   * Removes all "change" subscribers. Listeners for "#has-subscribers" and "#no-subscribers" are not removed.
+   * Removes all change subscribers, keeping lifecycle listeners
+   * registered via `onHasSubscribers`, `onNoSubscribers`, and
+   * `onDestroy`.
    */
   clearSubscribers() {
     this.engine.subscribeController.clearSubscribers();
   }
   /**
-   * Removes all subscribers, including listeners for "#has-subscribers" and "#no-subscribers" events.
+   * Removes all subscribers, including lifecycle listeners.
+   *
+   * After this call, the item no longer invokes any user callbacks until
+   * a new subscription is made.
    */
   clearAllSubscribers() {
     this.engine.subscribeController.clearAllSubscribers();
   }
   /**
-   * Returns true if there are any subscribers, false otherwise.
-   * @returns {boolean} Whether there are any subscribers.
+   * Returns `true` if at least one change subscriber is currently
+   * registered.
+   *
+   * @returns {boolean}
    */
   hasSubscribers() {
     return this.engine.subscribeController.hasSubscribers();
   }
   /**
-   * Retrieves the current value of the reactive item.
-   * @param {object} [options] - Optional options.
-   * @param {boolean} [options.untracked=false] - If `true`, the value will not be added to the dependencyTracker.
-   * @returns {any} The current value of the reactive item.
+   * Reads the current value, tracking the item as a dependency unless
+   * `untracked` is `true`.
+   *
+   * Throws if the item has been destroyed.
+   *
+   * @param {object} [options]
+   * @param {boolean} [options.untracked=false]
+   * @returns {any}
    */
   getValue(options) {
     if (this.engine.isDestroyed) {
@@ -1900,31 +2390,39 @@ var ReactiveItem = class {
     }
     const _options = Object.assign({ untracked: false }, options);
     if (_options.untracked === false) {
-      dependencyTracker.add(this);
+      this.engine.context.dependencyTracker.add(this);
     }
   }
   /**
-   * Retrieves the current value of the reactive item.
-   * @returns {any} The current value of the reactive item.
+   * Returns the current value without registering a dependency and
+   * without triggering recalculation for `Computed`.
+   *
+   * For `Computed`, this returns the last cached value even if it is
+   * stale. To force a fresh value, use `.value` or `.getValue()`.
+   *
+   * @returns {any}
    */
   peekValue() {
     return this.getValue({ untracked: true });
   }
   /**
-   * Returns the last error that occurred while calculating the value of the reactive item,
-   * or null if there is no error.
-   * @returns {Error|null} The last error that occurred, or null if there is no error.
+   * Returns the last error produced by this item, or `null`.
+   *
+   * For `Computed`, this is the error thrown during the most recent
+   * evaluation. The error is preserved until a dependency changes.
+   *
+   * @returns {Error | null}
    */
   getLastError() {
     return this.engine.error;
   }
   /**
-   * Returns true if there has been an error while calculating the value of the reactive item,
-   * false otherwise. This method returns true if the reactive item has been destroyed, if the
-   * reactive item has an error, or if the calculation of the value of the reactive item has
-   * thrown an error.
-   * @returns {boolean} Whether there has been an error while calculating the value of the
-   * reactive item.
+   * Returns `true` if reading the value currently throws or has thrown.
+   *
+   * For `Computed`, this forces a read to determine whether the current
+   * dependencies are valid.
+   *
+   * @returns {boolean}
    */
   hasError() {
     try {
@@ -1935,52 +2433,67 @@ var ReactiveItem = class {
     return this.engine.error !== null;
   }
   /**
-   * Subscribes a function to be called whenever a subscriber is added to the reactive item.
-   * The function is called with no arguments.
-   * @param {function():void} fn - The function to be called.
-   * @returns {()=>void} A function that unsubscribes the given function.
+   * Registers a callback that fires when the first change subscriber is
+   * added.
+   *
+   * Useful for lazy initialisation: start expensive work only when
+   * somebody actually listens.
+   *
+   * @param {() => void} fn
+   * @returns {() => void} An unsubscribe function.
    */
   onHasSubscribers(fn) {
     return this.engine.subscribeController.onHasSubscribers(fn);
   }
   /**
-   * Subscribes a function to be called whenever there are no longer any subscribers.
-   * The function is called with no arguments.
-   * @param {function():void} fn - The function to be called.
-   * @returns {()=>void} A function that unsubscribes the given function.
+   * Registers a callback that fires when the last change subscriber is
+   * removed.
+   *
+   * Useful for cleanup: stop timers or subscriptions that only make sense
+   * while somebody is listening.
+   *
+   * @param {() => void} fn
+   * @returns {() => void} An unsubscribe function.
    */
   onNoSubscribers(fn) {
     return this.engine.subscribeController.onNoSubscribers(fn);
   }
   /**
-   * Subscribes a function to be called when the reactive item is destroyed.
-   * The function is called with no arguments.
-   * @param {(reactiveItem:ReactiveItem)=>void} fn - The function to be called.
-   * @returns {()=>void} A function that unsubscribes the given function.
+   * Registers a callback that fires when the item is destroyed.
+   *
+   * The callback receives the destroyed item as its only argument.
+   *
+   * @param {(reactiveItem: ReactiveItem) => void} fn
+   * @returns {() => void} An unsubscribe function.
    */
   onDestroy(fn) {
     const that = this;
     const callback = () => {
       fn(that);
     };
-    const unsubscriber = this.engine.subscribeController.onDestroy(callback);
-    return unsubscriber;
+    return this.engine.subscribeController.onDestroy(callback);
   }
   /**
-   * Destroys the reactive item. This method is useful for cleaning up after a reactive item
-   * that is no longer needed. It calls destroy on the engine of the reactive item, which
-   * removes all dependencies, dependents and subscribers, and marks the engine as destroyed.
+   * Destroys the item and tears down its dependency graph.
+   *
+   * All subscribers are detached, all dependencies are released, and any
+   * further read or write throws. Idempotent — subsequent calls are
+   * no-ops.
    */
   destroy() {
     this.engine.destroy();
   }
   /**
-   * Checks if two values are equal. If the compareFn property is a function, it is used to compare the two values.
-   * If the compareFn property is not a function, the values are compared using the === operator.
-   * If the optional second argument is not provided, the value of the reactive item is used.
-   * @param {any} a - The first value to compare.
-   * @param {any} [b] - The second value to compare. If not provided, the value of the reactive item is used.
-   * @returns {boolean} True if the two values are equal, false otherwise.
+   * Returns `true` if the two values are considered equal by this item's
+   * comparator.
+   *
+   * When the second argument is omitted, it is compared against the
+   * item's current value. Uses the custom `compareFunction` if one was
+   * provided at construction, otherwise falls back to shallow equality.
+   *
+   * @param {any} a
+   * @param {any} [b]
+   * @returns {boolean}
    */
   equals(a, b) {
     if (b === void 0) {
@@ -1992,10 +2505,39 @@ var ReactiveItem = class {
     return compareAny(a, b);
   }
   /**
-   * @returns {boolean} True if the reactive item has been destroyed, false otherwise.
+   * Returns `true` if `destroy()` has been called.
+   *
+   * After destruction, reads and writes throw. This getter is the only
+   * operation that remains safe to call.
+   *
+   * @returns {boolean}
    */
   get isDestroyed() {
     return this.engine.isDestroyed;
+  }
+  /**
+   * Returns a plain data representation suitable for storage or transport.
+   *
+   * The base implementation returns `null`, signalling that the item must
+   * not be persisted. `Atom`, `Collection`, `ShallowReactive`, and `Store`
+   * override this method. `Computed` deliberately keeps the `null`
+   * default — derived state is recalculated on hydration, never restored.
+   *
+   * @returns {any}
+   */
+  serialize() {
+    return null;
+  }
+  /**
+   * Restores state previously produced by `serialize()`.
+   *
+   * The base implementation is a no-op. Subclasses override this to apply
+   * the given data. Implementations must be idempotent and must not throw
+   * on malformed input — silently ignore what they cannot apply.
+   *
+   * @param {any} _data
+   */
+  hydrate(_data) {
   }
 };
 
@@ -2004,11 +2546,12 @@ var Atom = class extends ReactiveItem {
   /** @type {T} */
   #currentValue;
   /**
-   * Initializes an Atom instance with a given value.
-   * @param {T} value - The initial value of the Atom.
-   * @param {object} [options] - Options.
-   * @param {string} [options.name] - The name of the Atom.
-   * @param {((a:T, b:T)=>boolean)|null} [options.compareFunction] - A function that compares two values for equality.
+   * Creates a new Atom with the given initial value.
+   *
+   * @param {T} value - The initial value.
+   * @param {object} [options]
+   * @param {string} [options.name] - Debug name used in error messages.
+   * @param {((a: T, b: T) => boolean) | null} [options.compareFunction] - Custom equality function. Defaults to shallow comparison.
    */
   constructor(value, options = {
     name: "",
@@ -2024,11 +2567,6 @@ var Atom = class extends ReactiveItem {
     this.engine.compareFn = options.compareFunction || null;
     this.#currentValue = value;
   }
-  /**
-   * Sets the value of the Atom. If the new value is the same as the current value, no action is taken.
-   * Updates the current value to the new value if they are different.
-   * @param {T} value - The new value to set for the Atom.
-   */
   set value(value) {
     if (value instanceof ReactiveItem) {
       throw new Error(
@@ -2048,49 +2586,65 @@ var Atom = class extends ReactiveItem {
     }
   }
   /**
-   * Retrieves the current value of the Atom. If the engine is destroyed, an error is thrown.
-   * Tracks the Atom for dependency management.
-   * @param {{untracked?: boolean}} [options] - Optional options. If `untracked` is `false`, the Atom value will be added to the dependencyTracker.
-   * @returns {T} The current value of the Atom.
+   * Returns the current value.
+   *
+   * When `options.untracked` is `false` (the default), registers this
+   * atom as a dependency of the enclosing tracked scope. Pass
+   * `{ untracked: true }` to read without creating a dependency.
+   *
+   * @param {{ untracked?: boolean }} [options]
+   * @returns {T}
    */
   getValue(options) {
     super.getValue(options);
     return this.#currentValue;
   }
   /**
-   * Returns the current value of the Atom. If the engine is destroyed, an error is thrown.
-   * @returns {T} The current value of the Atom.
+   * The current value.
+   *
+   * Reading this property inside a tracked scope registers a dependency.
+   * Writing it schedules a change if the new value differs from the
+   * current one.
+   *
+   * @returns {T}
    */
   get value() {
     return this.getValue();
   }
   /**
-   * Returns the current value of the Atom without tracking it for dependency management.
-   * This is useful when you want to access the value without affecting its reactive state.
-   * @returns {T} The current value of the Atom.
-   * @example
-   * ```js
-   * const a = atom(0);
-   * const b = atom(0);
-   * const c = computed(() => a.value + b.valueUntracked, {
-   *     name: "c",
-   * });
+   * Returns the current value without registering a dependency.
    *
-   * c.subscribe(() => {
-   *     console.log(c.name, c.value);
-   * });
-   * console.log("change b.value");
-   * b.value++;
-   * b.value++;
-   * console.log("change a.value");
-   * a.value++;
-   * // Output: c 3
-   * a.value++;
-   * // Output: c 4
-   * ```
+   * Shorthand for `getValue({ untracked: true })`. Useful when you need
+   * to peek at an atom inside a `Computed` or `autorun` without making it
+   * re-run when the atom changes.
+   *
+   * @returns {T}
    */
   get valueUntracked() {
     return this.getValue({ untracked: true });
+  }
+  /**
+   * Returns a serializable representation of the current value.
+   *
+   * @returns {any}
+   */
+  serialize() {
+    return {
+      type: "atom",
+      value: this.#currentValue
+    };
+  }
+  /**
+   * Applies data previously produced by `serialize()`.
+   *
+   * Silently ignores malformed input.
+   *
+   * @param {any} data
+   */
+  hydrate(data) {
+    if (data && typeof data === "object" && "value" in data) {
+      this.value = data.value;
+    }
   }
 };
 
@@ -2098,24 +2652,25 @@ var Atom = class extends ReactiveItem {
 var Computed = class extends ReactiveItem {
   /** @type {T} */
   #currentValue;
-  /** @type {function():T} */
+  /** @type {() => T} */
   #fn;
   /** @type {string} */
-  __cachedDependentsVersionString = "";
+  #cachedDependentsVersionString = "";
+  /**
+   * Read-only view of the options passed to the constructor. Currently
+   * exposes `smartRecompute`.
+   */
   options = {
     smartRecompute: false
   };
   /**
-   * Initializes an Atom instance with a given value.
-   * @param {function():T} fn - function that returns the value of the Computed
-   * @param {object} [options] - Options
-   * @param {string} [options.name] - The name of the Computed instance.
-   * @param {((a:T, b:T)=>boolean)|null} [options.compareFunction] - A function that compares two values for equality.
-   * @param {boolean} [options.smartRecompute] - When true, the computed value will be
-   *        recalculated only when the version string of its dependencies changes,
-   *        rather than on every dependency notification. This avoids unnecessary
-   *        recalculations when dependencies change but their final values remain
-   *        the same (e.g., toggling back and forth). Defaults to false.
+   * Creates a new Computed.
+   *
+   * @param {() => T} fn - The derivation function. Must read at least one reactive value.
+   * @param {object} [options]
+   * @param {string} [options.name] - Debug name used in error messages.
+   * @param {((a: T, b: T) => boolean) | null} [options.compareFunction] - Custom equality function. Defaults to shallow comparison.
+   * @param {boolean} [options.smartRecompute] - When `true`, the value is recalculated only if the version of a dependency actually changed, avoiding recomputation when dependencies toggled back to their previous values within a batch.
    */
   constructor(fn, options = {
     name: "",
@@ -2131,11 +2686,10 @@ var Computed = class extends ReactiveItem {
     this.#fn = fn;
     this.#currentValue = this.#collectDependenciesAndInitValue();
     if (this.options.smartRecompute) {
-      this.__cachedDependentsVersionString = this.#getDependenciesVersionString();
+      this.#cachedDependentsVersionString = this.#getDependenciesVersionString();
     }
   }
   /**
-   * Returns a string representation of the dependencies of the Computed value.
    * @returns {string}
    */
   #getDependenciesVersionString() {
@@ -2149,10 +2703,21 @@ var Computed = class extends ReactiveItem {
     });
     return result.join(";");
   }
+  /**
+   * @returns {T}
+   */
   #collectDependenciesAndInitValue() {
-    dependencyTracker.enable();
-    modeController.isComputing = true;
-    let value;
+    const engine = this.engine;
+    const tracker = engine.context.dependencyTracker;
+    const modeController2 = engine.context.modeController;
+    tracker.enable();
+    modeController2.isComputing = true;
+    let value = (
+      /** @type {any} */
+      void 0
+    );
+    let newDeps;
+    let thrownError = null;
     try {
       value = this.#fn();
       if (value instanceof ReactiveItem) {
@@ -2161,23 +2726,33 @@ var Computed = class extends ReactiveItem {
         );
       }
     } catch (e) {
-      this.engine.setError(getError(e));
+      thrownError = getError(e);
+    } finally {
+      newDeps = tracker.data;
+      tracker.disable();
+      modeController2.isComputing = false;
     }
-    modeController.isComputing = false;
-    dependencyTracker.disable();
-    if (this.engine.error) {
-      throw this.engine.error;
+    if (thrownError) {
+      engine.setError(thrownError);
+      throw engine.error;
     }
-    if (dependencyTracker.data.size === 0) {
+    if (newDeps.size === 0) {
       throw new Error(`Computed${this.name ? ` (${this.name})` : ""}: No dependencies`);
     }
-    this.engine.addDependencies(dependencyTracker.data);
-    return value;
+    engine.addDependencies(newDeps);
+    return (
+      /** @type {T} */
+      value
+    );
   }
   /**
-   * Checks whether the Computed value needs to be recalculated. A recalculation is needed if the engine's shouldRecalc
-   * property is true, if the engine has an error, or if the version string of the dependencies has changed.
-   * @returns {boolean} true if the Computed value needs to be recalculated, false if it does not.
+   * Returns `true` if the cached value is out of date and a read would
+   * trigger recalculation.
+   *
+   * A computed is stale if one of its dependencies notified a change, or
+   * if its last evaluation threw an error.
+   *
+   * @returns {boolean}
    */
   isStale() {
     const engine = this.engine;
@@ -2189,19 +2764,32 @@ var Computed = class extends ReactiveItem {
     }
     return false;
   }
+  /**
+   * @returns {boolean}
+   */
   #areDependenciesStale() {
     const engine = this.engine;
     const dependentsVersionString = this.#getDependenciesVersionString();
-    if (dependentsVersionString !== this.__cachedDependentsVersionString) {
-      this.__cachedDependentsVersionString = dependentsVersionString;
+    if (dependentsVersionString !== this.#cachedDependentsVersionString) {
+      this.#cachedDependentsVersionString = dependentsVersionString;
       engine.shouldRecalc = true;
       return true;
     }
     return false;
   }
   /**
-   * @param {{untracked?: boolean}} [options] - Optional options. If `untracked` is `false`, the Computed value will be added to the dependencyTracker.
-   * @returns {T} The current value of the Computed value.
+   * Returns the computed value, recalculating first if any dependency
+   * changed.
+   *
+   * When `options.untracked` is `false` (the default), registers this
+   * computed as a dependency of the enclosing tracked scope. Pass
+   * `{ untracked: true }` to read without creating a dependency.
+   *
+   * Throws if the derivation function throws, or if the item has been
+   * destroyed.
+   *
+   * @param {{ untracked?: boolean }} [options]
+   * @returns {T}
    */
   getValue(options) {
     super.getValue(options);
@@ -2209,7 +2797,7 @@ var Computed = class extends ReactiveItem {
     if (engine.error !== null && !engine.shouldRecalc) {
       throw engine.error;
     }
-    if (modeController.isComputing) {
+    if (engine.context.modeController.isComputing) {
       if (this.isStale()) {
         throw new Error(
           `Computed${this.name ? ` (${this.name})` : ""}: Dependencies cannot be stale`,
@@ -2230,104 +2818,98 @@ var Computed = class extends ReactiveItem {
     return this.#calc();
   }
   /**
-   * Returns the current value of the Computed value.
-   * @returns {T} The current value of the Computed value.
+   * The computed value.
+   *
+   * Reading this property recalculates if a dependency changed and
+   * registers a dependency in the enclosing tracked scope.
+   *
+   * @returns {T}
    */
   get value() {
     return this.getValue();
   }
   /**
-   * Returns the current cached value of the computed without triggering a recalculation
-   * and without tracking dependencies.
+   * Returns the last cached value without triggering recalculation.
    *
-   * Unlike the `value` getter, this method does not check if dependencies have changed
-   * and does not recompute the value if it's stale. It simply returns the last
-   * computed value. This is useful for debugging or for accessing the value
-   * without causing side effects (e.g., inside an untracked context).
+   * If the computed is stale, this returns the previous value — not a
+   * fresh one. Useful for debugging and for reading without causing side
+   * effects, but the value may be out of date.
    *
-   * If the computed has an error, this method will still return the last cached
-   * value (which may be undefined or a previous value) without rethrowing the error.
-   *
-   * @override
-   * @returns {T} The cached value.
-   *
-   * @example
-   * ```js
-   * const a = atom(1);
-   * const b = computed(() => a.value * 2);
-   *
-   * console.log(b.peekValue()); // 2 (without tracking dependencies)
-   * a.value = 2;
-   * console.log(b.peekValue()); // still 2 (stale, not recomputed)
-   * console.log(b.value);       // 4 (recomputed now)
-   * ```
+   * @returns {T}
    */
   peekValue() {
     return this.#currentValue;
   }
   /**
-   * Returns the current value of the Computed value without tracking it for dependency management.
-   * This is useful when you want to access the value without affecting its reactive state.
-   * @returns {T} The current value of the Computed value.
-   * @example
-   * ```js
-   * const a = atom(0);
-   * const b = atom(0);
-   * const c = computed(() => a.value + 1);
-   * const d = computed(() => c.valueUntracked + b.value);
+   * Returns the computed value without registering a dependency.
    *
-   * d.subscribe(() => {
-   *     console.log(`d = ${d.value}`);
-   * });
+   * Shorthand for `getValue({ untracked: true })`. The value is still
+   * recalculated if stale — only dependency registration is skipped.
    *
-   * console.log(`c = ${c.value}`);
-   * // Outputs: c = 1
-   * a.value++;
-   * // a = 1
-   * // Outputs: nothing
-   * console.log(`c = ${c.value}`);
-   * // Outputs: c = 2
-   *
-   * b.value++;
-   * // Outputs: d = 3
-   * ```
+   * @returns {T}
    */
   get valueUntracked() {
     return this.getValue({ untracked: true });
   }
+  /**
+   * @returns {T}
+   */
   #calc() {
     const engine = this.engine;
+    const tracker = engine.context.dependencyTracker;
     engine.shouldRecalc = false;
     engine.clearError();
-    const newDeps = /* @__PURE__ */ new Set();
-    const unsubscribe = dependencyTracker.onAdd((item) => {
-      newDeps.add(item);
-    });
-    let value;
+    tracker.enable();
+    let value = (
+      /** @type {any} */
+      void 0
+    );
+    let newDeps;
+    let thrownError = null;
     try {
       value = this.#fn();
     } catch (e) {
-      const error = getError(e);
+      thrownError = getError(e);
+    } finally {
+      newDeps = tracker.data;
+      tracker.disable();
+    }
+    if (thrownError) {
       engine.setError(
-        new Error(`Computed${this.name ? ` (${this.name})` : ""}: ` + error.message, {
+        new Error(`Computed${this.name ? ` (${this.name})` : ""}: ` + thrownError.message, {
           cause: this
         })
       );
       throw engine.error;
-    } finally {
-      unsubscribe();
+    }
+    if (newDeps.size > 0) {
+      engine.updateDependencies(newDeps);
     }
     if (this.equals(this.#currentValue, value)) {
-      this.engine.clearUpdates();
+      engine.clearUpdates();
       return this.#currentValue;
     }
     const oldValue = this.#currentValue;
-    this.#currentValue = clone(value);
+    this.#currentValue = clone(
+      /** @type {any} */
+      value
+    );
     const newValue = this.#currentValue;
     if (engine.addUpdate("", "set", oldValue, newValue)) {
       engine.valueChangedCallback();
     }
+    engine.context.emitPlugin("onComputedRecalc", this, oldValue, newValue);
     return this.#currentValue;
+  }
+  /**
+   * Always returns `null`. Computed items are derived state and are never
+   * persisted — they are recalculated from their dependencies on
+   * hydration.
+   *
+   * @returns {null}
+   */
+  serialize() {
+    return null;
   }
 };
 
@@ -2342,12 +2924,15 @@ var Collection = class extends ReactiveItem {
   /** @type {ProxyHandler<T[]>} */
   #handler;
   /**
-   * Initializes a Collection instance with an initial array.
+   * Creates a new Collection wrapping the given array.
    *
-   * @param {T[]} value - The initial array value.
-   * @param {object} [options] - Configuration options.
-   * @param {string} [options.name] - The name of the Collection (for debugging).
-   * @param {import('./types.d.ts').CompareFunction|null} [options.compareFunction] - Custom equality function for values.
+   * The array is copied element-by-element; the caller's array reference
+   * is not stored.
+   *
+   * @param {T[]} value - The initial array.
+   * @param {object} [options]
+   * @param {string} [options.name] - Debug name used in error messages.
+   * @param {import('../types.js').CompareFunction | null} [options.compareFunction] - Custom equality function for element comparison.
    */
   constructor(value, options = { name: "", compareFunction: null }) {
     super(COLLECTION);
@@ -2362,21 +2947,11 @@ var Collection = class extends ReactiveItem {
     }
   }
   /**
-   * Initializes the proxy handler for array interception.
-   *
-   * @returns {ProxyHandler<T[]>} The proxy handler object.
+   * @returns {ProxyHandler<T[]>}
    */
-  #initHandler = () => {
+  #initHandler() {
     const that = this;
     return {
-      /**
-       * Intercepts property assignments on the array.
-       *
-       * @param {T[]} target - The target array.
-       * @param {string|symbol} key - The property key.
-       * @param {any} value - The value to set.
-       * @returns {boolean} True if the operation succeeded.
-       */
       set: (target, key, value) => {
         if (typeof key === "symbol") {
           target[key] = value;
@@ -2401,32 +2976,18 @@ var Collection = class extends ReactiveItem {
         engine.valueChangedCallback();
         return true;
       },
-      /**
-       * Intercepts property accesses on the array.
-       *
-       * @param {T[]} target - The target array.
-       * @param {string|symbol} key - The property key.
-       * @returns {any} The property value.
-       */
       get: (target, key) => {
         that.getValue();
         return target[key];
       },
-      /**
-       * Intercepts property deletions on the array.
-       *
-       * @param {T[]} target - The target array.
-       * @param {string|symbol} key - The property key.
-       * @returns {boolean} True if the operation succeeded.
-       */
       deleteProperty: (target, key) => {
         if (typeof key === "symbol") {
           delete target[key];
           return true;
         }
-        if (modeController.subscribersMode) {
+        if (that.engine.context.modeController.subscribersMode) {
           throw new Error(
-            `Collection${this.name ? ` (${this.name})` : ""}: Cannot delete property while subscribers are running`
+            `Collection${that.name ? ` (${that.name})` : ""}: Cannot delete property while subscribers are running`
           );
         }
         const engine = that.engine;
@@ -2443,13 +3004,7 @@ var Collection = class extends ReactiveItem {
         return true;
       }
     };
-  };
-  /**
-   * Sets the entire array, replacing all elements.
-   * Only triggers reactivity if the new array differs from the current one.
-   *
-   * @param {T[]} value - The new array value.
-   */
+  }
   set value(value) {
     if (!Array.isArray(value)) {
       throw new Error(
@@ -2471,32 +3026,65 @@ var Collection = class extends ReactiveItem {
     engine.valueChangedCallback();
   }
   /**
-   * Returns the proxied array value.
-   * Tracks this Collection as a dependency when accessed.
+   * Returns the proxied array.
    *
-   * @param {{untracked?: boolean}} [options] - If `untracked` is true, does not add to dependency tracker.
-   * @returns {T[]} The reactive array proxy.
+   * Mutations through the returned proxy are reactive. When
+   * `options.untracked` is `false` (the default), registers this
+   * collection as a dependency of the enclosing tracked scope.
+   *
+   * @param {{ untracked?: boolean }} [options]
+   * @returns {T[]}
    */
   getValue(options) {
     super.getValue(options);
     return this.#proxy;
   }
   /**
-   * Returns the proxied array value (same as getValue()).
+   * The proxied array.
    *
-   * @returns {T[]} The reactive array proxy.
+   * Reading this property registers a dependency. Mutating the returned
+   * array — `push`, index assignment, `splice`, and so on — triggers a
+   * reactive update.
+   *
+   * @returns {T[]}
    */
   get value() {
     return this.getValue();
   }
   /**
-   * Returns the raw, unproxied target array.
-   * Warning: Mutating the raw array directly does NOT trigger reactivity.
+   * Returns the underlying array without the proxy.
    *
-   * @returns {T[]} The raw array.
+   * Mutations on the returned array do not trigger reactivity. Use for
+   * inspection, iteration, or passing to APIs that must receive a plain
+   * array — not for state changes.
+   *
+   * @returns {T[]}
    */
   getRawValue() {
     return this.#target;
+  }
+  /**
+   * Returns a serializable representation of the array contents.
+   *
+   * @returns {any}
+   */
+  serialize() {
+    return {
+      type: "collection",
+      value: this.#target.slice()
+    };
+  }
+  /**
+   * Applies data previously produced by `serialize()`.
+   *
+   * Silently ignores malformed input.
+   *
+   * @param {any} data
+   */
+  hydrate(data) {
+    if (data && typeof data === "object" && Array.isArray(data.value)) {
+      this.value = data.value;
+    }
   }
 };
 
@@ -2509,14 +3097,13 @@ var ShallowReactive = class extends ReactiveItem {
   /** @type {ProxyHandler<T>} */
   #handler;
   /**
-   * Initializes a ShallowReactive instance with a given value.
-   * @param {T} value - The initial value of the ShallowReactive.
-   * @param {object} [options] - Options.
-   * @param {string} [options.name] - The name of the ShallowReactive.
+   * Creates a new ShallowReactive wrapping the given object.
+   *
+   * @param {T} value - The object to wrap. Must be a plain object.
+   * @param {object} [options]
+   * @param {string} [options.name] - Debug name used in error messages.
    */
-  constructor(value, options = {
-    name: ""
-  }) {
+  constructor(value, options = { name: "" }) {
     super(SHALLOW_REACTIVE);
     this.name = options.name || "";
     if (!isPlainObject(value)) {
@@ -2528,16 +3115,12 @@ var ShallowReactive = class extends ReactiveItem {
     this.#target = value;
     this.#proxy = new Proxy(this.#target, this.#handler);
   }
+  /**
+   * @returns {ProxyHandler<T>}
+   */
   #initHandler() {
     const that = this;
     return {
-      /**
-       * Sets a property on the ShallowReactive. If the property already exists, its value is updated. If not, a new property is added.
-       * @param {T} target - The ShallowReactive to set the property on.
-       * @param {string} key - The key of the property to set.
-       * @param {any} value - The value to set for the property.
-       * @returns {boolean} true if the property was successfully set.
-       */
       set: (target, key, value) => {
         if (typeof key === "symbol") {
           target[key] = value;
@@ -2545,7 +3128,10 @@ var ShallowReactive = class extends ReactiveItem {
         }
         const engine = that.engine;
         engine.prepareSetValue();
-        const oldValue = target[key];
+        const oldValue = (
+          /** @type {any} */
+          target[key]
+        );
         if (that.equals(oldValue, value)) {
           return true;
         }
@@ -2555,35 +3141,34 @@ var ShallowReactive = class extends ReactiveItem {
         }
         return true;
       },
-      /**
-       * Gets a property from the ShallowReactive. If the property is not found, undefined is returned.
-       * @param {T} target - The ShallowReactive to get the property from.
-       * @param {string} key - The key of the property to get.
-       * @returns {any} The value of the property, or undefined if it was not found.
-       */
       get: (target, key) => {
         that.getValue();
-        return target[key];
+        return (
+          /** @type {any} */
+          target[key]
+        );
       },
-      /**
-       * Deletes a property from the ShallowReactive. If the property is not found, an error is thrown.
-       * @param {T} target - The ShallowReactive to delete the property from.
-       * @param {string} key - The key of the property to delete.
-       * @returns {boolean} true if the property was deleted, false if it was not.
-       */
       deleteProperty: (target, key) => {
         if (typeof key === "symbol") {
-          delete target[key];
+          delete /** @type {any} */
+          target[key];
           return true;
         }
-        if (modeController.subscribersMode) {
+        if (that.engine.context.modeController.subscribersMode) {
           throw new Error(
-            `ShallowReactive${this.name ? ` (${this.name})` : ""}: Cannot delete property while subscribers are running`
+            `ShallowReactive${that.name ? ` (${that.name})` : ""}: Cannot delete property while subscribers are running`
           );
         }
         const engine = that.engine;
-        if (engine.addUpdate(key, "delete", target[key], void 0)) {
-          delete target[key];
+        if (engine.addUpdate(
+          key,
+          "delete",
+          /** @type {any} */
+          target[key],
+          void 0
+        )) {
+          delete /** @type {any} */
+          target[key];
           engine.valueChangedCallback();
         }
         return true;
@@ -2591,18 +3176,26 @@ var ShallowReactive = class extends ReactiveItem {
     };
   }
   /**
-   * Retrieves the proxied value of the ShallowReactive. If the engine is destroyed, an error is thrown.
-   * Tracks the ShallowReactive for dependency management.
-   * @param {{untracked?: boolean}} [options] - Optional options. If `untracked` is `false`, the ShallowReactive value will be added to the dependencyTracker.
-   * @returns {T} The proxied value of the ShallowReactive.
+   * Returns the proxied object.
+   *
+   * When `options.untracked` is `false` (the default), registers this
+   * item as a dependency of the enclosing tracked scope.
+   *
+   * @param {{ untracked?: boolean }} [options]
+   * @returns {T}
    */
   getValue(options) {
     super.getValue(options);
     return this.#proxy;
   }
   /**
-   * Sets the value of the ShallowReactive. If the value is an object, it will be proxied and reactive.
-   * @param {T} value - The new value of the ShallowReactive.
+   * Replaces the object's properties wholesale.
+   *
+   * Keys absent from `value` are deleted from the target; new keys are
+   * added. The entire operation is batched and produces a single
+   * notification.
+   *
+   * @param {T} value
    */
   setValue(value) {
     this.getValue({ untracked: true });
@@ -2618,39 +3211,71 @@ var ShallowReactive = class extends ReactiveItem {
     this.engine.suppressNotifications = false;
     this.engine.valueChangedCallback();
   }
-  /**
-   * Sets the value of the ShallowReactive. If the value is an object, it will be proxied and reactive.
-   * @param {T} value - The new value of the ShallowReactive.
-   */
   set value(value) {
     this.setValue(value);
   }
   /**
-   * Retrieves the proxied value of the ShallowReactive. If the engine is destroyed, an error is thrown.
-   * Tracks the ShallowReactive for dependency management.
-   * @returns {T} The proxied value of the ShallowReactive.
+   * The proxied object.
+   *
+   * Reading a top-level property registers a dependency on this item.
+   * Writing a top-level property schedules an update. Nested properties
+   * are not tracked.
+   *
+   * @returns {T}
    */
   get value() {
     return this.getValue();
   }
   /**
-   * Returns the raw, unproxied value of the ShallowReactive. This is generally not recommended as it breaks reactivity.
-   * @returns {T} The raw, unproxied value of the ShallowReactive.
+   * Returns the underlying object without the proxy.
+   *
+   * Mutations on the returned object do not trigger reactivity. Use for
+   * inspection or for passing to APIs that must receive a plain object —
+   * not for state changes.
+   *
+   * @returns {T}
    */
   getRawValue() {
     return this.#target;
+  }
+  /**
+   * Returns a serializable representation of the object's own enumerable
+   * properties.
+   *
+   * @returns {any}
+   */
+  serialize() {
+    return {
+      type: "shallowReactive",
+      value: { ...this.#target }
+    };
+  }
+  /**
+   * Applies data previously produced by `serialize()`.
+   *
+   * Silently ignores malformed input.
+   *
+   * @param {any} data
+   */
+  hydrate(data) {
+    if (data && typeof data === "object" && isPlainObject(data.value)) {
+      this.value = /** @type {T} */
+      data.value;
+    }
   }
 };
 
 // src/complex/Store.js
 var Store = class _Store {
   /**
-   * @type {Map<string, ReactiveItem>}
+   * Local path of this store within its parent. Empty for the root store.
+   * The full path is available via `getPath()`.
+   * @type {string}
    */
+  path = "";
+  /** @type {Map<string, ReactiveItem>} */
   #items = /* @__PURE__ */ new Map();
-  /**
-   * @type {Map<string, Store>}
-   */
+  /** @type {Map<string, Store>} */
   #childStores = /* @__PURE__ */ new Map();
   /** @type {EventEmitter} */
   #eventEmitter;
@@ -2658,7 +3283,7 @@ var Store = class _Store {
   #isDestroyed = false;
   /** @type {Map<string, Set<Function>>} */
   #unsubscribers = /* @__PURE__ */ new Map();
-  /** @type {Map<string, import('./types.d.ts').UpdateDataRecord>} */
+  /** @type {Map<string, import('../core/UpdateDataRecord.js').UpdateDataRecord>} */
   #updates;
   /** @type {UpdateDataRecordManager} */
   #updatesManager;
@@ -2666,6 +3291,11 @@ var Store = class _Store {
   #subscriber;
   #muted = false;
   #pendingUpdate = false;
+  /** @type {Store | null} */
+  #parentStore = null;
+  /**
+   * Creates a new empty Store.
+   */
   constructor() {
     this.#eventEmitter = new EventEmitter();
     this.#updates = /* @__PURE__ */ new Map();
@@ -2693,10 +3323,31 @@ var Store = class _Store {
     };
   }
   /**
-   * @type {boolean}
+   * Returns `true` after `destroy()` has been called.
+   *
+   * After destruction, all mutating methods throw and only this getter
+   * remains safe to call.
+   *
+   * @returns {boolean}
    */
   get isDestroyed() {
     return this.#isDestroyed;
+  }
+  /**
+   * Returns the full path of this store by walking up the parent chain.
+   *
+   * For a root store, returns `path` — which is `''` unless the user set
+   * it manually. For a child store, returns `"parent.getPath() + '.' +
+   * this.path"`.
+   *
+   * @returns {string}
+   */
+  getPath() {
+    if (this.#parentStore) {
+      const parentPath = this.#parentStore.getPath();
+      return parentPath ? `${parentPath}.${this.path}` : this.path;
+    }
+    return this.path;
   }
   #notifySubscribers() {
     if (this.#muted) {
@@ -2707,10 +3358,8 @@ var Store = class _Store {
     }
   }
   /**
-   * Adds a reactive item to the store with the given key.
-   * @param {string} key - The key to use when adding the item to the store.
-   * @param {ReactiveItem} reactiveItem - The reactive item to add to the store.
-   * @throws {Error} If an item with the given key already exists in the store.
+   * @param {string} key
+   * @param {ReactiveItem} reactiveItem
    */
   #addReactiveItem(key, reactiveItem) {
     if (this.#items.has(key)) {
@@ -2718,6 +3367,7 @@ var Store = class _Store {
     }
     this.#items.set(key, reactiveItem);
     this.#keys.set(reactiveItem, key);
+    reactiveItem.path = key;
     const that = this;
     const unsubscriber = reactiveItem.subscribe(this.#subscriber);
     const unsubscriber2 = reactiveItem.onDestroy(() => {
@@ -2733,18 +3383,18 @@ var Store = class _Store {
     }
   }
   /**
-   * Adds a child store with the given key to this store.
-   * @param {string} storeName - The key to use when adding the child store to this store.
-   * @param {Store} store - The child store to add to this store.
-   * @throws {Error} If a child store with the given key already exists in this store.
+   * @param {string} storeName
+   * @param {Store} store
    */
   #addStore(storeName, store) {
     if (this.#childStores.has(storeName)) {
       throw new Error(`Child store with key ${storeName} already exists in this store.`);
     }
     this.#childStores.set(storeName, store);
-    const that = this;
     this.#keys.set(store, storeName);
+    store.path = storeName;
+    store.#parentStore = this;
+    const that = this;
     const unsubscriber = store.subscribe(this.#subscriber);
     const unsubscriber2 = store.onDestroy(() => {
       that.#removeChildStore(storeName);
@@ -2759,10 +3409,12 @@ var Store = class _Store {
     }
   }
   /**
-   * Adds one or more reactive items to the store.
-   * @param {{[key: string]: ReactiveItem|Store}} items
-   * @throws {Error} If an item with the given key already exists in the store.
-   * @throws {Error} If the store is destroyed.
+   * Adds reactive items or child stores to the store under the given keys.
+   *
+   * Throws if a key is already registered, or if a value is neither a
+   * `ReactiveItem` nor a `Store`.
+   *
+   * @param {{[key: string]: ReactiveItem | Store}} items
    */
   addItems(items) {
     if (this.isDestroyed) {
@@ -2777,8 +3429,7 @@ var Store = class _Store {
     }
   }
   /**
-   * Destroys the child store with the given key.
-   * @param {string} key - The key of the child store to destroy.
+   * @param {string} key
    */
   #destroyChildStore(key) {
     const childStore = this.#childStores.get(key);
@@ -2789,8 +3440,14 @@ var Store = class _Store {
     childStore.destroy();
   }
   /**
-   * Destroys the item with the given key, whether it's a reactive item or a child store.
-   * @param {string} key - The key of the item or child store to destroy.
+   * Destroys the item or child store registered under `key`.
+   *
+   * When `key` refers to a reactive item, the item is removed from the
+   * store and then destroyed. When it refers to a child store, the child
+   * store and every item inside it is destroyed recursively. No-op if
+   * the key is not present.
+   *
+   * @param {string} key
    */
   destroyItem(key) {
     if (this.isDestroyed) {
@@ -2800,7 +3457,6 @@ var Store = class _Store {
     this.#destroyChildStore(key);
   }
   /**
-   * Removes a reactive item from the store WITHOUT destroying it.
    * @param {string} key
    */
   #removeReactiveItem(key) {
@@ -2821,7 +3477,6 @@ var Store = class _Store {
     this.#notifySubscribers();
   }
   /**
-   * Removes a child store WITHOUT destroying it.
    * @param {string} key
    */
   #removeChildStore(key) {
@@ -2831,6 +3486,7 @@ var Store = class _Store {
     }
     this.#childStores.delete(key);
     this.#keys.delete(store);
+    store.#parentStore = null;
     const set = this.#unsubscribers.get(key);
     if (set) {
       for (const fn of set) {
@@ -2842,7 +3498,6 @@ var Store = class _Store {
     this.#notifySubscribers();
   }
   /**
-   * Removes and DESTROYS a reactive item.
    * @param {string} key
    */
   #destroyReactiveItem(key) {
@@ -2854,8 +3509,13 @@ var Store = class _Store {
     item.destroy();
   }
   /**
-   * Removes the reactive item with the given key from the store (without destroying it).
-   * @param {string} key - The key of the item to remove.
+   * Removes the item or child store registered under `key` from the
+   * store, without destroying it.
+   *
+   * The removed item remains usable and can be re-added to a store (this
+   * one or another). No-op if the key is not present.
+   *
+   * @param {string} key
    */
   removeItem(key) {
     if (this.isDestroyed) {
@@ -2865,7 +3525,10 @@ var Store = class _Store {
     this.#removeChildStore(key);
   }
   /**
-   * Destroys all reactive items stored in the Store.
+   * Destroys the store and every item and child store inside it.
+   *
+   * After this call, all mutating methods throw. Idempotent — subsequent
+   * calls are no-ops.
    */
   destroy() {
     if (this.#isDestroyed) {
@@ -2887,7 +3550,10 @@ var Store = class _Store {
     this.#unsubscribers.clear();
   }
   /**
-   * Clears all reactive items from the store without destroying them.
+   * Removes all items and child stores without destroying them.
+   *
+   * After this call the store is empty, but the detached items continue
+   * to work and can be re-added elsewhere.
    */
   detachAll() {
     if (this.isDestroyed) {
@@ -2904,25 +3570,25 @@ var Store = class _Store {
     this.#unsubscribers.clear();
   }
   /**
-   * Retrieves the reactive item with the given key.
    * @param {string} key
-   * @returns {ReactiveItem|null}
+   * @returns {ReactiveItem | null}
    */
   #getReactiveItem(key) {
     return this.#items.get(key) || null;
   }
   /**
-   * Retrieves the child store with the given key.
    * @param {string} key
-   * @returns {Store|null}
+   * @returns {Store | null}
    */
   #getChildStore(key) {
     return this.#childStores.get(key) || null;
   }
   /**
-   * Retrieves the item with the given key.
+   * Returns the item or child store registered under `key`, or `null` if
+   * the key is not present.
+   *
    * @param {string} key
-   * @returns {ReactiveItem|Store|null}
+   * @returns {ReactiveItem | Store | null}
    */
   getItem(key) {
     if (this.isDestroyed) {
@@ -2931,7 +3597,9 @@ var Store = class _Store {
     return this.#getReactiveItem(key) || this.#getChildStore(key) || null;
   }
   /**
-   * Checks if an item with the given key exists.
+   * Returns `true` if `key` is registered as either a reactive item or a
+   * child store.
+   *
    * @param {string} key
    * @returns {boolean}
    */
@@ -2942,8 +3610,13 @@ var Store = class _Store {
     return this.#items.has(key) || this.#childStores.has(key);
   }
   /**
-   * Retrieves the names of items stored.
-   * @param {"all"|"reactives"|"stores"} [filter="all"]
+   * Returns the keys of the store's contents.
+   *
+   * The `filter` argument narrows the result: `"reactives"` returns only
+   * reactive items, `"stores"` returns only child stores, `"all"` (the
+   * default) returns both, reactives first.
+   *
+   * @param {"all" | "reactives" | "stores"} [filter="all"]
    * @returns {Array<string>}
    */
   getItemNames(filter = "all") {
@@ -2958,9 +3631,13 @@ var Store = class _Store {
     return Array.from(this.#items.keys()).concat(Array.from(this.#childStores.keys()));
   }
   /**
-   * Retrieves all items stored.
-   * @param {"all"|"reactives"|"stores"} [filter="all"]
-   * @returns {Map<string, ReactiveItem|Store>}
+   * Returns the store's contents as a `Map`.
+   *
+   * The `filter` argument narrows the result the same way as in
+   * `getItemNames()`.
+   *
+   * @param {"all" | "reactives" | "stores"} [filter="all"]
+   * @returns {Map<string, ReactiveItem | Store>}
    */
   toMap(filter = "all") {
     if (this.isDestroyed) {
@@ -2992,8 +3669,16 @@ var Store = class _Store {
     return object;
   }
   /**
-   * Retrieves the value of this Store as a plain object.
-   * @param {"all"|"reactives"|"stores"} [filter="all"]
+   * Returns the store's current values as a plain object.
+   *
+   * Computed values are included — this is a full state dump, not a
+   * persistence payload. For persistence, prefer `serialize()`, which
+   * omits derived state.
+   *
+   * The `filter` argument narrows the result the same way as in
+   * `getItemNames()`.
+   *
+   * @param {"all" | "reactives" | "stores"} [filter="all"]
    * @returns {object}
    */
   toJSON(filter = "all") {
@@ -3012,9 +3697,72 @@ var Store = class _Store {
     return object;
   }
   /**
-   * Subscribes a function to be called whenever the value of this Store changes.
-   * @param {(update: Map<string, import('./types.d.ts').UpdateDataRecord>, store: Store)=>void} fn
-   * @returns {()=>void}
+   * Serializes the store and its children.
+   *
+   * Items whose `serialize()` returns `null` — notably `Computed` — are
+   * omitted. The output is suitable for `hydrate()` and for JSON
+   * transport.
+   *
+   * @returns {any}
+   */
+  serialize() {
+    const items = {};
+    this.#items.forEach((item, key) => {
+      const data = item.serialize();
+      if (data !== null && data !== void 0) {
+        items[key] = data;
+      }
+    });
+    const stores = {};
+    this.#childStores.forEach((store, key) => {
+      stores[key] = store.serialize();
+    });
+    return {
+      type: "store",
+      items,
+      stores
+    };
+  }
+  /**
+   * Applies serialized data produced by `serialize()`.
+   *
+   * Keys absent from `data` are left untouched; keys present in `data`
+   * but not in this store are ignored. Malformed input is a no-op.
+   * Runs entirely inside the caller's batch — the context wraps hydration
+   * in a batch already.
+   *
+   * @param {any} data
+   */
+  hydrate(data) {
+    if (!data || typeof data !== "object" || data.type !== "store") {
+      return;
+    }
+    if (data.items && typeof data.items === "object") {
+      for (const [key, itemData] of Object.entries(data.items)) {
+        const item = this.#items.get(key);
+        if (item) {
+          item.hydrate(itemData);
+        }
+      }
+    }
+    if (data.stores && typeof data.stores === "object") {
+      for (const [key, storeData] of Object.entries(data.stores)) {
+        const store = this.#childStores.get(key);
+        if (store) {
+          store.hydrate(storeData);
+        }
+      }
+    }
+  }
+  /**
+   * Subscribes a function to changes across the store's contents.
+   *
+   * The callback receives a `Map` of dot-separated update paths to
+   * `UpdateDataRecord` instances, plus this store as the second
+   * argument. It is invoked once per batch of effective changes.
+   *
+   * @param {(update: Map<string, import('../core/UpdateDataRecord.js').UpdateDataRecord>, store: Store) => void} fn
+   * @returns {() => void} An unsubscribe function.
    */
   subscribe(fn) {
     if (this.isDestroyed) {
@@ -3026,9 +3774,10 @@ var Store = class _Store {
     });
   }
   /**
-   * Subscribes a function to be called when this Store is destroyed.
-   * @param {(store:Store)=>void} fn
-   * @returns {()=>void}
+   * Registers a callback fired when the store is destroyed.
+   *
+   * @param {(store: Store) => void} fn
+   * @returns {() => void} An unsubscribe function.
    */
   onDestroy(fn) {
     if (this.isDestroyed) {
@@ -3037,7 +3786,11 @@ var Store = class _Store {
     return this.#eventEmitter.on("destroy", fn);
   }
   /**
-   * Mutes the event emitter, preventing any updates from being triggered.
+   * Suppresses change notifications until `unmuteUpdates()` is called.
+   *
+   * Mutations that happen while muted are still applied and their
+   * updates accumulated; subscribers are notified once, with everything,
+   * when the store is unmuted.
    */
   muteUpdates() {
     if (this.isDestroyed) {
@@ -3046,7 +3799,10 @@ var Store = class _Store {
     this.#muted = true;
   }
   /**
-   * Unmutes the event emitter, allowing updates to be triggered.
+   * Resumes change notifications after `muteUpdates()`.
+   *
+   * If any updates accumulated while muted, subscribers are notified
+   * immediately with the full set.
    */
   unmuteUpdates() {
     if (this.isDestroyed) {
@@ -3059,7 +3815,8 @@ var Store = class _Store {
     }
   }
   /**
-   * Returns whether the event emitter is currently muted.
+   * Returns `true` if change notifications are currently suppressed.
+   *
    * @returns {boolean}
    */
   isMuted() {
@@ -3075,6 +3832,13 @@ function isReactiveWrapper(item) {
   return item instanceof Atom || item instanceof ShallowReactive;
 }
 var ReactiveList = class {
+  /**
+   * Local path of this list. Empty unless set by the user. Used by
+   * snapshot tooling to build dotted paths when the list is nested inside
+   * a `Store`.
+   * @type {string}
+   */
+  path = "";
   /** @type {Atom<number>} */
   #lengthAtom;
   /** @type {Store} */
@@ -3090,34 +3854,36 @@ var ReactiveList = class {
     this.#store.unmuteUpdates();
   }
   /**
-   * Creates a reactive wrapper for the given value.
-   * Uses ShallowReactive for objects/arrays, Atom for items.
-   *
-   * @param {any} value - The value to wrap.
-   * @param {string} name - The name to assign to the reactive item (used for debugging).
-   * @returns {ReactiveWrapper<any>} The reactive wrapper.
+   * @param {any} value
+   * @param {string} name
+   * @returns {ReactiveWrapper<any>}
    */
   #createReactiveItem(value, name) {
+    let item;
     if (isPlainObject(value) || Array.isArray(value)) {
-      return new ShallowReactive(value, { name });
+      item = new ShallowReactive(value, { name });
+    } else {
+      item = new Atom(value, { name });
     }
-    return new Atom(value, { name });
+    item.path = name;
+    return item;
   }
   /**
-   * Updates the value of a reactive wrapper.
-   * Works for both Atom and ShallowReactive.
-   *
-   * @param {ReactiveWrapper<any>} wrapper - The reactive wrapper.
-   * @param {any} newValue - The new value to set.
+   * @param {ReactiveWrapper<any>} wrapper
+   * @param {any} newValue
    */
   #updateReactiveItem(wrapper, newValue) {
     wrapper.value = newValue;
   }
   /**
-   * Adds one or more items to the end of the list.
+   * Appends one or more values to the end of the list.
    *
-   * @param {...T} values - The values to add. Primitives are wrapped in `Atom`,
-   *                        objects and arrays are wrapped in `ShallowReactive`.
+   * Each value is wrapped according to its type — primitives become
+   * `Atom`, objects and arrays become `ShallowReactive`. The whole
+   * operation produces a single notification, regardless of how many
+   * values are added.
+   *
+   * @param {...T} values
    */
   add(...values) {
     if (this.isDestroyed) {
@@ -3132,8 +3898,7 @@ var ReactiveList = class {
     const wrappers = {};
     for (let i = 0; i < values.length; i++) {
       const idx = startIndex + i;
-      const wrapper = this.#createReactiveItem(values[i], idx.toString());
-      wrappers[idx] = wrapper;
+      wrappers[idx] = this.#createReactiveItem(values[i], idx.toString());
     }
     this.#store.addItems(wrappers);
     for (let i = 0; i < values.length; i++) {
@@ -3146,10 +3911,14 @@ var ReactiveList = class {
     }
   }
   /**
-   * Retrieves the value at the given index.
+   * Returns the value at the given index, or `undefined` if the index is
+   * out of bounds.
    *
-   * @param {number} index - The index of the item to retrieve.
-   * @returns {T | undefined} The value, or undefined if the index is out of bounds.
+   * Reads through the reactive wrapper, so a call inside a tracked scope
+   * registers a dependency on the item at that index.
+   *
+   * @param {number} index
+   * @returns {T | undefined}
    */
   getItem(index) {
     if (this.isDestroyed) {
@@ -3164,7 +3933,11 @@ var ReactiveList = class {
   /**
    * Returns a shallow copy of all items in the list as a plain array.
    *
-   * @returns {T[]} An array containing all values.
+   * The array is newly allocated on each call; mutating it does not
+   * affect the list. Elements that are reactive objects are returned as
+   * their underlying values, not as wrappers.
+   *
+   * @returns {T[]}
    */
   toArray() {
     if (this.isDestroyed) {
@@ -3180,10 +3953,13 @@ var ReactiveList = class {
     return items;
   }
   /**
-   * Updates the value at the specified index.
+   * Replaces the value at the specified index.
    *
-   * @param {number} index - The index to update.
-   * @param {T} value - The new value. Primitives become `Atom`, objects/arrays become `ShallowReactive`.
+   * The whole operation produces a single notification. No-op if `index`
+   * is out of bounds.
+   *
+   * @param {number} index
+   * @param {T} value
    */
   setItem(index, value) {
     if (this.isDestroyed) {
@@ -3201,7 +3977,10 @@ var ReactiveList = class {
     }
   }
   /**
-   * Returns the current length of the list.
+   * The current number of items in the list.
+   *
+   * Reading this property inside a tracked scope registers a dependency,
+   * so the enclosing effect re-runs whenever items are added or removed.
    *
    * @returns {number}
    */
@@ -3214,7 +3993,11 @@ var ReactiveList = class {
   /**
    * Replaces the entire content of the list with the given array.
    *
-   * @param {T[]} values - The new array of values. Wrapping follows the same rules as `add()`.
+   * Existing positions are updated in place; positions beyond the new
+   * length are destroyed; new positions are created. The whole operation
+   * produces a single notification.
+   *
+   * @param {T[]} values
    */
   setItems(values) {
     if (this.isDestroyed) {
@@ -3257,11 +4040,17 @@ var ReactiveList = class {
     }
   }
   /**
-   * Removes elements from the list starting at `startIndex` and removing `count` items.
-   * Remaining elements are shifted left. The operation is batched to emit only one notification.
+   * Removes `count` items starting at `startIndex`.
    *
-   * @param {number} startIndex - The index at which to start removal.
-   * @param {number} count - The number of elements to remove.
+   * Remaining items shift left to fill the gap; the tail positions are
+   * destroyed. The whole operation produces a single notification.
+   *
+   * No-op if `count <= 0`, `startIndex < 0`, or `startIndex >= length`.
+   * If `count` exceeds the number of items from `startIndex` to the end,
+   * it is clamped.
+   *
+   * @param {number} startIndex
+   * @param {number} count
    */
   removeRange(startIndex, count) {
     if (this.isDestroyed) {
@@ -3302,32 +4091,39 @@ var ReactiveList = class {
   /**
    * Removes the item at the given index.
    *
-   * @param {number} index - The index of the item to remove.
+   * Shorthand for `removeRange(index, 1)`. No-op if `index` is out of
+   * bounds.
+   *
+   * @param {number} index
    */
   removeItem(index) {
     this.removeRange(index, 1);
   }
   /**
-   * Removes the last item of the list.
+   * Removes the last item. No-op if the list is empty.
    */
   removeLastItem() {
     this.removeRange(this.#lengthAtom.value - 1, 1);
   }
   /**
-   * Removes the first item of the list.
+   * Removes the first item. No-op if the list is empty.
    */
   removeFirstItem() {
     this.removeRange(0, 1);
   }
   /**
    * Removes all items from the list.
+   *
+   * The length becomes `0` and every item is destroyed.
    */
   clear() {
     this.removeRange(0, this.#lengthAtom.value);
   }
   /**
-   * Destroys the list, releasing all internal resources.
-   * After destruction, any method call (except `isDestroyed`) will throw an error.
+   * Destroys the list and releases its internal store.
+   *
+   * After this call, all mutating methods throw. Idempotent — subsequent
+   * calls are no-ops.
    */
   destroy() {
     if (this.isDestroyed) {
@@ -3336,7 +4132,10 @@ var ReactiveList = class {
     this.#store.destroy();
   }
   /**
-   * Indicates whether the list has been destroyed.
+   * Returns `true` after `destroy()` has been called.
+   *
+   * After destruction, all mutating methods throw and only this getter
+   * remains safe to call.
    *
    * @returns {boolean}
    */
@@ -3344,11 +4143,14 @@ var ReactiveList = class {
     return this.#store.isDestroyed;
   }
   /**
-   * Subscribes a callback to be invoked whenever the list changes.
-   * The callback receives a Map of updates with details about changed items.
+   * Subscribes a function to changes of the list.
    *
-   * @param {(updates: Map<string, import('./types.d.ts').UpdateDataRecord>) => void} fn - The callback function.
-   * @returns {() => void} A function to unsubscribe the callback.
+   * The callback receives a `Map` of update paths to `UpdateDataRecord`
+   * instances. It is invoked once per batch of effective changes,
+   * regardless of how many items were affected.
+   *
+   * @param {(updates: Map<string, import('../core/UpdateDataRecord.js').UpdateDataRecord>) => void} fn
+   * @returns {() => void} An unsubscribe function.
    */
   subscribe(fn) {
     if (this.isDestroyed) {
@@ -3356,10 +4158,50 @@ var ReactiveList = class {
     }
     return this.#store.subscribe(fn);
   }
+  /**
+   * Returns a serializable representation of the list's contents.
+   *
+   * The shape is `{ type: 'list', value: [...] }`, matching the
+   * serialization protocol used by reactive items.
+   *
+   * @returns {any}
+   */
+  serialize() {
+    return {
+      type: "list",
+      value: this.toArray()
+    };
+  }
+  /**
+   * Applies data produced by `serialize()`.
+   *
+   * Uses `setItems` internally, so the whole replacement is batched and
+   * subscribers fire once. Silently ignores malformed input.
+   *
+   * @param {any} data
+   */
+  hydrate(data) {
+    if (data && typeof data === "object" && data.type === "list" && Array.isArray(data.value)) {
+      this.setItems(data.value);
+    }
+  }
 };
 
 // src/api/api.js
+function collectDependencies(fn) {
+  const tracker = getCurrentContext().dependencyTracker;
+  tracker.enable();
+  let deps;
+  try {
+    fn();
+    deps = tracker.data;
+  } finally {
+    tracker.disable();
+  }
+  return deps;
+}
 function createReactiveSubscription(dataFn, effectFn, options = {}) {
+  const ctx = getCurrentContext();
   const {
     name = "",
     delay = 0,
@@ -3369,7 +4211,7 @@ function createReactiveSubscription(dataFn, effectFn, options = {}) {
     isAutorun = false,
     passUpdates = false
   } = options;
-  if (modeController.untrackMode) {
+  if (ctx.modeController.untrackMode) {
     throw new Error(
       `Cannot initialize reactive subscription${name ? ` (${name})` : ""} when untrackMode is on.`
     );
@@ -3411,24 +4253,22 @@ function createReactiveSubscription(dataFn, effectFn, options = {}) {
           }
         }
         unsubscribers = [];
-        const deps = getSetOfUsedReactiveItems(dataFn);
+        const deps = collectDependencies(dataFn);
         if (deps.size === 0) {
           throw new Error(`No reactive items found${name ? ` (${name})` : ""}.`);
         }
         unsubscribers = subscribeTo(deps);
       }
-      if (!isAutorun) {
-        modeController.enterBatch();
-        try {
-          if (passUpdates && collectedUpdates.size > 0) {
-            finalEffect(collectedUpdates);
-          } else {
-            finalEffect(void 0);
-          }
-        } finally {
-          modeController.exitBatch();
-        }
+      const shouldRunEffect = !isAutorun || !recomputeDependencies;
+      if (shouldRunEffect) {
+        const updatesForEffect = passUpdates && collectedUpdates.size > 0 ? new Map(collectedUpdates) : void 0;
         collectedUpdates.clear();
+        ctx.modeController.enterBatch();
+        try {
+          finalEffect(updatesForEffect);
+        } finally {
+          ctx.modeController.exitBatch();
+        }
       }
     } catch (error) {
       if (onError) {
@@ -3439,7 +4279,7 @@ function createReactiveSubscription(dataFn, effectFn, options = {}) {
       isRunning = false;
     }
   }
-  const initialDeps = getSetOfUsedReactiveItems(dataFn);
+  const initialDeps = collectDependencies(dataFn);
   if (initialDeps.size === 0) {
     throw new Error(`No reactive items found${name ? ` (${name})` : ""}.`);
   }
@@ -3467,20 +4307,22 @@ function autorun(fn, options = {}) {
   return createReactiveSubscription(fn, fn, {
     ...options,
     recomputeDependencies: options.recomputeDependencies ?? true,
-    isAutorun: true
+    isAutorun: true,
+    passUpdates: false
   });
 }
 function reaction(dataFn, effectFn, options = {}) {
   return createReactiveSubscription(dataFn, effectFn, {
     ...options,
     recomputeDependencies: options.recomputeDependencies ?? true,
+    passUpdates: options.passUpdates ?? true,
     isAutorun: false
   });
 }
 function when(predicate, fn, options) {
-  const computed2 = new Computed(predicate);
+  const computed2 = new Computed(predicate, { name: "when" });
   const timeout = options?.timeout || 0;
-  let timer;
+  let timer = null;
   const mainUnsubscriber = function() {
     if (timer) {
       clearTimeout(timer);
@@ -3503,9 +4345,9 @@ function when(predicate, fn, options) {
 }
 function waitUntil(predicate, options) {
   return new Promise((resolve) => {
-    const computed2 = new Computed(predicate);
+    const computed2 = new Computed(predicate, { name: "waitUntil" });
     const timeout = options?.timeout || 0;
-    let timer;
+    let timer = null;
     const mainUnsubscriber = function() {
       if (timer) {
         clearTimeout(timer);
@@ -3528,55 +4370,55 @@ function waitUntil(predicate, options) {
   });
 }
 function runInAction(fn) {
-  if (modeController.subscribersMode) {
-    modeController.runAfterSubscribers(() => {
-      batch(fn);
+  const ctx = getCurrentContext();
+  if (ctx.modeController.subscribersMode) {
+    ctx.modeController.runAfterSubscribers(() => {
+      ctx.batch(fn);
     });
   } else {
-    batch(fn);
+    ctx.batch(fn);
   }
 }
-function batch(fn) {
-  modeController.enterBatch();
-  try {
-    fn();
-  } finally {
-    modeController.exitBatch();
-  }
+function batch(nameOrFn, fn) {
+  return getCurrentContext().batch(nameOrFn, fn);
+}
+function action(name, fn, payload) {
+  return getCurrentContext().action(name, fn, payload);
 }
 function untrack(fn) {
-  const untrackMode = modeController.untrackMode;
-  let result;
-  modeController.untrackMode = true;
+  const modeController2 = getCurrentContext().modeController;
+  const previous = modeController2.untrackMode;
+  modeController2.untrackMode = true;
   try {
-    result = fn();
-  } catch (e) {
-    modeController.untrackMode = untrackMode;
-    throw e;
+    return fn();
+  } finally {
+    modeController2.untrackMode = previous;
   }
-  modeController.untrackMode = untrackMode;
-  return result;
 }
 function getNow(interval = 1e3) {
-  const atom2 = new Atom(0, { name: "now" });
+  const nowAtom = new Atom(0, { name: "now" });
   let intervalId;
-  atom2.onHasSubscribers(() => {
+  nowAtom.onHasSubscribers(() => {
     intervalId = setInterval(() => {
       runInAction(() => {
-        atom2.value = Date.now();
+        nowAtom.value = Date.now();
       });
     }, interval);
   });
-  atom2.onNoSubscribers(() => {
-    clearInterval(intervalId);
+  nowAtom.onNoSubscribers(() => {
+    if (intervalId !== void 0) {
+      clearInterval(intervalId);
+    }
     runInAction(() => {
-      atom2.value = 0;
+      nowAtom.value = 0;
     });
   });
-  atom2.onDestroy(() => {
-    clearInterval(intervalId);
+  nowAtom.onDestroy(() => {
+    if (intervalId !== void 0) {
+      clearInterval(intervalId);
+    }
   });
-  return atom2;
+  return nowAtom;
 }
 function fromPromise(promise) {
   const stateAtom = new Atom("pending", { name: "fromPromise" });
@@ -3620,9 +4462,7 @@ function fromPromise(promise) {
       stateAtom.destroy();
     });
   }
-  return {
-    case: caseMethod
-  };
+  return { case: caseMethod };
 }
 function atom(value, options) {
   return new Atom(value, options);
@@ -3644,7 +4484,7 @@ function makeObservable(obj, annotations, options) {
       continue;
     }
     if (
-      /** @type {Array<string|boolean>} */
+      /** @type {Array<string | boolean>} */
       [
         "atom",
         "collection",
@@ -3769,14 +4609,333 @@ function makeAutoObservable(obj, overrides = {}, options, filter) {
   annotations = Object.assign({}, annotations, overrides);
   return makeObservable(obj, annotations, _options);
 }
+
+// src/plugins/devtools.js
+var DevToolsPlugin = class {
+  /**
+   * Plugin identifier. Also used as the default display name in the
+   * Redux DevTools Extension when no `name` option is provided.
+   */
+  name = "devtools";
+  /** @type {import('../core/context.js').Store2Context | null} */
+  #context = null;
+  /** @type {Array<DevToolsEntry>} */
+  #entries = [];
+  /** @type {number} */
+  #maxAge;
+  /** @type {number} */
+  #nextId = 0;
+  /** @type {number} */
+  #currentIndex = -1;
+  /** @type {any} */
+  #extension = null;
+  /** @type {(() => void) | null} */
+  #extensionUnsubscribe = null;
+  /** @type {boolean} */
+  #isTimeTraveling = false;
+  /** @type {Set<(entry: DevToolsEntry | null, index: number) => void>} */
+  #listeners = /* @__PURE__ */ new Set();
+  /** @type {DevToolsOptions} */
+  #options;
+  /**
+   * @param {DevToolsOptions} [options]
+   */
+  constructor(options = {}) {
+    this.#maxAge = options.maxAge ?? 50;
+    this.#options = options;
+  }
+  /**
+   * Called by the context when the plugin is registered via `use()`.
+   *
+   * Captures the initial baseline snapshot and connects to the Redux
+   * DevTools Extension when it is available in the host environment.
+   *
+   * Do not call this method directly — it is part of the plugin
+   * installation contract.
+   *
+   * @param {import('../core/context.js').Store2Context} context
+   */
+  install(context) {
+    this.#context = context;
+    this.#recordEntry("@@INIT", 0);
+    if (this.#options.connectToExtension !== false) {
+      this.#tryConnectToExtension();
+    }
+  }
+  /**
+   * Records a new history entry after an action completes.
+   *
+   * Called by the context's action lifecycle. Ignored while a time-travel
+   * jump is in progress, so that rewinding does not itself appear as a
+   * new action in the history.
+   *
+   * @param {import('../types.js').ActionInfo} action
+   */
+  onActionEnd(action2) {
+    if (this.#isTimeTraveling) {
+      return;
+    }
+    const durationMs = action2.endTime !== null ? action2.endTime - action2.startTime : 0;
+    const entry = this.#recordEntry(action2.name, durationMs);
+    if (this.#extension && entry) {
+      try {
+        this.#extension.send(action2.name, entry.snapshot);
+      } catch (e) {
+        console.warn("[store2-devtools] failed to send to extension:", e);
+      }
+    }
+  }
+  /**
+   * Appends a new entry to the history, truncating any future entries that
+   * were superseded by a time-travel followed by a fresh action.
+   *
+   * @param {string} name
+   * @param {number} durationMs
+   * @returns {DevToolsEntry | null}
+   */
+  #recordEntry(name, durationMs) {
+    if (!this.#context) {
+      return null;
+    }
+    if (this.#currentIndex < this.#entries.length - 1) {
+      this.#entries.splice(this.#currentIndex + 1);
+    }
+    const entry = {
+      id: this.#nextId++,
+      name,
+      timestamp: Date.now(),
+      durationMs,
+      snapshot: this.#context.snapshot()
+    };
+    this.#entries.push(entry);
+    while (this.#entries.length > this.#maxAge) {
+      this.#entries.shift();
+    }
+    this.#currentIndex = this.#entries.length - 1;
+    this.#emitChange();
+    return entry;
+  }
+  #emitChange() {
+    const entry = this.#entries[this.#currentIndex] || null;
+    for (const listener of this.#listeners) {
+      try {
+        listener(entry, this.#currentIndex);
+      } catch (e) {
+        console.error("[store2-devtools] listener threw:", e);
+      }
+    }
+  }
+  /**
+   * Returns a shallow copy of the recorded history.
+   *
+   * The returned array is newly allocated; mutating it does not affect
+   * the plugin. The snapshot objects inside each entry are shared by
+   * reference — treat them as immutable.
+   *
+   * @returns {Array<DevToolsEntry>}
+   */
+  getHistory() {
+    return this.#entries.map((e) => ({ ...e }));
+  }
+  /**
+   * Returns the index of the entry the plugin is currently positioned at.
+   *
+   * Entry `0` is the baseline; higher indices correspond to completed
+   * actions in order. Returns `-1` if the plugin has not been installed
+   * yet.
+   *
+   * @returns {number}
+   */
+  getCurrentIndex() {
+    return this.#currentIndex;
+  }
+  /**
+   * Returns the entry at the current history index, or `null` if the
+   * history is empty.
+   *
+   * After `jumpTo(index)`, the returned entry is the one at that index,
+   * not the most recent one. Use `getHistory()` to inspect the full
+   * history.
+   *
+   * @returns {DevToolsEntry | null}
+   */
+  getCurrentEntry() {
+    return this.#entries[this.#currentIndex] ?? null;
+  }
+  /**
+   * Travels to a specific history index.
+   *
+   * Restores the state captured at that entry by calling
+   * `context.hydrate(snapshot, { timeTravel: true })`. Plugin hooks are
+   * suppressed for the duration of the hydration, so the jump does not
+   * appear as a new action. Subscribers still run — the UI updates.
+   *
+   * No-op if the index is out of range or already current.
+   *
+   * @param {number} index
+   */
+  jumpTo(index) {
+    if (!this.#context) {
+      return;
+    }
+    if (index < 0 || index >= this.#entries.length) {
+      return;
+    }
+    if (index === this.#currentIndex) {
+      return;
+    }
+    const entry = this.#entries[index];
+    this.#isTimeTraveling = true;
+    try {
+      this.#context.hydrate(entry.snapshot, { timeTravel: true });
+      this.#currentIndex = index;
+    } finally {
+      this.#isTimeTraveling = false;
+    }
+    this.#emitChange();
+  }
+  /**
+   * Clears the history and records a fresh baseline.
+   *
+   * Called by the plugin itself in response to a `RESET` message from the
+   * Redux DevTools Extension, or directly by user code. After this call,
+   * the history contains exactly one entry: the new baseline.
+   */
+  reset() {
+    this.#entries.length = 0;
+    this.#currentIndex = -1;
+    this.#nextId = 0;
+    this.#recordEntry("@@INIT", 0);
+  }
+  /**
+   * Subscribes a listener called whenever the current index or the
+   * history changes.
+   *
+   * The listener receives the current entry (or `null` if the history is
+   * empty) and its index. Errors thrown by the listener are caught and
+   * logged, so one faulty listener cannot break others.
+   *
+   * @param {(entry: DevToolsEntry | null, index: number) => void} fn
+   * @returns {() => void} An unsubscribe function.
+   */
+  subscribe(fn) {
+    this.#listeners.add(fn);
+    return () => {
+      this.#listeners.delete(fn);
+    };
+  }
+  /**
+   * Detaches from the Redux DevTools Extension, if connected.
+   *
+   * Safe to call when no extension is connected or after the plugin was
+   * installed with `connectToExtension: false`. Idempotent.
+   */
+  disconnect() {
+    if (this.#extensionUnsubscribe) {
+      try {
+        this.#extensionUnsubscribe();
+      } catch (e) {
+        console.warn("[store2-devtools] failed to unsubscribe:", e);
+      }
+      this.#extensionUnsubscribe = null;
+    }
+    this.#extension = null;
+  }
+  #tryConnectToExtension() {
+    const g = (
+      /** @type {any} */
+      globalThis
+    );
+    const ext = g.__REDUX_DEVTOOLS_EXTENSION__;
+    if (!ext || typeof ext.connect !== "function") {
+      return;
+    }
+    try {
+      this.#extension = ext.connect({
+        name: this.#options.name || "store2",
+        features: {
+          pause: false,
+          lock: false,
+          persist: false,
+          export: true,
+          import: "custom",
+          jump: true,
+          skip: false,
+          reorder: false,
+          dispatch: false,
+          test: false
+        }
+      });
+      if (this.#context) {
+        try {
+          this.#extension.init(this.#context.snapshot());
+        } catch (e) {
+          console.warn("[store2-devtools] extension.init failed:", e);
+        }
+      }
+      if (typeof this.#extension.subscribe === "function") {
+        const unsubscribe = this.#extension.subscribe(
+          /** @param {any} message */
+          (message) => {
+            this.#handleExtensionMessage(message);
+          }
+        );
+        if (typeof unsubscribe === "function") {
+          this.#extensionUnsubscribe = unsubscribe;
+        }
+      }
+    } catch (e) {
+      console.warn("[store2-devtools] failed to connect to extension:", e);
+      this.#extension = null;
+    }
+  }
+  /**
+   * Handles messages from the Redux DevTools Extension.
+   *
+   * The extension tracks actions independently of our history. We sent the
+   * baseline via `init()`, so its action list is offset by one relative to
+   * our entry list: extension action `N` corresponds to our entry `N + 1`.
+   * `JUMP_TO_STATE` refers to the initial state, i.e. our entry `0`.
+   *
+   * @param {any} message
+   */
+  #handleExtensionMessage(message) {
+    if (!message || typeof message !== "object") {
+      return;
+    }
+    if (message.type !== "DISPATCH") {
+      return;
+    }
+    const payload = message.payload;
+    if (!payload) {
+      return;
+    }
+    if (payload.type === "JUMP_TO_ACTION") {
+      const extIndex = Number(payload.actionId);
+      if (Number.isFinite(extIndex)) {
+        this.jumpTo(extIndex + 1);
+      }
+    } else if (payload.type === "JUMP_TO_STATE") {
+      this.jumpTo(0);
+    } else if (payload.type === "RESET") {
+      this.reset();
+    }
+  }
+};
+function createDevToolsPlugin(options = {}) {
+  return new DevToolsPlugin(options);
+}
 export {
   Atom,
   Collection,
   Computed,
+  DevToolsPlugin,
   ReactiveItem,
   ReactiveList,
   ShallowReactive,
   Store,
+  Store2Context,
+  action,
   atom,
   autorun,
   batch,
@@ -3785,10 +4944,14 @@ export {
   compareAny,
   comparePlainObjects,
   computed,
+  createDevToolsPlugin,
+  createStore2Context,
   debounce,
+  defaultContext,
   extendObservable,
   fromPromise,
   getAllPropertyDescriptors,
+  getCurrentContext,
   getError,
   getItemNamesFromSet,
   getNow,
@@ -3798,6 +4961,7 @@ export {
   makeObservable,
   reaction,
   runInAction,
+  runWithContext,
   shallowReactive,
   sleep,
   sortReactiveItems,

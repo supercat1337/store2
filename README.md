@@ -258,6 +258,145 @@ console.log(list.toArray()); // [42, 3]
 
 ---
 
+## Contexts & Ecosystem
+
+The core primitives work with a process-wide default context out of the
+box. For SSR, testing, DevTools, and persistence, `store2` exposes explicit
+contexts.
+
+### `Store2Context`
+
+A context owns the services that drive reactivity — ID generation, batch
+and subscriber coordination, dependency tracking, change propagation — plus
+the plugin and root registries. Multiple contexts can coexist in one
+process without sharing state.
+
+```js
+import {
+    createStore2Context,
+    runWithContext,
+    getCurrentContext,
+    defaultContext,
+} from '@supercat1337/store2';
+
+const ctx = createStore2Context({ name: 'app' });
+
+runWithContext(ctx, () => {
+    const a = atom(0); // binds to ctx
+    a.engine.context === ctx; // true
+});
+
+// Outside the run: reads use the default context again.
+getCurrentContext() === defaultContext; // true
+```
+
+This is what makes server-side rendering safe: each request gets its own
+context, and items created inside it never leak across requests.
+
+### Named actions and middleware
+
+`context.action(name, fn, payload?)` wraps a synchronous or asynchronous
+body in a logical action. Middleware registered via `addMiddleware()`
+forms a Koa-style chain around every action.
+
+```js
+await ctx.action('add todo', async () => {
+    todos.value = [...todos.value, newTodo];
+});
+
+ctx.addMiddleware(async (action, next) => {
+    console.log('→', action.name);
+    try {
+        return await next();
+    } finally {
+        console.log('←', action.name);
+    }
+});
+```
+
+Actions are the unit of work that DevTools, loggers, and time-travel
+plugins reason about. Each has an `ActionInfo` with `id`, `name`,
+`payload`, `parentId`, `startTime`, `endTime`, and `error`.
+
+### Plugins
+
+A plugin is an object with `name`, `install(context)`, and any subset of
+lifecycle hooks — `onActionStart`/`onActionEnd`, `onBatchStart`/`onBatchEnd`,
+`onUpdate`, `onComputedRecalc`, `onSubscriberRun`, `onDestroy`, `onError`.
+
+```js
+ctx.use({
+    name: 'logger',
+    install() {},
+    onActionEnd: action => console.log('✓', action.name),
+});
+```
+
+Plugin errors are caught and logged. A plugin cannot break reactivity.
+
+### Snapshots and hydration
+
+Every reactive item implements `serialize(): any` and `hydrate(data): void`.
+`Store` and `ReactiveList` compose them recursively. `Computed` returns
+`null` — derived state is recalculated on hydration, never persisted.
+
+Register the roots you want to snapshot, then capture and restore:
+
+```js
+ctx.registerRoot('app', store);
+
+const snap = ctx.snapshot();
+// { version: 1, timestamp: ..., roots: { app: { type: 'store', ... } } }
+
+ctx.hydrate(snap); // normal restore
+ctx.hydrate(snap, { timeTravel: true }); // DevTools rewind
+```
+
+Snapshots are JSON-safe by construction. Persistence adapters
+(`localStorage`, `IndexedDB`, SSR transport) sit on top of this protocol;
+migration logic belongs in the adapter, not in the core.
+
+### DevTools
+
+```js
+import { createDevToolsPlugin } from '@supercat1337/store2';
+
+const devtools = createDevToolsPlugin({ name: 'my app', maxAge: 50 });
+ctx.use(devtools);
+
+await ctx.action('increment', () => {
+    count.value++;
+});
+await ctx.action('increment', () => {
+    count.value++;
+});
+
+devtools.getHistory().length; // 3: baseline + 2 actions
+devtools.jumpTo(1);
+count.value; // 1
+```
+
+The plugin records a snapshot on every completed action, exposes
+`jumpTo`, and optionally bridges to the Redux DevTools Extension when
+`__REDUX_DEVTOOLS_EXTENSION__` is present in the host environment.
+
+### Testing
+
+```js
+import { createStore2Context, runWithContext } from '@supercat1337/store2';
+
+const ctx = createStore2Context({ name: 'test' });
+runWithContext(ctx, () => {
+    // create items, register roots, install plugins here
+});
+
+// ctx.flush() forces pending subscribers to run synchronously.
+```
+
+Use a fresh context per test to avoid leaking state between test cases.
+
+---
+
 ## Advanced APIs
 
 ### `autorun(fn, options)`
@@ -428,7 +567,10 @@ counter.increment(); // logs "Double: 2"
 
 ## TypeScript Support
 
-This library is written in plain JavaScript with JSDoc annotations. Type definitions are generated automatically and shipped with the package. You get full IntelliSense and type checking in supporting editors.
+This library is written in plain JavaScript with JSDoc annotations.
+Type definitions are bundled into a single `dist/types.d.ts` via
+`@microsoft/api-extractor`. Full IntelliSense and type checking work in
+supporting editors without an extra `@types` package.
 
 ---
 
@@ -437,6 +579,9 @@ This library is written in plain JavaScript with JSDoc annotations. Type definit
 - **Full API Documentation**: [`docs-md/README.md`](docs-md/README.md)
 - **Examples**: Check out the [`examples/`](./examples) folder for runnable code snippets covering all features.
 - **Architecture Overview**: For a deep dive into the internal architecture, dependency graph, batching, and core engine mechanics, see [`AGENTS.md`](./AGENTS.md) — this file is also intended for AI assistants and advanced developers.
+- **Public API contract**: [`etc/store2.api.md`](./etc/store2.api.md) — a
+  machine-generated snapshot of the public surface. Changed on every
+  release; review the diff before merging API-affecting PRs.
 
 ---
 

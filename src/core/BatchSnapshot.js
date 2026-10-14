@@ -15,13 +15,13 @@ export class BatchSnapshot {
     /**
      * Reference to the reactive item this snapshot belongs to.
      * Used to access the equality comparison function.
-     * @type {import('../types.d.ts').ReactiveItem}
+     * @type {import('../reactives/ReactiveItem.js').ReactiveItem}
      */
     #reactiveItem;
 
     /**
      * Creates a new BatchSnapshot instance.
-     * @param {import('../types.d.ts').ReactiveItem} reactiveItem - The reactive item to snapshot.
+     * @param {import('../reactives/ReactiveItem.js').ReactiveItem} reactiveItem - The reactive item to snapshot.
      */
     constructor(reactiveItem) {
         this.#reactiveItem = reactiveItem;

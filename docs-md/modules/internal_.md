@@ -58,7 +58,7 @@
 
 #### Defined in
 
-[src/types.d.ts:4](https://github.com/supercat1337/store2/blob/c65c4382ec22e2f61bbc31b786846fc524db2820/src/types.d.ts#L4)
+[src/types.js:4](https://github.com/supercat1337/store2/blob/c65c4382ec22e2f61bbc31b786846fc524db2820/src/types.js#L4)
 
 ___
 

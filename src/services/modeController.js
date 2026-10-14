@@ -2,38 +2,79 @@
 
 import { EventEmitterLite } from '@supercat1337/event-emitter';
 
+/**
+ * Coordinates global reactivity modes: batching, subscriber notification,
+ * untracked reads, and named actions.
+ *
+ * Each `Store2Context` owns its own instance so that multiple root stores
+ * can coexist (SSR requests, parallel tests, embedded widgets).
+ */
 class ModeControllerService {
+    /** @type {boolean} */
     isComputing = false;
-    untrackMode = false;
+
+    /** @type {boolean} */
     throwErrorInSubscribers = true;
 
+    /**
+     * When `true`, tracked reads are suppressed. `untrack()` saves and
+     * restores this value, so nesting is safe.
+     * @type {boolean}
+     */
+    untrackMode = false;
+
+    /** @type {number} */
     #batchDepth = 0;
+
+    /** @type {string} */
+    #currentBatchName = '';
+
+    /** @type {boolean} */
     #subscribersMode = false;
 
-    /** @type {EventEmitterLite<"batchModeStart"|"batchModeEnd"|"beforeBatchModeEnd">} */
+    /** @type {Array<import('../types.js').ActionInfo>} */
+    #actionStack = [];
+
+    /** @type {number} */
+    #actionCounter = 0;
+
+    /** @type {EventEmitterLite<"batchModeStart"|"batchModeEnd"|"beforeBatchModeEnd">} @internal */
     batchModeEvents;
 
-    /** @type {EventEmitterLite<"subscribersModeEnd">} */
+    /** @type {EventEmitterLite<"subscribersModeEnd">} @internal */
     subscribersModeEvents;
+
+    /** @type {EventEmitterLite<"actionStart"|"actionEnd">} @internal */
+    actionEvents;
 
     constructor() {
         this.batchModeEvents = new EventEmitterLite();
-
         this.subscribersModeEvents = new EventEmitterLite();
+        this.actionEvents = new EventEmitterLite();
     }
 
     /**
-     * Subscribes a function to be called whenever the given event is triggered.
-     * @param {"batchModeStart"|"batchModeEnd"|"beforeBatchModeEnd"} event - The event to subscribe to.
-     * @param {function():void} callback - The function to be called.
-     * @returns {()=>void} A function that unsubscribes the given function.
+     * Subscribes to a batch lifecycle event.
+     * @param {"batchModeStart"|"batchModeEnd"|"beforeBatchModeEnd"} event
+     * @param {() => void} callback
+     * @returns {() => void}
      */
     on(event, callback) {
         return this.batchModeEvents.on(event, callback);
     }
 
     /**
-     * Returns true if currently inside a batch (batch depth > 0).
+     * Subscribes to an action lifecycle event.
+     * @param {"actionStart"|"actionEnd"} event
+     * @param {(action: import('../types.js').ActionInfo) => void} callback
+     * @returns {() => void}
+     */
+    onAction(event, callback) {
+        return this.actionEvents.on(event, callback);
+    }
+
+    /**
+     * Returns true while the controller is inside a batch.
      * @returns {boolean}
      */
     get batchMode() {
@@ -41,20 +82,39 @@ class ModeControllerService {
     }
 
     /**
-     * Enters a batch mode. Increments the batch depth.
-     * Emits "batchModeStart" when entering the first batch.
+     * Returns the current batch depth.
+     * @returns {number}
      */
-    enterBatch() {
+    get batchDepth() {
+        return this.#batchDepth;
+    }
+
+    /**
+     * Returns the name of the currently running outermost batch, or ''.
+     * @returns {string}
+     */
+    get currentBatchName() {
+        return this.#currentBatchName;
+    }
+
+    /**
+     * Increments the batch depth. Emits `batchModeStart` on the first entry.
+     * @param {string} [name] - Optional human-readable name for the batch.
+     */
+    enterBatch(name = '') {
         const wasInBatch = this.batchMode;
         this.#batchDepth++;
+        if (name || !this.#currentBatchName) {
+            this.#currentBatchName = name || this.#currentBatchName;
+        }
         if (!wasInBatch) {
             this.batchModeEvents.emit('batchModeStart');
         }
     }
 
     /**
-     * Exits a batch mode. Decrements the batch depth.
-     * If exiting the last batch, emits "beforeBatchModeEnd" and then "batchModeEnd".
+     * Decrements the batch depth. Emits `beforeBatchModeEnd`, then
+     * `batchModeEnd` when leaving the outermost batch.
      */
     exitBatch() {
         if (this.#batchDepth === 0) {
@@ -67,11 +127,13 @@ class ModeControllerService {
         this.#batchDepth--;
         if (isLast) {
             this.batchModeEvents.emit('batchModeEnd');
+            // Clear the batch name only after listeners have observed it.
+            this.#currentBatchName = '';
         }
     }
 
     /**
-     * Retrieves whether any subscribers are currently running.
+     * Returns true while subscribers are running.
      * @returns {boolean}
      */
     get subscribersMode() {
@@ -79,14 +141,14 @@ class ModeControllerService {
     }
 
     /**
-     * Sets the state to indicate that subscribers are currently running.
+     * Marks the start of subscriber notification.
      */
     startSubscribersMode() {
         this.#subscribersMode = true;
     }
 
     /**
-     * Sets the state to indicate that no subscribers are currently running.
+     * Marks the end of subscriber notification and flushes deferred callbacks.
      */
     endSubscribersMode() {
         if (!this.#subscribersMode) {
@@ -97,14 +159,67 @@ class ModeControllerService {
     }
 
     /**
-     * Subscribes a function to be called once after all subscribers have finished running.
-     * @param {Function} callback
+     * Registers a callback to run once after subscribers finish.
+     * @param {() => void} callback
      */
     runAfterSubscribers(callback) {
         this.subscribersModeEvents.once('subscribersModeEnd', callback);
     }
+
+    /**
+     * Returns the currently running action, or null if no action is in flight.
+     * @returns {import('../types.js').ActionInfo | null}
+     */
+    get currentAction() {
+        if (this.#actionStack.length === 0) {
+            return null;
+        }
+        const last = this.#actionStack[this.#actionStack.length - 1];
+        return /** @type {import('../types.js').ActionInfo} */ (last);
+    }
+
+    /**
+     * Starts a new named action.
+     * @param {string} name
+     * @param {any} [payload]
+     * @returns {import('../types.js').ActionInfo}
+     */
+    beginAction(name, payload = undefined) {
+        const parent = this.currentAction;
+        /** @type {import('../types.js').ActionInfo} */
+        const action = {
+            id: String(++this.#actionCounter),
+            name,
+            payload,
+            parentId: parent ? parent.id : null,
+            startTime: Date.now(),
+            endTime: null,
+            error: null,
+        };
+        this.#actionStack.push(action);
+        this.actionEvents.emit('actionStart', action);
+        return action;
+    }
+
+    /**
+     * Ends an action previously started with `beginAction`.
+     * @param {import('../types.js').ActionInfo} action
+     * @param {Error | null} [error]
+     */
+    endAction(action, error = null) {
+        action.endTime = Date.now();
+        action.error = error;
+        const index = this.#actionStack.indexOf(action);
+        if (index !== -1) {
+            this.#actionStack.splice(index, 1);
+        }
+        this.actionEvents.emit('actionEnd', action);
+    }
 }
 
+/**
+ * Default process-wide instance. Kept for backward compatibility.
+ */
 const modeController = new ModeControllerService();
-export { modeController };
 
+export { ModeControllerService, modeController };

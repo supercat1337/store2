@@ -21,7 +21,7 @@ export class MessageHandler {
     /**
      * Processes an incoming message.
      * @param {number} message - The message code.
-     * @param {{ sender: import('../types.d.ts').ReactiveItem, recipients: Set<import('../types.d.ts').ReactiveItem> }} ctx - Context.
+     * @param {{ sender: import('../reactives/ReactiveItem.js').ReactiveItem, recipients: Set<import('../reactives/ReactiveItem.js').ReactiveItem> }} ctx - Context.
      * @param {_Engine} engineState - The engine's state container (provides getters/setters).
      * @param {Function} setError - Callback to set the engine's error.
      * @param {Function} setShouldRecalc - Callback to set the shouldRecalc flag.

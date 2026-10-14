@@ -188,30 +188,30 @@ test('Computed: smartRecompute = true, dependencies are changed', t => {
 
     // foo == 1;
     /*
-    t.log('c.__cachedDependentsVersionString = ', c.__cachedDependentsVersionString);
+    t.log('c.#cachedDependentsVersionString = ', c.#cachedDependentsVersionString);
     t.log('c.engine.shouldRecalc = ', c.engine.shouldRecalc);
-    t.log('d.__cachedDependentsVersionString = ', d.__cachedDependentsVersionString);
+    t.log('d.#cachedDependentsVersionString = ', d.#cachedDependentsVersionString);
     t.log('d.engine.shouldRecalc = ', d.engine.shouldRecalc);
     */
     a.value = 1;
     b.value = 1;
     /*
-    t.log('c.__cachedDependentsVersionString = ', c.__cachedDependentsVersionString);
+    t.log('c.#cachedDependentsVersionString = ', c.#cachedDependentsVersionString);
     t.log('c.engine.shouldRecalc = ', c.engine.shouldRecalc);
     t.log('c.engine.version = ', c.engine.version);
     */
     t.is(c.value, 2);
     /*
-    t.log('c.__cachedDependentsVersionString = ', c.__cachedDependentsVersionString);
+    t.log('c.#cachedDependentsVersionString = ', c.#cachedDependentsVersionString);
     t.log('c.engine.shouldRecalc = ', c.engine.shouldRecalc);
     t.log('c.engine.version = ', c.engine.version);
 
-    t.log('d.__cachedDependentsVersionString = ', d.__cachedDependentsVersionString);
+    t.log('d.#cachedDependentsVersionString = ', d.#cachedDependentsVersionString);
     t.log('d.engine.shouldRecalc = ', d.engine.shouldRecalc);
 */
     t.is(d.value, 2);
     /*
-    t.log(d.__cachedDependentsVersionString);
+    t.log(d.#cachedDependentsVersionString);
 */
     // foo == 2;
 

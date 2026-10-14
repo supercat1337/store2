@@ -2,26 +2,28 @@
 
 import { BatchSnapshot } from './BatchSnapshot.js';
 import { UpdateDataRecord } from './UpdateDataRecord.js';
-import { modeController } from '../services/modeController.js';
 
 /**
  * Tracks updates and batch snapshots for a reactive item.
  * Manages the `updates` map and handles batch change detection.
  */
 export class UpdateTracker {
-    /** @type {Map<string, import('../types.d.ts').UpdateDataRecord>} */
+    /** @type {Map<string, import('./UpdateDataRecord.js').UpdateDataRecord>} */
     #updates;
-    /** @type {import('../types.d.ts').ReactiveItem} */
+
+    /** @type {import('../reactives/ReactiveItem.js').ReactiveItem} */
     #reactiveItem;
+
     /** @type {BatchSnapshot | null} */
     #batchSnapshot = null;
+
     /** @type {import('./Engine.js').Engine} */
-    #engine; // ссылка на Engine для доступа к version и batchSnapshot
+    #engine;
 
     /**
-     * @param {Map<string, import('../types.d.ts').UpdateDataRecord>} updates - The engine's updates map.
-     * @param {import('../types.d.ts').ReactiveItem} reactiveItem - The owning reactive item.
-     * @param {import('./Engine.js').Engine} engine - The owning engine (for version and batch snapshot access).
+     * @param {Map<string, import('./UpdateDataRecord.js').UpdateDataRecord>} updates
+     * @param {import('../reactives/ReactiveItem.js').ReactiveItem} reactiveItem
+     * @param {import('./Engine.js').Engine} engine
      */
     constructor(updates, reactiveItem, engine) {
         this.#updates = updates;
@@ -30,12 +32,12 @@ export class UpdateTracker {
     }
 
     /**
-     * Records a change attempt. In batch mode, stores the original value in a snapshot.
-     * @param {string} property - The property key.
-     * @param {any} oldValue - The value before the change.
+     * In batch mode, stores the original value in a snapshot.
+     * @param {string} property
+     * @param {any} oldValue
      */
     #recordChange(property, oldValue) {
-        if (modeController.batchMode) {
+        if (this.#engine.context.modeController.batchMode) {
             if (!this.#batchSnapshot) {
                 this.#batchSnapshot = new BatchSnapshot(this.#reactiveItem);
             }
@@ -44,11 +46,12 @@ export class UpdateTracker {
     }
 
     /**
-     * Determines if a change is effective (i.e., not reverted) considering batch snapshots.
-     * @param {string} property - The property key.
-     * @param {any} oldValue - The immediate previous value.
-     * @param {any} newValue - The new value.
-     * @param {import('../types.d.ts').CompareFunction|null} compareFn - Equality function.
+     * Determines whether a change is effective (i.e. not reverted) considering
+     * batch snapshots.
+     * @param {string} property
+     * @param {any} oldValue
+     * @param {any} newValue
+     * @param {import('../types.js').CompareFunction | null} compareFn
      * @returns {boolean}
      */
     isEffectiveChange(property, oldValue, newValue, compareFn) {
@@ -58,7 +61,10 @@ export class UpdateTracker {
          * @returns {boolean}
          */
         const equals = (a, b) => (compareFn ? compareFn(a, b) : this.#reactiveItem.equals(a, b));
-        if (modeController.batchMode && this.#batchSnapshot?.has(property)) {
+
+        const batchMode = this.#engine.context.modeController.batchMode;
+
+        if (batchMode && this.#batchSnapshot?.has(property)) {
             const original = this.#batchSnapshot.getOriginal(property);
             return !equals(original, newValue);
         }
@@ -67,14 +73,14 @@ export class UpdateTracker {
 
     /**
      * Adds an update record if the change is effective.
-     * @param {string} property - The property key.
-     * @param {"set"|"delete"} type - The operation type.
-     * @param {any} oldValue - The previous value (immediate).
-     * @param {any} newValue - The new value.
-     * @param {import('../types.d.ts').CompareFunction|null} compareFn - Equality function.
-     * @param {() => void} notifyDependentsCallback - Callback to notify dependents of a change.
-     * @param {() => void} addToChangedItemsCallback - Callback to add the item to the changed items controller.
-     * @returns {boolean} True if an update was added.
+     * @param {string} property
+     * @param {"set" | "delete"} type
+     * @param {any} oldValue
+     * @param {any} newValue
+     * @param {import('../types.js').CompareFunction | null} compareFn
+     * @param {() => void} notifyDependentsCallback
+     * @param {() => void} addToChangedItemsCallback
+     * @returns {boolean}
      */
     addUpdate(
         property,
@@ -87,53 +93,45 @@ export class UpdateTracker {
     ) {
         this.#recordChange(property, oldValue);
 
-        // Compute the reported old value (original in batch, else immediate)
+        const batchMode = this.#engine.context.modeController.batchMode;
+
         let reportedOld = oldValue;
         let compareOld = oldValue;
-        if (modeController.batchMode && this.#batchSnapshot?.has(property)) {
+        if (batchMode && this.#batchSnapshot?.has(property)) {
             const original = this.#batchSnapshot.getOriginal(property);
             reportedOld = original;
             compareOld = original;
         }
 
-        // Check if the mutation actually changed the value (immediate check)
         /**
          * @param {*} a
          * @param {*} b
          * @returns {boolean}
          */
         const equals = (a, b) => (compareFn ? compareFn(a, b) : this.#reactiveItem.equals(a, b));
-        const hasMutation = property === '' ? !equals(oldValue, newValue) : oldValue !== newValue;
-        if (!hasMutation) {return false;}
 
-        // Notify dependents and add to changed items controller
+        const hasMutation = property === '' ? !equals(oldValue, newValue) : oldValue !== newValue;
+        if (!hasMutation) {
+            return false;
+        }
+
         notifyDependentsCallback();
         addToChangedItemsCallback();
 
-        // Determine if the change is effective relative to the batch original (if any)
         const effective = !equals(compareOld, newValue);
         if (!effective) {
-            // Reverted back to original – remove the update record
             this.#updates.delete(property);
             return false;
         }
 
-        // Create or update the record with the reported old value
         const record = new UpdateDataRecord(type, reportedOld, newValue, this.#reactiveItem);
         this.#updates.set(property, record);
-        // Increment engine version (needed for smartRecompute)
         this.#engine.version++;
 
-        /*
-        console.log(
-            `[UpdateTracker] ${this.#reactiveItem.name} addUpdate: property=${property}, old=${oldValue}, new=${newValue}, effective=${effective}, hasMutation=${hasMutation}`
-        );
-        */
         return true;
     }
 
     /**
-     * Checks if there are any pending updates.
      * @returns {boolean}
      */
     hasUpdates() {
@@ -152,10 +150,9 @@ export class UpdateTracker {
     }
 
     /**
-     * Processes temporary changes after batch ends.
-     * Removes updates for properties that reverted to original values.
-     * @param {(prop: string) => any} getCurrentValue - Function to get current value for a property.
-     * @returns {boolean} True if any changes remain.
+     * Removes updates for properties that reverted to their original values.
+     * @param {(prop: string) => any} getCurrentValue
+     * @returns {boolean}
      */
     checkChangesTemporary(getCurrentValue) {
         if (!this.#batchSnapshot) {
@@ -163,6 +160,7 @@ export class UpdateTracker {
         }
 
         const changedProps = this.#batchSnapshot.getChangedProperties(getCurrentValue);
+
         for (const key of this.#updates.keys()) {
             if (!changedProps.includes(key)) {
                 this.#updates.delete(key);
@@ -172,13 +170,6 @@ export class UpdateTracker {
         const hasChanges = this.#updates.size > 0;
         this.#batchSnapshot.clear();
         this.#batchSnapshot = null;
-        
-        /*
-        console.log(
-            `[checkChangesTemporary] ${this.#reactiveItem.name} result: ${hasChanges}, updates:`,
-            Array.from(this.#updates.keys())
-        );
-        */
 
         return hasChanges;
     }

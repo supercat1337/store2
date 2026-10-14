@@ -1,911 +1,813 @@
-import { EventEmitter } from '@supercat1337/event-emitter';
-
-type CompareFunction = (a: any, b: any) => boolean;
-/* From api\api.d.ts */
 /**
- * Creates a new Atom instance. An Atom is a reactive item that holds a value. Same as `atom` but
- * returns a new Atom instance.
- * @template T
- * @param {T} value - The initial value of the Atom.
- * @param {object} [options] - Options
- * @param {string} [options.name] - The name of Atom.
- * @param {(a:T, b:T)=>boolean} [options.compareFunction] - A function that compares two values to determine if they are equal.
- * @returns {Atom<T>} A new Atom instance with the given value and options.
- * @example
- * ```js
- * const count = atom(0);
+ * A lightweight, efficient, and easy-to-use reactive state management
+ * system for JavaScript.
  *
- * count.subscribe(() => {
- *     console.log(count.value);
- * });
+ * Zero runtime dependencies beyond a tiny event emitter. Provides atoms,
+ * computed values, collections, shallow reactive objects, stores, and a
+ * context/plugin system for building ecosystem packages.
  *
- * count.value = 1;
- * ```
+ * @packageDocumentation
  */
-export function atom<T>(value: T, options?: {
+
+import { EventEmitterLite } from '@supercat1337/event-emitter';
+
+/**
+ * Runs `fn` as a named, optionally asynchronous action. Middleware installed
+ * on the current context is applied around the body.
+ *
+ * @param {string} name
+ * @param {(action: import('../types.js').ActionInfo) => any} fn
+ * @param {any} [payload]
+ * @returns {Promise<any>}
+ */
+export declare function action(name: string, fn: (action: ActionInfo) => any, payload?: any): Promise<any>;
+
+/**
+ * Metadata about a single logical user action.
+ *
+ * Actions are the unit of work that DevTools, loggers, and time-travel
+ * plugins reason about. An `ActionInfo` is created by
+ * `Store2Context.action()` and passed to middleware and lifecycle hooks.
+ *
+ * @public
+ */
+export declare interface ActionInfo {
+    /**
+     * Unique identifier, monotonic within the owning context.
+     */
+    id: string;
+    /**
+     * Human-readable action name, e.g. `"add todo"`.
+     */
+    name: string;
+    /**
+     * Optional payload passed to `action()`.
+     */
+    payload: any;
+    /**
+     * Id of the enclosing action when actions are nested, or `null` for
+     * top-level actions.
+     */
+    parentId: string | null;
+    /**
+     * Wall-clock timestamp (milliseconds since epoch) when the action
+     * started.
+     */
+    startTime: number;
+    /**
+     * Wall-clock timestamp when the action finished, or `null` while the
+     * action body is still running.
+     */
+    endTime: number | null;
+    /**
+     * Error thrown by the action body, or `null` on success.
+     */
+    error: Error | null;
+}
+
+/**
+ * Middleware invoked for every action. Must call `next()` to continue the
+ * chain. Returning without calling `next()` short-circuits the action.
+ *
+ * @public
+ */
+export declare type ActionMiddleware = (action: ActionInfo, next: () => Promise<any>) => Promise<any>;
+
+/**
+ * Atom is a reactive item that holds a single value.
+ *
+ * It is the base unit of reactive state — a single mutable cell. Reads
+ * inside a tracked scope (a `Computed` body, an `autorun`, or a `reaction`)
+ * register a dependency; writes schedule a change notification.
+ *
+ * Objects assigned to an Atom are shallow-cloned, so mutating nested
+ * properties does not trigger reactivity. Use `Collection` or
+ * `ShallowReactive` for structures that need deep updates.
+ *
+ * @augments ReactiveItem
+ * @template T
+ * @public
+ */
+export declare class Atom<T> extends ReactiveItem {
+    /**
+     * Creates a new Atom with the given initial value.
+     *
+     * @param {T} value - The initial value.
+     * @param {object} [options]
+     * @param {string} [options.name] - Debug name used in error messages.
+     * @param {((a: T, b: T) => boolean) | null} [options.compareFunction] - Custom equality function. Defaults to shallow comparison.
+     */
+    constructor(value: T, options?: {
+        name?: string;
+        compareFunction?: ((a: T, b: T) => boolean) | null;
+    });
+    set value(value: T);
+    /**
+     * The current value.
+     *
+     * Reading this property inside a tracked scope registers a dependency.
+     * Writing it schedules a change if the new value differs from the
+     * current one.
+     *
+     * @returns {T}
+     */
+    get value(): T;
+    /**
+     * Returns the current value.
+     *
+     * When `options.untracked` is `false` (the default), registers this
+     * atom as a dependency of the enclosing tracked scope. Pass
+     * `{ untracked: true }` to read without creating a dependency.
+     *
+     * @param {{ untracked?: boolean }} [options]
+     * @returns {T}
+     */
+    getValue(options?: {
+        untracked?: boolean;
+    }): T;
+    /**
+     * Returns the current value without registering a dependency.
+     *
+     * Shorthand for `getValue({ untracked: true })`. Useful when you need
+     * to peek at an atom inside a `Computed` or `autorun` without making it
+     * re-run when the atom changes.
+     *
+     * @returns {T}
+     */
+    get valueUntracked(): T;
+    #private;
+}
+
+/**
+ * Creates a new reactive Atom holding the given value.
+ *
+ * An Atom is the base unit of reactive state — a single mutable cell. Reads
+ * inside tracked contexts register a dependency; writes schedule a change.
+ *
+ * @template T
+ * @param {T} value
+ * @param {object} [options]
+ * @param {string} [options.name]
+ * @param {(a: T, b: T) => boolean} [options.compareFunction]
+ * @returns {Atom<T>}
+ */
+export declare function atom<T>(value: T, options?: {
     name?: string;
     compareFunction?: (a: T, b: T) => boolean;
 }): Atom<T>;
+
 /**
- * Creates a new Computed instance. Computed is a reactive item that holds a value that is computed from other reactive values.
- * @template T
- * @param {()=>T} fn - The function that returns the value of the Computed
- * @param {object} [options] - Options
- * @param {string} [options.name] - The name of Computed.
- * @param {(a:T, b:T)=>boolean} [options.compareFunction] - A function that compares two values to determine if they are equal.
- * @param {boolean} [options.smartRecompute] - Whether the function is a hard function. If true, it prevents calling the function by comparing the string representation of the dependencies.
- * @returns {Computed<T>} A new Computed instance with the given function and options.
- * @example
- * ```js
- * const a = atom(0);
- * const b = computed(() => a.value + 1);
+ * Autorun – runs the effect immediately and re-runs it on any dependency
+ * change.
  *
- * b.subscribe(() => {
- *     console.log(b.value);
- * });
- *
- * a.value = 1;
- * // b = 2
- * ```
+ * @param {() => void} fn
+ * @param {object} [options]
+ * @param {string} [options.name]
+ * @param {number} [options.delay]
+ * @param {AbortSignal} [options.signal]
+ * @param {Function} [options.onError]
+ * @param {boolean} [options.recomputeDependencies=true]
+ * @returns {() => void}
  */
-export function computed<T>(fn: () => T, options?: {
+export declare function autorun(fn: () => void, options?: {
+    name?: string;
+    delay?: number;
+    signal?: AbortSignal;
+    onError?: Function;
+    recomputeDependencies?: boolean;
+}): () => void;
+
+/**
+ * Groups multiple updates into a single notification round.
+ *
+ *     batch(() => { ... })
+ *     batch('update todos', () => { ... })
+ *
+ * @param {string | Function} nameOrFn
+ * @param {Function} [fn]
+ * @returns {any}
+ */
+export declare function batch(nameOrFn: string | Function, fn?: Function): any;
+
+/**
+ * Metadata about a batch scope. Emitted to plugins via `onBatchStart` and
+ * `onBatchEnd`.
+ *
+ * @public
+ */
+export declare interface BatchInfo {
+    /**
+     * Nesting depth of the batch at the moment of emission. The outermost
+     * batch has depth `1`.
+     */
+    depth: number;
+    /**
+     * Name passed to `context.batch(name, fn)`, or `''` for unnamed
+     * batches.
+     */
+    name: string;
+    /**
+     * The action currently running, if the batch is nested inside one, or
+     * `null`.
+     */
+    action: ActionInfo | null;
+}
+
+/**
+ * Coordinates notification of changed reactive items: collects them,
+ * recalculates stale computed values in a deterministic order, and invokes
+ * subscribers.
+ *
+ * One instance per `Store2Context`. The class receives the owning
+ * `ModeControllerService` in its constructor so that batching and subscriber
+ * modes can be controlled independently for each context.
+ */
+export declare class ChangedItemsController {
+    /**
+     * @param {import('../services/modeController.js').ModeControllerService} modeController
+     */
+    constructor(modeController: ModeControllerService);
+    /** @type {Set<import('../reactives/ReactiveItem.js').ReactiveItem>} */
+    items: Set<ReactiveItem>;
+    /**
+     * Marks an item as changed. Outside a batch, immediately runs subscribers
+     * and clears the pending set.
+     * @param {import('../reactives/ReactiveItem.js').ReactiveItem} item
+     */
+    addItem(item: ReactiveItem): void;
+    /**
+     * Removes an item from the pending set.
+     * @param {import('../reactives/ReactiveItem.js').ReactiveItem} item
+     */
+    removeItem(item: ReactiveItem): void;
+    /**
+     * Clears the pending set.
+     */
+    clear(): void;
+    /**
+     * Runs all pending subscribers.
+     *
+     * The outer loop re-checks `this.items` after each notification round so
+     * that updates added during subscriber execution (e.g. via `runInAction`)
+     * are processed in the same call.
+     */
+    runSubscribers(): void;
+    #private;
+}
+
+/**
+ * Clones an object shallowly.
+ * @template T
+ * @param {T} obj
+ * @returns {T}
+ */
+export declare function clone<T>(obj: T): T;
+
+/**
+ * Collection is a reactive item that holds an array of values.
+ *
+ * Array mutations (`push`, `pop`, `splice`, index assignment) trigger
+ * reactivity. The `.value` property returns a Proxy — direct mutations
+ * through it are tracked. The underlying raw array is available via
+ * `getRawValue()` but bypassing the proxy disables reactivity.
+ *
+ * @augments ReactiveItem
+ * @template T
+ * @public
+ */
+export declare class Collection<T> extends ReactiveItem {
+    /**
+     * Creates a new Collection wrapping the given array.
+     *
+     * The array is copied element-by-element; the caller's array reference
+     * is not stored.
+     *
+     * @param {T[]} value - The initial array.
+     * @param {object} [options]
+     * @param {string} [options.name] - Debug name used in error messages.
+     * @param {import('../types.js').CompareFunction | null} [options.compareFunction] - Custom equality function for element comparison.
+     */
+    constructor(value: T[], options?: {
+        name?: string;
+        compareFunction?: CompareFunction | null;
+    });
+    set value(value: T[]);
+    /**
+     * The proxied array.
+     *
+     * Reading this property registers a dependency. Mutating the returned
+     * array — `push`, index assignment, `splice`, and so on — triggers a
+     * reactive update.
+     *
+     * @returns {T[]}
+     */
+    get value(): T[];
+    /**
+     * Returns the proxied array.
+     *
+     * Mutations through the returned proxy are reactive. When
+     * `options.untracked` is `false` (the default), registers this
+     * collection as a dependency of the enclosing tracked scope.
+     *
+     * @param {{ untracked?: boolean }} [options]
+     * @returns {T[]}
+     */
+    getValue(options?: {
+        untracked?: boolean;
+    }): T[];
+    /**
+     * Returns the underlying array without the proxy.
+     *
+     * Mutations on the returned array do not trigger reactivity. Use for
+     * inspection, iteration, or passing to APIs that must receive a plain
+     * array — not for state changes.
+     *
+     * @returns {T[]}
+     */
+    getRawValue(): T[];
+    #private;
+}
+
+/**
+ * Creates a new reactive Collection wrapping an array.
+ *
+ * Array mutations (`push`, `pop`, `splice`, index assignment) trigger
+ * reactivity. The `.value` property returns a Proxy; direct mutations
+ * through it are tracked.
+ *
+ * @template T
+ * @param {T[]} value
+ * @param {object} [options]
+ * @param {string} [options.name]
+ * @param {(a: T, b: T) => boolean} [options.compareFunction]
+ * @returns {Collection<T>}
+ */
+export declare function collection<T>(value: T[], options?: {
+    name?: string;
+    compareFunction?: (a: T, b: T) => boolean;
+}): Collection<T>;
+
+/**
+ * Checks if two values are equal.
+ * @param {unknown} a
+ * @param {unknown} b
+ * @returns {boolean}
+ */
+export declare function compareAny(a: unknown, b: unknown): boolean;
+
+/**
+ * A function that compares two values for equality. Used by reactive items
+ * to decide whether a mutation is effective.
+ *
+ * @public
+ */
+export declare type CompareFunction = (a: any, b: any) => boolean;
+
+/**
+ * Checks if two plain objects are equal.
+ * @param {object} a
+ * @param {object} b
+ * @returns {boolean}
+ */
+export declare function comparePlainObjects(a: object, b: object): boolean;
+
+/**
+ * Computed is a reactive item whose value is derived from other reactive
+ * sources.
+ *
+ * The function passed to the constructor runs once at construction time to
+ * establish dependencies and compute the initial value. It runs again
+ * whenever a dependency changes and the recomputed value differs from the
+ * cached one. Because equality is checked before notifying subscribers, a
+ * computed whose dependencies change but whose output stays the same does
+ * not cause any downstream work.
+ *
+ * `Computed` is derived state and is never persisted — `serialize()`
+ * returns `null`, and the value is recalculated from its dependencies on
+ * hydration.
+ *
+ * @augments ReactiveItem
+ * @template {unknown} T
+ * @public
+ */
+export declare class Computed<T extends unknown> extends ReactiveItem {
+    /**
+     * Creates a new Computed.
+     *
+     * @param {() => T} fn - The derivation function. Must read at least one reactive value.
+     * @param {object} [options]
+     * @param {string} [options.name] - Debug name used in error messages.
+     * @param {((a: T, b: T) => boolean) | null} [options.compareFunction] - Custom equality function. Defaults to shallow comparison.
+     * @param {boolean} [options.smartRecompute] - When `true`, the value is recalculated only if the version of a dependency actually changed, avoiding recomputation when dependencies toggled back to their previous values within a batch.
+     */
+    constructor(fn: () => T, options?: {
+        name?: string;
+        compareFunction?: ((a: T, b: T) => boolean) | null;
+        smartRecompute?: boolean;
+    });
+    /**
+     * Read-only view of the options passed to the constructor. Currently
+     * exposes `smartRecompute`.
+     */
+    options: {
+        smartRecompute: boolean;
+    };
+    /**
+     * Returns `true` if the cached value is out of date and a read would
+     * trigger recalculation.
+     *
+     * A computed is stale if one of its dependencies notified a change, or
+     * if its last evaluation threw an error.
+     *
+     * @returns {boolean}
+     */
+    isStale(): boolean;
+    /**
+     * Returns the computed value, recalculating first if any dependency
+     * changed.
+     *
+     * When `options.untracked` is `false` (the default), registers this
+     * computed as a dependency of the enclosing tracked scope. Pass
+     * `{ untracked: true }` to read without creating a dependency.
+     *
+     * Throws if the derivation function throws, or if the item has been
+     * destroyed.
+     *
+     * @param {{ untracked?: boolean }} [options]
+     * @returns {T}
+     */
+    getValue(options?: {
+        untracked?: boolean;
+    }): T;
+    /**
+     * The computed value.
+     *
+     * Reading this property recalculates if a dependency changed and
+     * registers a dependency in the enclosing tracked scope.
+     *
+     * @returns {T}
+     */
+    get value(): T;
+    /**
+     * Returns the last cached value without triggering recalculation.
+     *
+     * If the computed is stale, this returns the previous value — not a
+     * fresh one. Useful for debugging and for reading without causing side
+     * effects, but the value may be out of date.
+     *
+     * @returns {T}
+     */
+    peekValue(): T;
+    /**
+     * Returns the computed value without registering a dependency.
+     *
+     * Shorthand for `getValue({ untracked: true })`. The value is still
+     * recalculated if stale — only dependency registration is skipped.
+     *
+     * @returns {T}
+     */
+    get valueUntracked(): T;
+    /**
+     * Always returns `null`. Computed items are derived state and are never
+     * persisted — they are recalculated from their dependencies on
+     * hydration.
+     *
+     * @returns {null}
+     */
+    serialize(): null;
+    #private;
+}
+
+/**
+ * Creates a new reactive Computed whose value is derived from other
+ * reactive sources.
+ *
+ * The function passed as `fn` runs once at construction, then again
+ * whenever one of its dependencies changes and the recomputed value
+ * differs.
+ *
+ * @template T
+ * @param {() => T} fn
+ * @param {object} [options]
+ * @param {string} [options.name]
+ * @param {(a: T, b: T) => boolean} [options.compareFunction]
+ * @param {boolean} [options.smartRecompute]
+ * @returns {Computed<T>}
+ */
+export declare function computed<T>(fn: () => T, options?: {
     name?: string;
     compareFunction?: (a: T, b: T) => boolean;
     smartRecompute?: boolean;
 }): Computed<T>;
+
 /**
- * Creates a new reactive Collection instance that holds an array.
- * The Collection provides reactivity for array mutations (push, pop, splice, etc.)
- * and allows subscribing to changes.
+ * A serializable snapshot of an entire context.
  *
- * Unlike the `Atom` and `Computed` factories, this function returns the actual
- * `Collection` instance, not just the proxied array. To access the reactive array,
- * use the `.value` property.
+ * `roots` maps the name given at `registerRoot()` time to that root's own
+ * `serialize()` output. The snapshot is JSON-safe by construction — every
+ * `serialize()` implementation returns plain objects, arrays, and
+ * primitives.
  *
- * @template T
- * @param {T[]} value - The initial array to observe.
- * @param {object} [options] - Configuration options.
- * @param {string} [options.name] - The name of the Collection (used for debugging).
- * @param {(a:T, b:T)=>boolean} [options.compareFunction] - Custom equality function.
- * @returns {Collection<T>} The Collection instance.
+ * @public
+ */
+export declare interface ContextSnapshot {
+    /**
+     * Snapshot format version. Currently `1`. Persistence adapters should
+     * dispatch on this field for migrations.
+     */
+    version: number;
+    /**
+     * Wall-clock timestamp (milliseconds since epoch) when the snapshot was
+     * captured.
+     */
+    timestamp: number;
+    /**
+     * Snapshot data keyed by the root name passed to `registerRoot()`.
+     */
+    roots: {
+        [rootName: string]: any;
+    };
+}
+
+/**
+ * Creates a DevTools plugin instance.
+ *
+ * @param {DevToolsOptions} [options]
+ * @returns {DevToolsPlugin}
  *
  * @example
  * ```js
- * const coll = collection([1, 2, 3]);
+ * const devtools = createDevToolsPlugin({ name: 'my app', maxAge: 100 });
+ * ctx.use(devtools);
  *
- * // Subscribe to changes
- * coll.subscribe(() => console.log('changed'));
- *
- * // Mutate the array via .value
- * coll.value.push(4); // triggers subscriber
- * console.log(coll.value); // [1, 2, 3, 4]
- *
- * // Direct property access also works (proxied)
- * coll.value[0] = 10; // triggers subscriber
- * ```
- */
-export function collection<T>(value: T[], options?: {
-    name?: string;
-    compareFunction?: (a: T, b: T) => boolean;
-}): Collection<T>;
-/**
- * Creates a new reactive ShallowReactive instance that wraps an object.
- * The ShallowReactive provides reactivity for property assignments and deletions
- * on the top level of the object (shallow reactivity).
- *
- * This function returns the actual `ShallowReactive` instance, not just the proxy.
- * To access the reactive object, use the `.value` property.
- *
- * @template T
- * @param {T} value - The object to observe (must be a plain object or an instance).
- * @param {object} [options] - Configuration options.
- * @param {string} [options.name] - The name of the ShallowReactive (used for debugging).
- * @returns {ShallowReactive<T>} The ShallowReactive instance.
- *
- * @example
- * ```js
- * const reactive = shallowReactive({ a: 1, b: 2 });
- *
- * // Subscribe to changes
- * reactive.subscribe(() => console.log('changed'));
- *
- * // Modify the object via .value
- * reactive.value.a = 3; // triggers subscriber
- * console.log(reactive.value); // { a: 3, b: 2 }
- *
- * // Direct property access also works (proxied)
- * reactive.value.b = 5; // triggers subscriber
- * ```
- */
-export function shallowReactive<T>(value: T, options?: {
-    name?: string;
-}): ShallowReactive<T>;
-/**
- * Autorun – runs the effect immediately (during initial dependency collection)
- * and re‑runs it on any dependency change.
- * Dependencies are re‑collected on every run by default.
- *
- * @param {() => void} fn - The effect function.
- * @param {object} [options] - Options.
- * @param {string} [options.name] - Debug name.
- * @param {number} [options.delay] - Debounce delay (ms).
- * @param {AbortSignal} [options.signal] - AbortSignal.
- * @param {Function} [options.onError] - Error handler.
- * @param {boolean} [options.recomputeDependencies=true] - Re‑collect dependencies each run.
- * @returns {() => void} Unsubscribe function.
- */
-export function autorun(fn: () => void, options?: {
-    name?: string;
-    delay?: number;
-    signal?: AbortSignal;
-    onError?: Function;
-    recomputeDependencies?: boolean;
-}): () => void;
-/**
- * Executes the specified function while batching notifications to reactive items.
- * This is useful for operations that make multiple changes to reactive items, as
- * it prevents the notifications from being sent until all changes have been made.
- * Supports nested batch calls.
- *
- * @param {Function} fn - The function to execute while batching notifications.
- * @returns {void}
- * @example
- * ```js
- * const a = atom(0);
- * const b = atom(0);
- *
- * let foo = 0;
- *
- * autorun(() => {
- *     a.value;
- *     b.value;
- *     foo++;
- * });
- *
- * console.log(a.value, b.value, foo); // 0 0 1
- *
- * batch(() => {
- *     a.value++;
- *     b.value++;
- * });
- *
- * console.log(a.value, b.value, foo); // 1 1 2
- * ```
- */
-export function batch(fn: Function): void;
-/**
- * Reaction – tracks dependencies via dataFn and runs effectFn when they change.
- * The effect is NOT run immediately; it only runs after the first change.
- * Dependencies are re‑collected on every run by default.
- *
- * @param {() => any} dataFn - Function whose dependencies are tracked.
- * @param {(updates?: Map<string, UpdateDataRecord>) => void} effectFn - Effect to run.
- * @param {object} [options] - Options.
- * @param {string} [options.name] - Debug name.
- * @param {number} [options.delay] - Debounce delay (ms).
- * @param {AbortSignal} [options.signal] - AbortSignal.
- * @param {Function} [options.onError] - Error handler.
- * @param {boolean} [options.recomputeDependencies=true] - Re‑collect dependencies each run.
- * @param {boolean} [options.passUpdates=true] - Pass collected updates to effectFn.
- * @returns {() => void} Unsubscribe function.
- */
-export function reaction(dataFn: () => any, effectFn: (updates?: Map<string, UpdateDataRecord>) => void, options?: {
-    name?: string;
-    delay?: number;
-    signal?: AbortSignal;
-    onError?: Function;
-    recomputeDependencies?: boolean;
-    passUpdates?: boolean;
-}): () => void;
-/**
- * Automatically calls the given function whenever the given predicate evaluates to true.
- * @param {()=>boolean} predicate - The predicate that should be evaluated.
- * @param {()=>void} fn - The function to be called when the predicate evaluates to true.
- * @param {object} [options] - Optional options.
- * @param {number} [options.timeout] - The number of milliseconds to wait before timing out.
- * @param {number} [options.delay] - The number of milliseconds to wait before calling the function.
- * @param {AbortSignal} [options.signal] - An AbortSignal to cancel the function call.
- * @returns {()=>void} A function that can be called to unsubscribe the callback function from changes in the tracked dependencies.
- * @example
- * ```js
- * const a = atom(0, { name: "a" });
- * let foo = 0;
- *
- * when(
- *     () => a.value > 3,
- *     () => {
- *         foo++;
- *     }
- * );
- *
- * a.value = 2; // foo = 0
- * a.value = 3; // foo = 0
- * a.value = 4; // foo = 1
- * a.value = 5; // foo = 1
- * a.value = 3; // foo = 1
- * a.value = 4; // foo = 2
- * a.value = 5; // foo = 2
- * ```
- */
-export function when(predicate: () => boolean, fn: () => void, options?: {
-    timeout?: number;
-    delay?: number;
-    signal?: AbortSignal;
-}): () => void;
-/**
- * Waits until the given predicate evaluates to true.
- * @param {()=>boolean} predicate - The predicate that should be evaluated.
- * @param {object} [options] - Optional options.
- * @param {number} [options.timeout] - The number of milliseconds to wait before timing out.
- * @returns {Promise<void>} A promise that resolves when the predicate evaluates to true.
- * @example
- * ```js
- * const a = atom(0, { name: "a" });
- * let foo = 0;
- *
- * waitUntil(() => a.value > 3).then(() => {
- *     foo++;
- * });
- *
- * a.value = 2; // foo = 0
- * a.value = 3; // foo = 0
- * a.value = 4; // foo = 1
- * ```
- */
-export function waitUntil(predicate: () => boolean, options?: {
-    timeout?: number;
-}): Promise<void>;
-/**
- * Returns an Atom that automatically updates its value to the current time
- * at the given interval. The interval is specified in milliseconds and
- * defaults to 1000. When there are subscribers, the Atom updates its value
- * at the specified interval. When there are no subscribers, the interval
- * is cleared and the Atom's value is reset to 0.
- *
- * @param {number} [interval=1000] - The interval in milliseconds at which the Atom should update its value.
- * @returns {Atom<number>} An Atom that automatically updates its value to the current time at the given interval.
- * @example
- * ```js
- * const now = getNow();
- * console.log(now.value); // 0
- *
- * const unsubscribe = now.subscribe(() => {
- *     console.log(now.value); // Current time in milliseconds
+ * devtools.subscribe((entry, index) => {
+ *     console.log('now at', index, entry?.name);
  * });
  * ```
+ *
+ * @public
  */
-export function getNow(interval?: number): Atom<number>;
+export declare function createDevToolsPlugin(options?: DevToolsOptions): DevToolsPlugin;
+
 /**
- * Creates an object that provides a way to handle the result of a Promise.
- * The object has a single method called `case` which takes an object with
- * three optional methods: `resolved`, `rejected`, and `pending`. The appropriate
- * method will be called based on the state of the promise.
- * @template T
- * @param {Promise<T>} promise - The promise to handle.
- * @returns {{case: (param0: {resolved?:(value: T)=>void, rejected?:(error: Error)=>void, pending?:()=>void})=>Promise<void>}} An object with a single method called `case`.
- * @example
- * ```js
- * const promise = new Promise((resolve, reject) => {
- *     setTimeout(() => {
- *         resolve("Hello, world!");
- *     }, 1000);
- * });
- *
- * const fromPromiseResult = fromPromise(promise);
- *
- * await fromPromiseResult.case({
- *     resolved: (value) => {
- *         console.log("Resolved:", value); // Resolved: Hello, world!
- *     },
- *     rejected: () => {
- *         console.log("Rejected");
- *     },
- *     pending: () => {
- *         console.log("Pending"); // Pending
- *     },
- * });
- * ```
+ * Creates a new isolated context.
+ * @param {object} [options]
+ * @returns {Store2Context}
  */
-export function fromPromise<T>(promise: Promise<T>): {
-    case: (param0: {
-        resolved?: (value: T) => void;
-        rejected?: (error: Error) => void;
-        pending?: () => void;
-    }) => Promise<void>;
-};
+export declare function createStore2Context(options?: object): Store2Context;
+
 /**
- * Executes the specified function while not tracking reactive items.
- * This is useful for operations that access reactive items without
- * actually depending on them.
- * @template T
- * @param {()=>T} fn - The function to execute while not tracking reactive items.
- * @returns {T} The result of executing the function.
- * @example
- * ```js
- * const a = atom(0);
- * const b = atom(0);
- *
- * let foo = 0;
- *
- * autorun(() => {
- *     a.value;
- *     untrack(() => {
- *         b.value;
- *     });
- *     foo++;
- * });
- * console.log(a.value, b.value, foo); // 0 0 1
- *
- * a.value++;
- * console.log(a.value, b.value, foo); // 1 0 2
- * b.value++;
- * console.log(a.value, b.value, foo); // 1 1 2
- * ```
- */
-export function untrack<T>(fn: () => T): T;
-/**
- * Runs the given function in an action, i.e. when there are no active
- * subscribers. This is useful for making changes to reactive items without
- * triggering subscribers.
- * @param {Function} fn - The function to be run in an action.
- * @returns {void}
- * @example
- * ```js
- * let a = atom(0, { name: "a" });
- * let b = atom(0, { name: "b" });
- *
- * let count = 0;
- *
- * a.subscribe(() => {
- *     count++;
- *     runInAction(() => {
- *         b.value = a.value;
- *     });
- * });
- *
- * a.value++;
- * console.log(a.value, b.value, count); // 1 1 1
- * ```
- */
-export function runInAction(fn: Function): void;
-/**
- * Enhances an object to make its properties observable using specified annotations.
- *
- * @template T
- * @param {T} obj - The object to be observed.
- * @param {{[key:string]:"atom"|"computed"|"collection"|"shallowReactive"|false}} annotations -
- *        Annotations defining the type of reactivity for each property. Properties with a
- *        'false' annotation will be ignored.
- * @param {object} [options] - Options to configure the observable behavior.
- * @param {string} [options.name] - The name of the observable object. Defaults to an empty string. Using as prefix for reactive property names.
- * @returns {T} The input object with enhanced reactive properties.
- *
- * @example
- * ```js
- * class List {
- *     data = [];
- *
- *     constructor(data) {
- *         this.data = data;
- *         makeObservable(this, { data: "collection" });
- *     }
- *
- *     // not reactive property
- *     get length() {
- *         return this.data.length;
- *     }
- * }
- *
- * const list = new List([1, 2, 3]);
- *
- * let foo = 0;
- *
- * autorun((updates) => {
- *     console.log(`list.length = ${list.length}`);
- *     foo++;
- * });
- * // Outputs: list.length = 3
- *
- * console.log(foo);
- * // Outputs: 1
- *
- * list.data.push(4);
- * // Outputs: list.length = 4
- * console.log(foo);
- * // Outputs: 2
- *
- * list.data.pop();
- * // set last element to undefined. foo++
- * // Outputs: list.length = 4
- * // set new value of length/ foo++
- * // Outputs: list.length = 3
- *
- * console.log(foo);
- * // Outputs: 4
- * ```
- *
- * @example
- * ```js
- * let object = {
- *     value: 0,
- *     get double() {
- *         return this.value * 2;
- *     },
- *     increment() {
- *         this.value++;
- *     },
- * };
- *
- * makeObservable(object, { value: "atom", double: "computed" });
- *
- * let foo = 0;
- *
- * autorun(() => {
- *     foo++;
- *     object.double;
- * });
- * console.log(foo); // 1
- *
- * object.increment();
- * console.log(foo); // 2
- *
- * object.increment();
- * console.log(foo); // 3
- * ```
- */
-export function makeObservable<T>(obj: T, annotations: {
-    [key: string]: "atom" | "computed" | "collection" | "shallowReactive" | false;
-}, options?: {
-    name?: string;
-}): T;
-/**
- * Makes existing object properties observable. Same as {@link makeObservable} but infers all the properties.
- * @template T
- * @param {T} obj - The object to observe.
- * @param {{[key:string]:"atom"|"computed"|"collection"|"shallowReactive"|false}} [overrides] - The overrides to use to define type of the reactive property. If an override is false, the key will be ignored.
- * @param {object} [options] - Options to configure the observable behavior.
- * @param {string} [options.name] - The name of the observable object. Defaults to an empty string. Using as prefix for reactive property names.
- * @param {Set<string>} [filter] - A set of property keys to selectively apply annotations.
+ * Debounce function.
+ * @template {Function} T
+ * @param {T} func
+ * @param {number} wait
  * @returns {T}
- * @example
- * ```js
- * let object = {
- *     value: 0,
- *     get double() {
- *         return this.value * 2;
- *     },
- *     increment() {
- *         this.value++;
- *     },
- * };
- *
- * makeAutoObservable(object);
- *
- * let foo = 0;
- *
- * autorun(() => {
- *     foo++;
- *     object.double;
- * });
- * console.log(foo); // 1
- *
- * object.increment();
- * console.log(foo); // 2
- *
- * object.increment();
- * console.log(foo); // 3
- * ```
  */
-export function makeAutoObservable<T>(obj: T, overrides?: {
-    [key: string]: "atom" | "computed" | "collection" | "shallowReactive" | false;
-}, options?: {
-    name?: string;
-}, filter?: Set<string>): T;
-/**
- * Extends an object with new properties and makes them observable.
- *
- * @template T
- * @template {{[key:string]:any}} R
- * @param {T} target - The object to be extended and observed.
- * @param {R} properties - The properties to add to the target object.
- * @param {{[key:string]:"atom"|"computed"|"collection"|"shallowReactive"|false}} [overrides] - Optional overrides to define the type of the reactive property. If an override is false, the key will be ignored.
- * @param {object} [options] - Options to configure the observable behavior.
- * @param {string} [options.name] - The name of the observable object. Defaults to an empty string. Using as prefix for reactive property names.
- * @returns {T & R} The extended object with observable properties.
- * @example
- * ```js
- * let object = {
- *     value: 0,
- *     get double() {
- *         return this.value * 2;
- *     },
- *     increment() {
- *         this.value++;
- *     },
- * };
- *
- * makeObservable(object, { value: "atom", double: "computed" });
- * extendObservable(object, {a: 1, b: 2});
- *
- * let foo = 0;
- *
- * autorun(() => {
- *     foo++;
- *     object.a;
- * });
- *
- * console.log(foo); // 1
- * object.a++;
- * console.log(foo); // 2
- * ```
- */
-export function extendObservable<T, R extends {
-    [key: string]: any;
-}>(target: T, properties: R, overrides?: {
-    [key: string]: "atom" | "computed" | "collection" | "shallowReactive" | false;
-}, options?: {
-    name?: string;
-}): T & R;
+export declare function debounce<T extends Function>(func: T, wait: number): T;
 
-/* From complex\ReactiveList.d.ts */
 /**
- * ReactiveList is a reactive array-like structure that stores values of any type.
- * It automatically chooses the appropriate reactive item:
- * - Objects and arrays are wrapped with `ShallowReactive` (shallow property tracking).
- * - Primitives (numbers, strings, booleans, etc.) are wrapped with `Atom`.
+ * The default context adopts the process-wide service singletons so that
+ * legacy code paths that import them directly continue to observe the same
+ * state as the context-aware engine.
+ */
+export declare const defaultContext: Store2Context;
+
+/**
+ * A single entry in the DevTools history.
+ */
+export declare type DevToolsEntry = {
+    /**
+     * Monotonic id assigned by the plugin.
+     */
+    id: number;
+    /**
+     * Action name, or `'@@INIT'` for the baseline.
+     */
+    name: string;
+    /**
+     * Wall-clock time when the entry was recorded.
+     */
+    timestamp: number;
+    /**
+     * Duration of the recorded action in milliseconds.
+     */
+    durationMs: number;
+    /**
+     * State captured after the action completed.
+     */
+    snapshot: ContextSnapshot;
+};
+
+/**
+ * Options accepted by `createDevToolsPlugin`.
+ */
+export declare type DevToolsOptions = {
+    /**
+     * Display name in the Redux DevTools Extension.
+     */
+    name?: string;
+    /**
+     * Maximum number of entries kept in history. Defaults to 50.
+     */
+    maxAge?: number;
+    /**
+     * Set to `false` to skip the extension bridge. Defaults to `true`.
+     */
+    connectToExtension?: boolean;
+};
+
+/**
+ * A single entry in the DevTools history.
  *
- * The list supports adding, removing, updating, and splicing items while maintaining
- * full reactivity. Subscribers are notified only once per batch of changes.
+ * @typedef {Object} DevToolsEntry@typedef {Object} DevToolsEntry
+ * @property {number} id           Monotonic id assigned by the plugin.
+ * @property {string} name         Action name, or `'@@INIT'` for the baseline.
+ * @property {number} timestamp    Wall-clock time when the entry was recorded.
+ * @property {number} durationMs   Duration of the recorded action in milliseconds.
+ * @property {import('../types.js').ContextSnapshot} snapshot  State captured after the action completed.
+ * @public
+ */
+/**
+ * Options accepted by `createDevToolsPlugin`.
  *
- * @template T
+ * @typedef {Object} DevToolsOptions@typedef {Object} DevToolsOptions
+ * @property {string} [name]                 Display name in the Redux DevTools Extension.
+ * @property {number} [maxAge]               Maximum number of entries kept in history. Defaults to 50.
+ * @property {boolean} [connectToExtension]  Set to `false` to skip the extension bridge. Defaults to `true`.
+ * @public
+ */
+/**
+ * Records a snapshot after every completed action and exposes a `jumpTo()`
+ * method for time-travel.
+ *
+ * The plugin maintains a linear history. Entry `0` is the baseline snapshot
+ * taken at install time; entries `1..N` are the state after each completed
+ * action. When a new action arrives after a `jumpTo()`, the future is
+ * truncated before the new entry is appended — matching Redux DevTools
+ * behaviour.
+ *
+ * Time-travel calls `context.hydrate(snapshot, { timeTravel: true })`, which
+ * suppresses plugin hooks for the duration of the rehydration so the
+ * rehydration does not itself appear as an action.
+ *
+ * Recommended usage: install the plugin **after** registering all roots, so
+ * the baseline snapshot captures their initial state.
  *
  * @example
  * ```js
- * const list = new ReactiveList();
+ * import { createStore2Context, createDevToolsPlugin, Store, atom } from '@supercat1337/store2';
  *
- * list.subscribe(() => {
- *     console.log('List changed:', list.toArray());
- * });
+ * const ctx = createStore2Context({ name: 'app' });
+ * const store = new Store();
+ * const count = atom(0, { name: 'count' });
+ * store.addItems({ count });
+ * ctx.registerRoot('app', store);
  *
- * list.add(1, 2, 3);                // numbers -> stored as Atom
- * list.setItem(1, 42);
- * list.removeRange(0, 1);
- * list.setItems([{ a: 1 }, { b: 2 }]); // objects -> stored as ShallowReactive
+ * const devtools = createDevToolsPlugin({ name: 'my app' });
+ * ctx.use(devtools);
+ *
+ * await ctx.action('increment', () => { count.value++; });
+ * await ctx.action('increment', () => { count.value++; });
+ *
+ * devtools.getHistory().length; // 3: baseline + 2 actions
+ * devtools.jumpTo(1);
+ * count.value; // 1
  * ```
+ *
+ * @public
  */
-export class ReactiveList<T> {
+export declare class DevToolsPlugin {
     /**
-     * Adds one or more items to the end of the list.
-     *
-     * @param {...T} values - The values to add. Primitives are wrapped in `Atom`,
-     *                        objects and arrays are wrapped in `ShallowReactive`.
+     * @param {DevToolsOptions} [options]
      */
-    add(...values: T[]): void;
+    constructor(options?: DevToolsOptions);
     /**
-     * Retrieves the value at the given index.
-     *
-     * @param {number} index - The index of the item to retrieve.
-     * @returns {T | undefined} The value, or undefined if the index is out of bounds.
+     * Plugin identifier. Also used as the default display name in the
+     * Redux DevTools Extension when no `name` option is provided.
      */
-    getItem(index: number): T | undefined;
+    name: string;
     /**
-     * Returns a shallow copy of all items in the list as a plain array.
+     * Called by the context when the plugin is registered via `use()`.
      *
-     * @returns {T[]} An array containing all values.
-     */
-    toArray(): T[];
-    /**
-     * Updates the value at the specified index.
+     * Captures the initial baseline snapshot and connects to the Redux
+     * DevTools Extension when it is available in the host environment.
      *
-     * @param {number} index - The index to update.
-     * @param {T} value - The new value. Primitives become `Atom`, objects/arrays become `ShallowReactive`.
+     * Do not call this method directly — it is part of the plugin
+     * installation contract.
+     *
+     * @param {import('../core/context.js').Store2Context} context
      */
-    setItem(index: number, value: T): void;
+    install(context: Store2Context): void;
     /**
-     * Returns the current length of the list.
+     * Records a new history entry after an action completes.
+     *
+     * Called by the context's action lifecycle. Ignored while a time-travel
+     * jump is in progress, so that rewinding does not itself appear as a
+     * new action in the history.
+     *
+     * @param {import('../types.js').ActionInfo} action
+     */
+    onActionEnd(action: ActionInfo): void;
+    /**
+     * Returns a shallow copy of the recorded history.
+     *
+     * The returned array is newly allocated; mutating it does not affect
+     * the plugin. The snapshot objects inside each entry are shared by
+     * reference — treat them as immutable.
+     *
+     * @returns {Array<DevToolsEntry>}
+     */
+    getHistory(): Array<DevToolsEntry>;
+    /**
+     * Returns the index of the entry the plugin is currently positioned at.
+     *
+     * Entry `0` is the baseline; higher indices correspond to completed
+     * actions in order. Returns `-1` if the plugin has not been installed
+     * yet.
      *
      * @returns {number}
      */
-    get length(): number;
+    getCurrentIndex(): number;
     /**
-     * Replaces the entire content of the list with the given array.
+     * Returns the entry at the current history index, or `null` if the
+     * history is empty.
      *
-     * @param {T[]} values - The new array of values. Wrapping follows the same rules as `add()`.
-     */
-    setItems(values: T[]): void;
-    /**
-     * Removes elements from the list starting at `startIndex` and removing `count` items.
-     * Remaining elements are shifted left. The operation is batched to emit only one notification.
+     * After `jumpTo(index)`, the returned entry is the one at that index,
+     * not the most recent one. Use `getHistory()` to inspect the full
+     * history.
      *
-     * @param {number} startIndex - The index at which to start removal.
-     * @param {number} count - The number of elements to remove.
+     * @returns {DevToolsEntry | null}
      */
-    removeRange(startIndex: number, count: number): void;
+    getCurrentEntry(): DevToolsEntry | null;
     /**
-     * Removes the item at the given index.
+     * Travels to a specific history index.
      *
-     * @param {number} index - The index of the item to remove.
-     */
-    removeItem(index: number): void;
-    /**
-     * Removes the last item of the list.
-     */
-    removeLastItem(): void;
-    /**
-     * Removes the first item of the list.
-     */
-    removeFirstItem(): void;
-    /**
-     * Removes all items from the list.
-     */
-    clear(): void;
-    /**
-     * Destroys the list, releasing all internal resources.
-     * After destruction, any method call (except `isDestroyed`) will throw an error.
-     */
-    destroy(): void;
-    /**
-     * Indicates whether the list has been destroyed.
+     * Restores the state captured at that entry by calling
+     * `context.hydrate(snapshot, { timeTravel: true })`. Plugin hooks are
+     * suppressed for the duration of the hydration, so the jump does not
+     * appear as a new action. Subscribers still run — the UI updates.
      *
-     * @returns {boolean}
-     */
-    get isDestroyed(): boolean;
-    /**
-     * Subscribes a callback to be invoked whenever the list changes.
-     * The callback receives a Map of updates with details about changed items.
+     * No-op if the index is out of range or already current.
      *
-     * @param {(updates: Map<string, UpdateDataRecord>) => void} fn - The callback function.
-     * @returns {() => void} A function to unsubscribe the callback.
+     * @param {number} index
      */
-    subscribe(fn: (updates: Map<string, UpdateDataRecord>) => void): () => void;
-
-}
-export type ReactiveWrapper<T> = T extends object ? ShallowReactive<T> : Atom<T>;
-
-/* From complex\Store.d.ts */
-/**
- * Store is a reactive container that holds a collection of reactive items.
- * You can add, remove and access items via methods of this class.
- * It also emits events when items are added, removed or updated.
- */
-export class Store {
+    jumpTo(index: number): void;
     /**
-     * @type {boolean}
+     * Clears the history and records a fresh baseline.
+     *
+     * Called by the plugin itself in response to a `RESET` message from the
+     * Redux DevTools Extension, or directly by user code. After this call,
+     * the history contains exactly one entry: the new baseline.
      */
-    get isDestroyed(): boolean;
+    reset(): void;
     /**
-     * Adds one or more reactive items to the store.
-     * @param {{[key: string]: ReactiveItem|Store}} items
-     * @throws {Error} If an item with the given key already exists in the store.
-     * @throws {Error} If the store is destroyed.
+     * Subscribes a listener called whenever the current index or the
+     * history changes.
+     *
+     * The listener receives the current entry (or `null` if the history is
+     * empty) and its index. Errors thrown by the listener are caught and
+     * logged, so one faulty listener cannot break others.
+     *
+     * @param {(entry: DevToolsEntry | null, index: number) => void} fn
+     * @returns {() => void} An unsubscribe function.
      */
-    addItems(items: {
-        [key: string]: ReactiveItem | Store;
-    }): void;
+    subscribe(fn: (entry: DevToolsEntry | null, index: number) => void): () => void;
     /**
-     * Destroys the item with the given key, whether it's a reactive item or a child store.
-     * @param {string} key - The key of the item or child store to destroy.
+     * Detaches from the Redux DevTools Extension, if connected.
+     *
+     * Safe to call when no extension is connected or after the plugin was
+     * installed with `connectToExtension: false`. Idempotent.
      */
-    destroyItem(key: string): void;
-    /**
-     * Removes the reactive item with the given key from the store (without destroying it).
-     * @param {string} key - The key of the item to remove.
-     */
-    removeItem(key: string): void;
-    /**
-     * Destroys all reactive items stored in the Store.
-     */
-    destroy(): void;
-    /**
-     * Clears all reactive items from the store without destroying them.
-     */
-    detachAll(): void;
-    /**
-     * Retrieves the item with the given key.
-     * @param {string} key
-     * @returns {ReactiveItem|Store|null}
-     */
-    getItem(key: string): ReactiveItem | Store | null;
-    /**
-     * Checks if an item with the given key exists.
-     * @param {string} key
-     * @returns {boolean}
-     */
-    hasItem(key: string): boolean;
-    /**
-     * Retrieves the names of items stored.
-     * @param {"all"|"reactives"|"stores"} [filter="all"]
-     * @returns {Array<string>}
-     */
-    getItemNames(filter?: "all" | "reactives" | "stores"): Array<string>;
-    /**
-     * Retrieves all items stored.
-     * @param {"all"|"reactives"|"stores"} [filter="all"]
-     * @returns {Map<string, ReactiveItem|Store>}
-     */
-    toMap(filter?: "all" | "reactives" | "stores"): Map<string, ReactiveItem | Store>;
-    /**
-     * Retrieves the value of this Store as a plain object.
-     * @param {"all"|"reactives"|"stores"} [filter="all"]
-     * @returns {object}
-     */
-    toJSON(filter?: "all" | "reactives" | "stores"): object;
-    /**
-     * Subscribes a function to be called whenever the value of this Store changes.
-     * @param {(update: Map<string, UpdateDataRecord>, store: Store)=>void} fn
-     * @returns {()=>void}
-     */
-    subscribe(fn: (update: Map<string, UpdateDataRecord>, store: Store) => void): () => void;
-    /**
-     * Subscribes a function to be called when this Store is destroyed.
-     * @param {(store:Store)=>void} fn
-     * @returns {()=>void}
-     */
-    onDestroy(fn: (store: Store) => void): () => void;
-    /**
-     * Mutes the event emitter, preventing any updates from being triggered.
-     */
-    muteUpdates(): void;
-    /**
-     * Unmutes the event emitter, allowing updates to be triggered.
-     */
-    unmuteUpdates(): void;
-    /**
-     * Returns whether the event emitter is currently muted.
-     * @returns {boolean}
-     */
-    isMuted(): boolean;
-
+    disconnect(): void;
+    #private;
 }
 
-/* From core\BatchSnapshot.d.ts */
-/**
- * BatchSnapshot stores the original values of properties at the start of a batch operation.
- * It allows detecting which properties have actually changed after a series of mutations
- * inside a batch, and whether they have reverted to their original values.
- */
-class BatchSnapshot {
-    /**
-     * Creates a new BatchSnapshot instance.
-     * @param {ReactiveItem} reactiveItem - The reactive item to snapshot.
-     */
-    constructor(reactiveItem: ReactiveItem);
-    /**
-     * Records the original value for a property if not already recorded in this batch.
-     * @param {string} property - The property key.
-     * @param {any} value - The original value at the start of the batch.
-     */
-    record(property: string, value: any): void;
-    /**
-     * Returns the original value recorded for a property.
-     * @param {string} property - The property key.
-     * @returns {any | undefined} The original value, or undefined if not recorded.
-     */
-    getOriginal(property: string): any | undefined;
-    /**
-     * Checks whether a property has been recorded in this snapshot.
-     * @param {string} property - The property key.
-     * @returns {boolean} True if the property was recorded.
-     */
-    has(property: string): boolean;
-    /**
-     * Returns an array of property keys that have changed compared to their original values.
-     * Uses the reactive item's equality comparison function.
-     * @param {(property: string) => any} getCurrentValue - Function that returns the current value for a given property.
-     * @returns {string[]} Array of property keys that actually changed.
-     */
-    getChangedProperties(getCurrentValue: (property: string) => any): string[];
-    /**
-     * Clears all recorded initial values.
-     */
-    clear(): void;
-    /**
-     * Returns the number of recorded properties.
-     * @returns {number}
-     */
-    get size(): number;
-
-}
-
-/* From core\DependencyGraph.d.ts */
-/**
- * Manages the dependency graph for a reactive item.
- * Handles adding/removing dependencies and dependents, and propagating messages through the graph.
- */
-export class DependencyGraph {
-    /**
-     * @param {Set<ReactiveItem>} dependencies - The engine's dependencies set.
-     * @param {Set<ReactiveItem>} dependents - The engine's dependents set.
-     * @param {ReactiveItem} reactiveItem - The owning reactive item.
-     */
-    constructor(dependencies: Set<ReactiveItem>, dependents: Set<ReactiveItem>, reactiveItem: ReactiveItem);
-    /**
-     * Adds a single dependency.
-     * @param {ReactiveItem} dependency
-     */
-    addDependency(dependency: ReactiveItem): void;
-    /**
-     * Adds multiple dependencies, sorted by id, and registers this reactive item as a dependent on each.
-     * @param {Set<ReactiveItem>} deps - Set of dependencies to add.
-     */
-    addDependencies(deps: Set<ReactiveItem>): void;
-    /**
-     * Removes a dependent from the dependents set.
-     * @param {ReactiveItem} dependent
-     */
-    removeDependent(dependent: ReactiveItem): void;
-    /**
-     * Adds a dependent to the dependents set.
-     * @param {ReactiveItem} dependent
-     * @returns {boolean} True if the dependent was added (i.e., not already present).
-     */
-    addDependent(dependent: ReactiveItem): boolean;
-    /**
-     * Returns all dependents of this reactive item (direct and indirect).
-     * @returns {Set<ReactiveItem>}
-     */
-    getDeepDependents(): Set<ReactiveItem>;
-    /**
-     * Returns sorted array of deep dependents.
-     * @returns {Array<ReactiveItem>}
-     */
-    getDeepDependentsArray(): Array<ReactiveItem>;
-    /**
-     * Notifies all dependents of a message.
-     * @param {number} message - The message code (EngineMessages).
-     * @param {{ sender: ReactiveItem, recipients: Set<ReactiveItem> }} ctx - Context containing sender and recipient set.
-     */
-    notifyDependents(message: number, ctx: {
-        sender: ReactiveItem;
-        recipients: Set<ReactiveItem>;
-    }): void;
-    /**
-     * Notifies all dependencies of a message.
-     * @param {number} message - The message code.
-     * @param {{ sender: ReactiveItem, recipients: Set<ReactiveItem> }} ctx
-     */
-    notifyDependencies(message: number, ctx: {
-        sender: ReactiveItem;
-        recipients: Set<ReactiveItem>;
-    }): void;
-    /**
-     * Updates the dependency set to a new set.
-     * @param {Set<ReactiveItem>} newDeps - New set of dependencies.
-     */
-    updateDependencies(newDeps: Set<ReactiveItem>): void;
-    /**
-     * Clears the graph (removes all dependencies and dependents).
-     */
-    clear(): void;
-
-}
-
-/* From core\Engine.d.ts */
-const ATOM: 1;
-const COMPUTED: 2;
-const COLLECTION: 3;
-const SHALLOW_REACTIVE: 4;
 /**
  * Engine is the core reactive engine for a single reactive item.
- * It manages dependencies, updates, and lifecycle, delegating to specialised submodules.
- * All public properties and methods remain unchanged for backward compatibility.
+ * It manages dependencies, updates, lifecycle, and plugin notifications.
+ *
+ * Every engine holds a reference to the `Store2Context` it was created in.
+ * All coordination with the id service, mode controller, and changed-items
+ * controller goes through that context, so multiple isolated roots can
+ * coexist in one process.
  */
-class Engine {
+declare class Engine {
     /**
-     * Creates an Engine instance.
-     * @param {ReactiveItem} reactiveItem - The owning reactive item.
-     * @param {1|2|3|4} type - The type of reactive item.
+     * @param {import('../reactives/ReactiveItem.js').ReactiveItem} reactiveItem
+     * @param {import('../types.js').ReactiveItemType} type
      */
-    constructor(reactiveItem: ReactiveItem, type: 1 | 2 | 3 | 4);
-    /** @type {Set<ReactiveItem>} */
+    constructor(reactiveItem: ReactiveItem, type: ReactiveItemType);
+    /** @type {import('./context.js').Store2Context} */
+    context: Store2Context;
+    /** @type {Set<import('../reactives/ReactiveItem.js').ReactiveItem>} */
     dependencies: Set<ReactiveItem>;
-    /** @type {Set<ReactiveItem>} */
+    /** @type {Set<import('../reactives/ReactiveItem.js').ReactiveItem>} */
     dependents: Set<ReactiveItem>;
     /** @type {number} */
     id: number;
     /** @type {number} */
     version: number;
-    /** @type {ReactiveItem} */
+    /** @type {import('../reactives/ReactiveItem.js').ReactiveItem} */
     reactiveItem: ReactiveItem;
     /** @type {boolean} */
     shouldRecalc: boolean;
@@ -913,87 +815,81 @@ class Engine {
     isDestroyed: boolean;
     /** @type {SubscribeController} */
     subscribeController: SubscribeController;
-    /** @type {number} */
-    type: number;
-    /** @type {Map<string, UpdateDataRecord>} */
+    /** @type {import('../types.js').ReactiveItemType} */
+    type: ReactiveItemType;
+    /** @type {Map<string, import('./UpdateDataRecord.js').UpdateDataRecord>} */
     updates: Map<string, UpdateDataRecord>;
-    /** @type {CompareFunction|null} */
+    /** @type {import('../types.js').CompareFunction | null} */
     compareFn: CompareFunction | null;
     /** @type {boolean} */
     suppressNotifications: boolean;
-    /** @type {Error|null} */
+    /**
+     * @returns {Error | null}
+     */
     get error(): Error;
     /**
-     * Records a change attempt.
-     * @param {string} property - The property key.
-     * @param {"set"|"delete"} type - The operation type.
-     * @param {any} oldValue - The previous value.
-     * @param {any} value - The new value.
-     * @returns {boolean} True if an update was added.
+     * Records a change attempt and emits `onUpdate` when the change is
+     * effective.
+     * @param {string} property
+     * @param {"set" | "delete"} type
+     * @param {any} oldValue
+     * @param {any} value
+     * @returns {boolean}
      */
     addUpdate(property: string, type: "set" | "delete", oldValue: any, value: any): boolean;
     /**
-     * Adds a single dependency.
-     * @param {ReactiveItem} dependency
+     * @param {import('../reactives/ReactiveItem.js').ReactiveItem} dependency
      */
     addDependency(dependency: ReactiveItem): void;
     /**
-     * Adds multiple dependencies.
-     * @param {Set<ReactiveItem>} dependencies
+     * @param {Set<import('../reactives/ReactiveItem.js').ReactiveItem>} dependencies
      */
     addDependencies(dependencies: Set<ReactiveItem>): void;
     /**
-     * Adds a dependent.
-     * @param {ReactiveItem} dependent
+     * @param {import('../reactives/ReactiveItem.js').ReactiveItem} dependent
      * @returns {boolean}
      */
     addDependent(dependent: ReactiveItem): boolean;
     /**
-     * Removes a dependent.
-     * @param {ReactiveItem} dependent
+     * @param {import('../reactives/ReactiveItem.js').ReactiveItem} dependent
      */
     removeDependent(dependent: ReactiveItem): void;
     /**
-     * Returns all dependents recursively.
-     * @returns {Set<ReactiveItem>}
+     * @returns {Set<import('../reactives/ReactiveItem.js').ReactiveItem>}
      */
     getDeepDependents(): Set<ReactiveItem>;
     /**
-     * Returns sorted array of deep dependents.
-     * @returns {Array<ReactiveItem>}
+     * @returns {Array<import('../reactives/ReactiveItem.js').ReactiveItem>}
      */
     getDeepDependentsArray(): Array<ReactiveItem>;
     /**
-     * Notifies dependents of a message.
-     * @param {number} message - The message code.
-     * @param {{ sender: ReactiveItem, recipients: Set<ReactiveItem> }} [ctx]
+     * @param {number} message
+     * @param {{ sender: import('../reactives/ReactiveItem.js').ReactiveItem, recipients: Set<import('../reactives/ReactiveItem.js').ReactiveItem> }} [ctx]
      */
     notifyDependents(message: number, ctx?: {
         sender: ReactiveItem;
         recipients: Set<ReactiveItem>;
     }): void;
     /**
-     * Notifies dependencies (reverse direction).
-     * @param {number} message - The message code.
-     * @param {{ sender: ReactiveItem, recipients: Set<ReactiveItem> }} [ctx]
+     * @param {number} message
+     * @param {{ sender: import('../reactives/ReactiveItem.js').ReactiveItem, recipients: Set<import('../reactives/ReactiveItem.js').ReactiveItem> }} [ctx]
      */
     notifyDependencies(message: number, ctx?: {
         sender: ReactiveItem;
         recipients: Set<ReactiveItem>;
     }): void;
     /**
-     * Handles incoming messages.
-     * @param {number} message - The message code.
-     * @param {{ sender: ReactiveItem, recipients: Set<ReactiveItem> }} ctx
+     * @param {number} message
+     * @param {{ sender: import('../reactives/ReactiveItem.js').ReactiveItem, recipients: Set<import('../reactives/ReactiveItem.js').ReactiveItem> }} ctx
      */
     getMessage(message: number, ctx: {
         sender: ReactiveItem;
         recipients: Set<ReactiveItem>;
     }): void;
     /**
-     * Sets an error and notifies dependents.
-     * @param {Error|null} error
-     * @param {{ sender: ReactiveItem, recipients: Set<ReactiveItem> }} [ctx]
+     * Sets an error and notifies dependents. Emits `onError`.
+     * @param {Error | null} error
+     * @param {{ sender: import('../reactives/ReactiveItem.js').ReactiveItem, recipients: Set<import('../reactives/ReactiveItem.js').ReactiveItem> }} [ctx]
      */
     setError(error: Error | null, ctx?: {
         sender: ReactiveItem;
@@ -1004,8 +900,8 @@ class Engine {
      */
     clearError(): void;
     /**
-     * Destroys the engine.
-     * @param {{ sender: ReactiveItem, recipients: Set<ReactiveItem> }} [ctx]
+     * Destroys the engine. Emits `onDestroy` after teardown.
+     * @param {{ sender: import('../reactives/ReactiveItem.js').ReactiveItem, recipients: Set<import('../reactives/ReactiveItem.js').ReactiveItem> }} [ctx]
      */
     destroy(ctx?: {
         sender: ReactiveItem;
@@ -1016,22 +912,18 @@ class Engine {
      */
     clearUpdates(): void;
     /**
-     * Checks if there are any pending updates.
      * @returns {boolean}
      */
     hasUpdates(): boolean;
     /**
-     * Processes temporary changes after batch ends.
-     * @returns {boolean} True if any changes remain.
+     * @returns {boolean}
      */
     checkChangesTemporary(): boolean;
     /**
-     * Updates dependencies to a new set.
-     * @param {Set<ReactiveItem>} newDeps
+     * @param {Set<import('../reactives/ReactiveItem.js').ReactiveItem>} newDeps
      */
     updateDependencies(newDeps: Set<ReactiveItem>): void;
     /**
-     * Prepares the engine for setting a new value.
      * @throws {Error} If destroyed or in subscribers mode.
      */
     prepareSetValue(): void;
@@ -1040,59 +932,1234 @@ class Engine {
      */
     valueChangedCallback(): void;
     /**
-     * Checks if a change is effective considering batch mode and snapshots.
-     * This method is kept for backward compatibility.
-     *
-     * @param {string} property - The property key.
-     * @param {any} oldValue - The immediate previous value.
-     * @param {any} newValue - The new value.
-     * @returns {boolean} True if the change is effective (not reverted).
+     * @param {string} property
+     * @param {any} oldValue
+     * @param {any} newValue
+     * @returns {boolean}
      */
     isEffectiveChangeWithOld(property: string, oldValue: any, newValue: any): boolean;
-
+    #private;
 }
 
-/* From core\MessageHandler.d.ts */
 /**
- * Message codes used in the engine.
+ * @template T
+ * @template {{[key: string]: any}} R
+ * @param {T} target
+ * @param {R} properties
+ * @param {{[key: string]: "atom" | "computed" | "collection" | "shallowReactive" | false}} [overrides]
+ * @param {object} [options]
+ * @param {string} [options.name]
+ * @returns {T & R}
  */
-type EngineMessages = number;
-namespace EngineMessages {
-    let DEPENDENCY_CHANGED: number;
-    let DEPENDENCY_DESTROYED: number;
-    let HAS_ERROR: number;
-    let DEPENDENT_DESTROYED: number;
-}
+export declare function extendObservable<T, R extends {
+    [key: string]: any;
+}>(target: T, properties: R, overrides?: {
+    [key: string]: "atom" | "computed" | "collection" | "shallowReactive" | false;
+}, options?: {
+    name?: string;
+}): T & R;
+
 /**
- * Handles incoming messages from dependencies/dependents.
- * All logic is stateless; it mutates the engine's state via callbacks.
+ * Observes a promise's state. The returned object exposes a single method
+ * `case({ pending, resolved, rejected })`.
+ * @template T
+ * @param {Promise<T>} promise
+ * @returns {{ case: (param0: { resolved?: (value: T) => void, rejected?: (error: Error) => void, pending?: () => void }) => Promise<void> }}
  */
-export class MessageHandler {
+export declare function fromPromise<T>(promise: Promise<T>): {
+    case: (param0: {
+        resolved?: (value: T) => void;
+        rejected?: (error: Error) => void;
+        pending?: () => void;
+    }) => Promise<void>;
+};
+
+/**
+ * Gets all property descriptors of an object, including its prototype and all its ancestors.
+ * The descriptors are returned as a plain object.
+ * @param {object | null | undefined} obj
+ * @param {number} [depth=0]
+ * @param {number} [maxDepth=100]
+ * @returns {{[x: string]: PropertyDescriptor}}
+ */
+export declare function getAllPropertyDescriptors(obj: object | null | undefined, depth?: number, maxDepth?: number): {
+    [x: string]: PropertyDescriptor;
+};
+
+/**
+ * Returns the currently installed context, or the default one.
+ * @returns {Store2Context}
+ */
+export declare function getCurrentContext(): Store2Context;
+
+/**
+ * Converts any value to an Error object.
+ * @param {unknown} e
+ * @returns {Error}
+ */
+export declare function getError(e: unknown): Error;
+
+/**
+ * Extracts names (and optionally ids) from a Set of reactive items.
+ *
+ * Uses duck typing (`item.engine && item.name`) to avoid importing from
+ * `reactives/` — that keeps `tools.js` free of circular dependencies.
+ *
+ * @param {Set<import('../reactives/ReactiveItem.js').ReactiveItem> | Iterable<import('../reactives/ReactiveItem.js').ReactiveItem>} items
+ * @param {{includeId?: boolean, fallback?: string, sorted?: boolean}} [options]
+ * @returns {string[]}
+ */
+export declare function getItemNamesFromSet(items: Set<ReactiveItem> | Iterable<ReactiveItem>, options?: {
+    includeId?: boolean;
+    fallback?: string;
+    sorted?: boolean;
+}): string[];
+
+/**
+ * Returns an Atom that ticks at the given interval while it has subscribers.
+ * @param {number} [interval=1000]
+ * @returns {Atom<number>}
+ */
+export declare function getNow(interval?: number): Atom<number>;
+
+/**
+ * Combines multiple reactive items or sets of reactive items into a single set,
+ * ensuring that each item appears only once. The combined set is then converted
+ * to an array and sorted by the internal id of the reactive items.
+ *
+ * @param {...(import('../reactives/ReactiveItem.js').ReactiveItem | Set<import('../reactives/ReactiveItem.js').ReactiveItem>)} items
+ * @returns {Array<import('../reactives/ReactiveItem.js').ReactiveItem>}
+ */
+export declare function getSortedReactiveItems(...items: (ReactiveItem | Set<ReactiveItem>)[]): Array<ReactiveItem>;
+
+/**
+ * Service that generates unique numeric identifiers for reactive items.
+ *
+ * Each context owns its own instance so that ordering stays deterministic
+ * inside one store tree and isolated between contexts (SSR, tests, etc.).
+ */
+export declare class IdService {
     /**
-     * Processes an incoming message.
-     * @param {number} message - The message code.
-     * @param {{ sender: ReactiveItem, recipients: Set<ReactiveItem> }} ctx - Context.
-     * @param {_Engine} engineState - The engine's state container (provides getters/setters).
-     * @param {Function} setError - Callback to set the engine's error.
-     * @param {Function} setShouldRecalc - Callback to set the shouldRecalc flag.
-     * @param {Function} notifyDependents - Callback to notify dependents of a message.
-     * @param {Function} removeDependent - Callback to remove a dependent.
-     * @param {Function} destroyEngine - Callback to destroy the engine.
+     * Generates a new unique numeric identifier.
+     * @returns {number} A monotonic unique number.
      */
-    handleMessage(message: number, ctx: {
-        sender: ReactiveItem;
-        recipients: Set<ReactiveItem>;
-    }, engineState: _Engine, setError: Function, setShouldRecalc: Function, notifyDependents: Function, removeDependent: Function, destroyEngine: Function): void;
+    generateId(): number;
+    /**
+     * Compares two numeric identifiers.
+     * @param {number} a
+     * @param {number} b
+     * @returns {number} -1 if a < b, 1 if a > b, 0 if equal.
+     */
+    compareIds(a: number, b: number): number;
+    /**
+     * Resets the internal counter. Useful in tests.
+     */
+    reset(): void;
+    #private;
 }
 
-/* From core\SubscribeController.d.ts */
+/**
+ * Checks if a given value is a plain object.
+ * @param {*} obj
+ * @returns {boolean} true if the value is a plain object, false otherwise.
+ */
+export declare function isPlainObject(obj: any): boolean;
+
+/**
+ * Same as `makeObservable` but infers annotations automatically.
+ *
+ * Plain objects become `shallowReactive`, arrays become `collection`,
+ * getters become `computed`, and everything else becomes `atom`. Pass
+ * `overrides` to correct the inference or disable a property with `false`.
+ *
+ * @template T
+ * @param {T} obj
+ * @param {{[key: string]: "atom" | "computed" | "collection" | "shallowReactive" | false}} [overrides]
+ * @param {object} [options]
+ * @param {string} [options.name]
+ * @param {Set<string>} [filter]
+ * @returns {T}
+ */
+export declare function makeAutoObservable<T>(obj: T, overrides?: {
+    [key: string]: "atom" | "computed" | "collection" | "shallowReactive" | false;
+}, options?: {
+    name?: string;
+}, filter?: Set<string>): T;
+
+/**
+ * Enhances an object with reactive properties using explicit annotations.
+ *
+ * Each key maps to one of `"atom"`, `"computed"`, `"collection"`,
+ * `"shallowReactive"`, or `false` to leave the property untouched.
+ *
+ * @template T
+ * @param {T} obj
+ * @param {{[key: string]: "atom" | "computed" | "collection" | "shallowReactive" | false}} annotations
+ * @param {object} [options]
+ * @param {string} [options.name]
+ * @returns {T}
+ */
+export declare function makeObservable<T>(obj: T, annotations: {
+    [key: string]: "atom" | "computed" | "collection" | "shallowReactive" | false;
+}, options?: {
+    name?: string;
+}): T;
+
+/**
+ * Coordinates global reactivity modes: batching, subscriber notification,
+ * untracked reads, and named actions.
+ *
+ * Each `Store2Context` owns its own instance so that multiple root stores
+ * can coexist (SSR requests, parallel tests, embedded widgets).
+ */
+export declare class ModeControllerService {
+    /** @type {boolean} */
+    isComputing: boolean;
+    /** @type {boolean} */
+    throwErrorInSubscribers: boolean;
+    /**
+     * When `true`, tracked reads are suppressed. `untrack()` saves and
+     * restores this value, so nesting is safe.
+     * @type {boolean}
+     */
+    untrackMode: boolean;
+    /* Excluded from this release type: batchModeEvents */
+    /* Excluded from this release type: subscribersModeEvents */
+    /* Excluded from this release type: actionEvents */
+    /**
+     * Subscribes to a batch lifecycle event.
+     * @param {"batchModeStart"|"batchModeEnd"|"beforeBatchModeEnd"} event
+     * @param {() => void} callback
+     * @returns {() => void}
+     */
+    on(event: "batchModeStart" | "batchModeEnd" | "beforeBatchModeEnd", callback: () => void): () => void;
+    /**
+     * Subscribes to an action lifecycle event.
+     * @param {"actionStart"|"actionEnd"} event
+     * @param {(action: import('../types.js').ActionInfo) => void} callback
+     * @returns {() => void}
+     */
+    onAction(event: "actionStart" | "actionEnd", callback: (action: ActionInfo) => void): () => void;
+    /**
+     * Returns true while the controller is inside a batch.
+     * @returns {boolean}
+     */
+    get batchMode(): boolean;
+    /**
+     * Returns the current batch depth.
+     * @returns {number}
+     */
+    get batchDepth(): number;
+    /**
+     * Returns the name of the currently running outermost batch, or ''.
+     * @returns {string}
+     */
+    get currentBatchName(): string;
+    /**
+     * Increments the batch depth. Emits `batchModeStart` on the first entry.
+     * @param {string} [name] - Optional human-readable name for the batch.
+     */
+    enterBatch(name?: string): void;
+    /**
+     * Decrements the batch depth. Emits `beforeBatchModeEnd`, then
+     * `batchModeEnd` when leaving the outermost batch.
+     */
+    exitBatch(): void;
+    /**
+     * Returns true while subscribers are running.
+     * @returns {boolean}
+     */
+    get subscribersMode(): boolean;
+    /**
+     * Marks the start of subscriber notification.
+     */
+    startSubscribersMode(): void;
+    /**
+     * Marks the end of subscriber notification and flushes deferred callbacks.
+     */
+    endSubscribersMode(): void;
+    /**
+     * Registers a callback to run once after subscribers finish.
+     * @param {() => void} callback
+     */
+    runAfterSubscribers(callback: () => void): void;
+    /**
+     * Returns the currently running action, or null if no action is in flight.
+     * @returns {import('../types.js').ActionInfo | null}
+     */
+    get currentAction(): ActionInfo;
+    /**
+     * Starts a new named action.
+     * @param {string} name
+     * @param {any} [payload]
+     * @returns {import('../types.js').ActionInfo}
+     */
+    beginAction(name: string, payload?: any): ActionInfo;
+    /**
+     * Ends an action previously started with `beginAction`.
+     * @param {import('../types.js').ActionInfo} action
+     * @param {Error | null} [error]
+     */
+    endAction(action: ActionInfo, error?: Error | null): void;
+    #private;
+}
+
+/**
+ * Reaction – tracks dependencies via `dataFn` and runs `effectFn` when they
+ * change. The effect is NOT run at setup time.
+ *
+ * @param {() => any} dataFn
+ * @param {(updates?: Map<string, import('../core/UpdateDataRecord.js').UpdateDataRecord>) => void} effectFn
+ * @param {object} [options]
+ * @param {string} [options.name]
+ * @param {number} [options.delay]
+ * @param {AbortSignal} [options.signal]
+ * @param {Function} [options.onError]
+ * @param {boolean} [options.recomputeDependencies=true]
+ * @param {boolean} [options.passUpdates=true]
+ * @returns {() => void}
+ */
+export declare function reaction(dataFn: () => any, effectFn: (updates?: Map<string, UpdateDataRecord>) => void, options?: {
+    name?: string;
+    delay?: number;
+    signal?: AbortSignal;
+    onError?: Function;
+    recomputeDependencies?: boolean;
+    passUpdates?: boolean;
+}): () => void;
+
+/**
+ * ReactiveItem is the base class for all reactive items. It provides methods
+ * for subscribing to changes, reading values, and lifecycle management.
+ *
+ * Concrete subclasses are `Atom`, `Computed`, `Collection`, and
+ * `ShallowReactive`. User code rarely instantiates this class directly; use
+ * the factory functions exported from the package root instead.
+ *
+ * @public
+ */
+export declare class ReactiveItem {
+    /**
+     * Creates a new reactive item. Subclasses pass their own type tag.
+     *
+     * @param {import('../types.js').ReactiveItemType} type
+     */
+    constructor(type: ReactiveItemType);
+    /* Excluded from this release type: engine */
+    /**
+     * Debug name assigned at construction. Used in error messages and
+     * DevTools listings. Empty string when not set.
+     * @type {string}
+     */
+    name: string;
+    /**
+     * Local path assigned by the immediate container. Top-level items get a
+     * path equal to their key in the root store; standalone items keep `''`.
+     * @type {string}
+     */
+    path: string;
+    /**
+     * The numeric type tag of this item: `1` for `Atom`, `2` for `Computed`,
+     * `3` for `Collection`, `4` for `ShallowReactive`.
+     *
+     * @returns {import('../types.js').ReactiveItemType}
+     */
+    get type(): ReactiveItemType;
+    /**
+     * Monotonic version counter, bumped on every effective change.
+     *
+     * Useful as a stable token for `useSyncExternalStore` and for cache
+     * invalidation: comparing two `getVersion()` results tells you whether
+     * the value changed, without reading it.
+     *
+     * @returns {number}
+     */
+    getVersion(): number;
+    /**
+     * Subscribes a function to changes of this item.
+     *
+     * The callback receives a `Map` of property paths to
+     * `UpdateDataRecord` instances. It is invoked once per batch of
+     * effective changes.
+     *
+     * @param {(updates: Map<string, import('../core/UpdateDataRecord.js').UpdateDataRecord>) => void} fn
+     * @param {object} [options]
+     * @param {number} [options.delay] - Debounce delay in milliseconds.
+     * @param {AbortSignal} [options.signal] - Cancels the subscription when aborted.
+     * @returns {() => void} An unsubscribe function.
+     */
+    subscribe(fn: (updates: Map<string, UpdateDataRecord>) => void, options?: {
+        delay?: number;
+        signal?: AbortSignal;
+    }): () => void;
+    /**
+     * Removes all change subscribers, keeping lifecycle listeners
+     * registered via `onHasSubscribers`, `onNoSubscribers`, and
+     * `onDestroy`.
+     */
+    clearSubscribers(): void;
+    /**
+     * Removes all subscribers, including lifecycle listeners.
+     *
+     * After this call, the item no longer invokes any user callbacks until
+     * a new subscription is made.
+     */
+    clearAllSubscribers(): void;
+    /**
+     * Returns `true` if at least one change subscriber is currently
+     * registered.
+     *
+     * @returns {boolean}
+     */
+    hasSubscribers(): boolean;
+    /**
+     * Reads the current value, tracking the item as a dependency unless
+     * `untracked` is `true`.
+     *
+     * Throws if the item has been destroyed.
+     *
+     * @param {object} [options]
+     * @param {boolean} [options.untracked=false]
+     * @returns {any}
+     */
+    getValue(options?: {
+        untracked?: boolean;
+    }): any;
+    /**
+     * Returns the current value without registering a dependency and
+     * without triggering recalculation for `Computed`.
+     *
+     * For `Computed`, this returns the last cached value even if it is
+     * stale. To force a fresh value, use `.value` or `.getValue()`.
+     *
+     * @returns {any}
+     */
+    peekValue(): any;
+    /**
+     * Returns the last error produced by this item, or `null`.
+     *
+     * For `Computed`, this is the error thrown during the most recent
+     * evaluation. The error is preserved until a dependency changes.
+     *
+     * @returns {Error | null}
+     */
+    getLastError(): Error | null;
+    /**
+     * Returns `true` if reading the value currently throws or has thrown.
+     *
+     * For `Computed`, this forces a read to determine whether the current
+     * dependencies are valid.
+     *
+     * @returns {boolean}
+     */
+    hasError(): boolean;
+    /**
+     * Registers a callback that fires when the first change subscriber is
+     * added.
+     *
+     * Useful for lazy initialisation: start expensive work only when
+     * somebody actually listens.
+     *
+     * @param {() => void} fn
+     * @returns {() => void} An unsubscribe function.
+     */
+    onHasSubscribers(fn: () => void): () => void;
+    /**
+     * Registers a callback that fires when the last change subscriber is
+     * removed.
+     *
+     * Useful for cleanup: stop timers or subscriptions that only make sense
+     * while somebody is listening.
+     *
+     * @param {() => void} fn
+     * @returns {() => void} An unsubscribe function.
+     */
+    onNoSubscribers(fn: () => void): () => void;
+    /**
+     * Registers a callback that fires when the item is destroyed.
+     *
+     * The callback receives the destroyed item as its only argument.
+     *
+     * @param {(reactiveItem: ReactiveItem) => void} fn
+     * @returns {() => void} An unsubscribe function.
+     */
+    onDestroy(fn: (reactiveItem: ReactiveItem) => void): () => void;
+    /**
+     * Destroys the item and tears down its dependency graph.
+     *
+     * All subscribers are detached, all dependencies are released, and any
+     * further read or write throws. Idempotent — subsequent calls are
+     * no-ops.
+     */
+    destroy(): void;
+    /**
+     * Returns `true` if the two values are considered equal by this item's
+     * comparator.
+     *
+     * When the second argument is omitted, it is compared against the
+     * item's current value. Uses the custom `compareFunction` if one was
+     * provided at construction, otherwise falls back to shallow equality.
+     *
+     * @param {any} a
+     * @param {any} [b]
+     * @returns {boolean}
+     */
+    equals(a: any, b?: any): boolean;
+    /**
+     * Returns `true` if `destroy()` has been called.
+     *
+     * After destruction, reads and writes throw. This getter is the only
+     * operation that remains safe to call.
+     *
+     * @returns {boolean}
+     */
+    get isDestroyed(): boolean;
+    /**
+     * Returns a plain data representation suitable for storage or transport.
+     *
+     * The base implementation returns `null`, signalling that the item must
+     * not be persisted. `Atom`, `Collection`, `ShallowReactive`, and `Store`
+     * override this method. `Computed` deliberately keeps the `null`
+     * default — derived state is recalculated on hydration, never restored.
+     *
+     * @returns {any}
+     */
+    serialize(): any;
+    /**
+     * Restores state previously produced by `serialize()`.
+     *
+     * The base implementation is a no-op. Subclasses override this to apply
+     * the given data. Implementations must be idempotent and must not throw
+     * on malformed input — silently ignore what they cannot apply.
+     *
+     * @param {any} _data
+     */
+    hydrate(_data: any): void;
+}
+
+/**
+ * The numeric type tag of a reactive item.
+ *
+ * - `1` — `Atom`
+ * - `2` — `Computed`
+ * - `3` — `Collection`
+ * - `4` — `ShallowReactive`
+ *
+ * @public
+ */
+export declare type ReactiveItemType = 1 | 2 | 3 | 4;
+
+/**
+ * ReactiveList is a reactive array-like structure that stores values of any
+ * type.
+ *
+ * Primitives (numbers, strings, booleans) are wrapped in `Atom`; objects
+ * and arrays are wrapped in `ShallowReactive`. Every mutation — adding,
+ * removing, replacing, reordering — is batched into a single notification.
+ *
+ * Internally the list is backed by a `Store` indexed by string positions,
+ * plus a separate `Atom` tracking the list length. This is not part of the
+ * public contract; treat the list as an opaque reactive array.
+ *
+ * @template T
+ * @public
+ */
+export declare class ReactiveList<T> {
+    /**
+     * Local path of this list. Empty unless set by the user. Used by
+     * snapshot tooling to build dotted paths when the list is nested inside
+     * a `Store`.
+     * @type {string}
+     */
+    path: string;
+    /**
+     * Appends one or more values to the end of the list.
+     *
+     * Each value is wrapped according to its type — primitives become
+     * `Atom`, objects and arrays become `ShallowReactive`. The whole
+     * operation produces a single notification, regardless of how many
+     * values are added.
+     *
+     * @param {...T} values
+     */
+    add(...values: T[]): void;
+    /**
+     * Returns the value at the given index, or `undefined` if the index is
+     * out of bounds.
+     *
+     * Reads through the reactive wrapper, so a call inside a tracked scope
+     * registers a dependency on the item at that index.
+     *
+     * @param {number} index
+     * @returns {T | undefined}
+     */
+    getItem(index: number): T | undefined;
+    /**
+     * Returns a shallow copy of all items in the list as a plain array.
+     *
+     * The array is newly allocated on each call; mutating it does not
+     * affect the list. Elements that are reactive objects are returned as
+     * their underlying values, not as wrappers.
+     *
+     * @returns {T[]}
+     */
+    toArray(): T[];
+    /**
+     * Replaces the value at the specified index.
+     *
+     * The whole operation produces a single notification. No-op if `index`
+     * is out of bounds.
+     *
+     * @param {number} index
+     * @param {T} value
+     */
+    setItem(index: number, value: T): void;
+    /**
+     * The current number of items in the list.
+     *
+     * Reading this property inside a tracked scope registers a dependency,
+     * so the enclosing effect re-runs whenever items are added or removed.
+     *
+     * @returns {number}
+     */
+    get length(): number;
+    /**
+     * Replaces the entire content of the list with the given array.
+     *
+     * Existing positions are updated in place; positions beyond the new
+     * length are destroyed; new positions are created. The whole operation
+     * produces a single notification.
+     *
+     * @param {T[]} values
+     */
+    setItems(values: T[]): void;
+    /**
+     * Removes `count` items starting at `startIndex`.
+     *
+     * Remaining items shift left to fill the gap; the tail positions are
+     * destroyed. The whole operation produces a single notification.
+     *
+     * No-op if `count <= 0`, `startIndex < 0`, or `startIndex >= length`.
+     * If `count` exceeds the number of items from `startIndex` to the end,
+     * it is clamped.
+     *
+     * @param {number} startIndex
+     * @param {number} count
+     */
+    removeRange(startIndex: number, count: number): void;
+    /**
+     * Removes the item at the given index.
+     *
+     * Shorthand for `removeRange(index, 1)`. No-op if `index` is out of
+     * bounds.
+     *
+     * @param {number} index
+     */
+    removeItem(index: number): void;
+    /**
+     * Removes the last item. No-op if the list is empty.
+     */
+    removeLastItem(): void;
+    /**
+     * Removes the first item. No-op if the list is empty.
+     */
+    removeFirstItem(): void;
+    /**
+     * Removes all items from the list.
+     *
+     * The length becomes `0` and every item is destroyed.
+     */
+    clear(): void;
+    /**
+     * Destroys the list and releases its internal store.
+     *
+     * After this call, all mutating methods throw. Idempotent — subsequent
+     * calls are no-ops.
+     */
+    destroy(): void;
+    /**
+     * Returns `true` after `destroy()` has been called.
+     *
+     * After destruction, all mutating methods throw and only this getter
+     * remains safe to call.
+     *
+     * @returns {boolean}
+     */
+    get isDestroyed(): boolean;
+    /**
+     * Subscribes a function to changes of the list.
+     *
+     * The callback receives a `Map` of update paths to `UpdateDataRecord`
+     * instances. It is invoked once per batch of effective changes,
+     * regardless of how many items were affected.
+     *
+     * @param {(updates: Map<string, import('../core/UpdateDataRecord.js').UpdateDataRecord>) => void} fn
+     * @returns {() => void} An unsubscribe function.
+     */
+    subscribe(fn: (updates: Map<string, UpdateDataRecord>) => void): () => void;
+    /**
+     * Returns a serializable representation of the list's contents.
+     *
+     * The shape is `{ type: 'list', value: [...] }`, matching the
+     * serialization protocol used by reactive items.
+     *
+     * @returns {any}
+     */
+    serialize(): any;
+    /**
+     * Applies data produced by `serialize()`.
+     *
+     * Uses `setItems` internally, so the whole replacement is batched and
+     * subscribers fire once. Silently ignores malformed input.
+     *
+     * @param {any} data
+     */
+    hydrate(data: any): void;
+    #private;
+}
+
+/**
+ * Defers mutations until after subscribers finish, so it is safe to call
+ * from inside a subscriber callback.
+ * @param {Function} fn
+ * @returns {void}
+ */
+export declare function runInAction(fn: Function): void;
+
+/**
+ * Runs `fn` with `context` installed as the active context.
+ * @template T
+ * @param {Store2Context} context
+ * @param {() => T} fn
+ * @returns {T}
+ */
+export declare function runWithContext<T>(context: Store2Context, fn: () => T): T;
+
+/**
+ * ShallowReactive tracks assignments and deletions on the top level of an
+ * object.
+ *
+ * Nested objects are stored by reference and are not made reactive —
+ * mutating a property of a nested object does not trigger an update. For
+ * deep reactivity, either use immutable updates on the top level or split
+ * the state across multiple reactive items.
+ *
+ * @augments ReactiveItem
+ * @template {{[key: string]: any}} T
+ * @public
+ */
+export declare class ShallowReactive<T extends {
+    [key: string]: any;
+}> extends ReactiveItem {
+    /**
+     * Creates a new ShallowReactive wrapping the given object.
+     *
+     * @param {T} value - The object to wrap. Must be a plain object.
+     * @param {object} [options]
+     * @param {string} [options.name] - Debug name used in error messages.
+     */
+    constructor(value: T, options?: {
+        name?: string;
+    });
+    /**
+     * Returns the proxied object.
+     *
+     * When `options.untracked` is `false` (the default), registers this
+     * item as a dependency of the enclosing tracked scope.
+     *
+     * @param {{ untracked?: boolean }} [options]
+     * @returns {T}
+     */
+    getValue(options?: {
+        untracked?: boolean;
+    }): T;
+    /**
+     * Replaces the object's properties wholesale.
+     *
+     * Keys absent from `value` are deleted from the target; new keys are
+     * added. The entire operation is batched and produces a single
+     * notification.
+     *
+     * @param {T} value
+     */
+    setValue(value: T): void;
+    set value(value: T);
+    /**
+     * The proxied object.
+     *
+     * Reading a top-level property registers a dependency on this item.
+     * Writing a top-level property schedules an update. Nested properties
+     * are not tracked.
+     *
+     * @returns {T}
+     */
+    get value(): T;
+    /**
+     * Returns the underlying object without the proxy.
+     *
+     * Mutations on the returned object do not trigger reactivity. Use for
+     * inspection or for passing to APIs that must receive a plain object —
+     * not for state changes.
+     *
+     * @returns {T}
+     */
+    getRawValue(): T;
+    #private;
+}
+
+/**
+ * @template {{[key: string]: any}} T
+ * @param {T} value
+ * @param {object} [options]
+ * @param {string} [options.name]
+ * @returns {ShallowReactive<T>}
+ */
+export declare function shallowReactive<T extends {
+    [key: string]: any;
+}>(value: T, options?: {
+    name?: string;
+}): ShallowReactive<T>;
+
+/**
+ * A Promise-based sleep function.
+ * @param {number} ms
+ * @returns {Promise<void>}
+ */
+export declare function sleep(ms: number): Promise<void>;
+
+/**
+ * Minimal interface a context root must satisfy to be snapshotted.
+ *
+ * `Store` and `ReactiveList` implement this interface out of the box.
+ *
+ * @public
+ */
+export declare interface SnapshotRoot {
+    /**
+     * Returns a plain data representation of the root suitable for storage
+     * or transport. Called by `context.snapshot()`.
+     */
+    serialize(): any;
+    /**
+     * Restores state previously produced by `serialize()`. Called by
+     * `context.hydrate()` inside a batch. Implementations must be
+     * idempotent and must not throw on malformed input.
+     */
+    hydrate(data: any): void;
+}
+
+/**
+ * Sorts reactive items by their internal id. This is used to
+ * ensure that reactive items are processed in a consistent order
+ * when they are notified of changes.
+ * @param {import('../reactives/ReactiveItem.js').ReactiveItem} a
+ * @param {import('../reactives/ReactiveItem.js').ReactiveItem} b
+ * @returns {number} -1 if a should come before b, 0 if a and b are equal, 1 if a should come after b
+ */
+export declare function sortReactiveItems(a: ReactiveItem, b: ReactiveItem): number;
+
+/**
+ * Store is a reactive container for reactive items and nested stores.
+ *
+ * It collects the individual subscriptions of its children and re-emits
+ * them as a single batched notification. Subscribing to a Store is
+ * therefore equivalent to subscribing to every item inside it, without
+ * registering a listener per item.
+ *
+ * Update keys are dot-separated paths. For a root store holding an atom
+ * named `count`, a write to `count.value` produces the update key `count`.
+ * For a child store named `settings` holding an atom `theme`, the update
+ * key is `settings.theme`.
+ *
+ * @public
+ */
+export declare class Store {
+    /**
+     * Local path of this store within its parent. Empty for the root store.
+     * The full path is available via `getPath()`.
+     * @type {string}
+     */
+    path: string;
+    /**
+     * Returns `true` after `destroy()` has been called.
+     *
+     * After destruction, all mutating methods throw and only this getter
+     * remains safe to call.
+     *
+     * @returns {boolean}
+     */
+    get isDestroyed(): boolean;
+    /**
+     * Returns the full path of this store by walking up the parent chain.
+     *
+     * For a root store, returns `path` — which is `''` unless the user set
+     * it manually. For a child store, returns `"parent.getPath() + '.' +
+     * this.path"`.
+     *
+     * @returns {string}
+     */
+    getPath(): string;
+    /**
+     * Adds reactive items or child stores to the store under the given keys.
+     *
+     * Throws if a key is already registered, or if a value is neither a
+     * `ReactiveItem` nor a `Store`.
+     *
+     * @param {{[key: string]: ReactiveItem | Store}} items
+     */
+    addItems(items: {
+        [key: string]: ReactiveItem | Store;
+    }): void;
+    /**
+     * Destroys the item or child store registered under `key`.
+     *
+     * When `key` refers to a reactive item, the item is removed from the
+     * store and then destroyed. When it refers to a child store, the child
+     * store and every item inside it is destroyed recursively. No-op if
+     * the key is not present.
+     *
+     * @param {string} key
+     */
+    destroyItem(key: string): void;
+    /**
+     * Removes the item or child store registered under `key` from the
+     * store, without destroying it.
+     *
+     * The removed item remains usable and can be re-added to a store (this
+     * one or another). No-op if the key is not present.
+     *
+     * @param {string} key
+     */
+    removeItem(key: string): void;
+    /**
+     * Destroys the store and every item and child store inside it.
+     *
+     * After this call, all mutating methods throw. Idempotent — subsequent
+     * calls are no-ops.
+     */
+    destroy(): void;
+    /**
+     * Removes all items and child stores without destroying them.
+     *
+     * After this call the store is empty, but the detached items continue
+     * to work and can be re-added elsewhere.
+     */
+    detachAll(): void;
+    /**
+     * Returns the item or child store registered under `key`, or `null` if
+     * the key is not present.
+     *
+     * @param {string} key
+     * @returns {ReactiveItem | Store | null}
+     */
+    getItem(key: string): ReactiveItem | Store | null;
+    /**
+     * Returns `true` if `key` is registered as either a reactive item or a
+     * child store.
+     *
+     * @param {string} key
+     * @returns {boolean}
+     */
+    hasItem(key: string): boolean;
+    /**
+     * Returns the keys of the store's contents.
+     *
+     * The `filter` argument narrows the result: `"reactives"` returns only
+     * reactive items, `"stores"` returns only child stores, `"all"` (the
+     * default) returns both, reactives first.
+     *
+     * @param {"all" | "reactives" | "stores"} [filter="all"]
+     * @returns {Array<string>}
+     */
+    getItemNames(filter?: "all" | "reactives" | "stores"): Array<string>;
+    /**
+     * Returns the store's contents as a `Map`.
+     *
+     * The `filter` argument narrows the result the same way as in
+     * `getItemNames()`.
+     *
+     * @param {"all" | "reactives" | "stores"} [filter="all"]
+     * @returns {Map<string, ReactiveItem | Store>}
+     */
+    toMap(filter?: "all" | "reactives" | "stores"): Map<string, ReactiveItem | Store>;
+    /**
+     * Returns the store's current values as a plain object.
+     *
+     * Computed values are included — this is a full state dump, not a
+     * persistence payload. For persistence, prefer `serialize()`, which
+     * omits derived state.
+     *
+     * The `filter` argument narrows the result the same way as in
+     * `getItemNames()`.
+     *
+     * @param {"all" | "reactives" | "stores"} [filter="all"]
+     * @returns {object}
+     */
+    toJSON(filter?: "all" | "reactives" | "stores"): object;
+    /**
+     * Serializes the store and its children.
+     *
+     * Items whose `serialize()` returns `null` — notably `Computed` — are
+     * omitted. The output is suitable for `hydrate()` and for JSON
+     * transport.
+     *
+     * @returns {any}
+     */
+    serialize(): any;
+    /**
+     * Applies serialized data produced by `serialize()`.
+     *
+     * Keys absent from `data` are left untouched; keys present in `data`
+     * but not in this store are ignored. Malformed input is a no-op.
+     * Runs entirely inside the caller's batch — the context wraps hydration
+     * in a batch already.
+     *
+     * @param {any} data
+     */
+    hydrate(data: any): void;
+    /**
+     * Subscribes a function to changes across the store's contents.
+     *
+     * The callback receives a `Map` of dot-separated update paths to
+     * `UpdateDataRecord` instances, plus this store as the second
+     * argument. It is invoked once per batch of effective changes.
+     *
+     * @param {(update: Map<string, import('../core/UpdateDataRecord.js').UpdateDataRecord>, store: Store) => void} fn
+     * @returns {() => void} An unsubscribe function.
+     */
+    subscribe(fn: (update: Map<string, UpdateDataRecord>, store: Store) => void): () => void;
+    /**
+     * Registers a callback fired when the store is destroyed.
+     *
+     * @param {(store: Store) => void} fn
+     * @returns {() => void} An unsubscribe function.
+     */
+    onDestroy(fn: (store: Store) => void): () => void;
+    /**
+     * Suppresses change notifications until `unmuteUpdates()` is called.
+     *
+     * Mutations that happen while muted are still applied and their
+     * updates accumulated; subscribers are notified once, with everything,
+     * when the store is unmuted.
+     */
+    muteUpdates(): void;
+    /**
+     * Resumes change notifications after `muteUpdates()`.
+     *
+     * If any updates accumulated while muted, subscribers are notified
+     * immediately with the full set.
+     */
+    unmuteUpdates(): void;
+    /**
+     * Returns `true` if change notifications are currently suppressed.
+     *
+     * @returns {boolean}
+     */
+    isMuted(): boolean;
+    #private;
+}
+
+/**
+ * A Store2 context owns the per-root services that drive reactivity and
+ * tracks the roots (stores, lists) it should snapshot and hydrate.
+ */
+export declare class Store2Context {
+    /**
+     * @param {object} [options]
+     * @param {string} [options.name]
+     * @param {IdService} [options.idService]
+     * @param {ModeControllerService} [options.modeController]
+     * @param {Tracker} [options.dependencyTracker]
+     * @param {ChangedItemsController} [options.changedItemsController]
+     */
+    constructor(options?: {
+        name?: string;
+        idService?: IdService;
+        modeController?: ModeControllerService;
+        dependencyTracker?: Tracker;
+        changedItemsController?: ChangedItemsController;
+    });
+    /** @type {IdService} */
+    idService: IdService;
+    /** @type {ModeControllerService} */
+    modeController: ModeControllerService;
+    /** @type {Tracker} */
+    dependencyTracker: Tracker;
+    /** @type {ChangedItemsController} */
+    changedItemsController: ChangedItemsController;
+    /** @type {string} */
+    name: string;
+    /**
+     * Installs a plugin into this context.
+     * @param {import('../types.js').Store2Plugin} plugin
+     * @returns {this}
+     */
+    use(plugin: Store2Plugin): this;
+    /**
+     * Registers an action middleware.
+     * @param {import('../types.js').ActionMiddleware} middleware
+     * @returns {this}
+     */
+    addMiddleware(middleware: ActionMiddleware): this;
+    /**
+     * Registers a root for snapshot/hydrate. The root must implement
+     * `serialize()` and `hydrate(data)`.
+     * @param {string} name
+     * @param {import('../types.js').SnapshotRoot} root
+     * @returns {this}
+     */
+    registerRoot(name: string, root: SnapshotRoot): this;
+    /**
+     * Unregisters a previously registered root.
+     * @param {string} name
+     * @returns {boolean}
+     */
+    unregisterRoot(name: string): boolean;
+    /**
+     * Returns the names of all roots currently registered with registerRoot()
+     *
+     * @returns {Array<string>}
+     */
+    getRootNames(): Array<string>;
+    /**
+     * Returns a copy of the plugins installed via use().
+     *
+     * @returns {Array<import('../types.js').Store2Plugin>}
+     */
+    get plugins(): Store2Plugin[];
+    /**
+     * Returns a copy of the middleware chain installed via addMiddleware()
+     *
+     * @returns {Array<import('../types.js').ActionMiddleware>}
+     */
+    get middlewares(): ActionMiddleware[];
+    /**
+     * Invokes a lifecycle hook on every installed plugin. Plugin errors are
+     * caught and logged. When plugins are suspended (e.g. during time-travel),
+     * calls are ignored.
+     * @param {string} hook
+     * @param {...any} args
+     */
+    emitPlugin(hook: string, ...args: any[]): void;
+    /**
+     * Runs `fn` inside a batch. Supports two signatures:
+     *
+     *     ctx.batch(() => { ... })
+     *     ctx.batch('update todos', () => { ... })
+     *
+     * @param {string | Function} nameOrFn
+     * @param {Function} [fn]
+     * @returns {any}
+     */
+    batch(nameOrFn: string | Function, fn?: Function): any;
+    /**
+     * Runs `fn` as a named action. Supports async bodies and middleware.
+     * @param {string} name
+     * @param {(action: import('../types.js').ActionInfo) => any} fn
+     * @param {any} [payload]
+     * @returns {Promise<any>}
+     */
+    action(name: string, fn: (action: ActionInfo) => any, payload?: any): Promise<any>;
+    /**
+     * Flushes pending subscribers synchronously.
+     */
+    flush(): void;
+    /**
+     * Captures a serializable snapshot of every registered root.
+     * @returns {import('../types.js').ContextSnapshot}
+     */
+    snapshot(): ContextSnapshot;
+    /**
+     * Applies a snapshot to every registered root. The whole operation runs
+     * in one batch.
+     *
+     * When `timeTravel` is `true`, plugin hooks are suppressed for the
+     * duration of the hydration so that a DevTools-style plugin does not
+     * re-record the rehydration as a new action. Subscribers still run so
+     * the UI updates.
+     *
+     * Roots present in the snapshot but not registered here are ignored.
+     * Roots registered here but missing from the snapshot are left untouched.
+     *
+     * @param {import('../types.js').ContextSnapshot} snapshot
+     * @param {{ timeTravel?: boolean }} [options]
+     */
+    hydrate(snapshot: ContextSnapshot, options?: {
+        timeTravel?: boolean;
+    }): void;
+    /**
+     * Releases the context and forgets all installed plugins and roots.
+     */
+    dispose(): void;
+    #private;
+}
+
+/**
+ * Plugin contract. Every hook is optional.
+ *
+ * Plugins are installed via `context.use(plugin)`. Plugin errors are caught
+ * and logged; a plugin cannot break reactivity by throwing.
+ *
+ * @public
+ */
+export declare interface Store2Plugin {
+    /**
+     * Debug name, used in error logs. Should be unique per context.
+     */
+    name: string;
+    /**
+     * Called once when the plugin is installed. Receives the context the
+     * plugin will observe.
+     */
+    install(context: Store2Context): void;
+    /**
+     * Called when an action begins.
+     */
+    onActionStart?(action: ActionInfo): void;
+    /**
+     * Called when an action finishes, successfully or with an error. The
+     * `action.error` field is set when the body threw.
+     */
+    onActionEnd?(action: ActionInfo): void;
+    /**
+     * Called when the outermost batch begins.
+     */
+    onBatchStart?(info: BatchInfo): void;
+    /**
+     * Called when the outermost batch ends.
+     */
+    onBatchEnd?(info: BatchInfo): void;
+    /**
+     * Called for every effective property change on a reactive item.
+     */
+    onUpdate?(item: ReactiveItem, property: string, record: UpdateDataRecord): void;
+    /**
+     * Called after a computed's value changes, with the previous and new
+     * values.
+     */
+    onComputedRecalc?(item: ReactiveItem, oldValue: any, newValue: any): void;
+    /**
+     * Called before a subscriber runs, with the item and its pending
+     * updates.
+     */
+    onSubscriberRun?(item: ReactiveItem, updates: Map<string, UpdateDataRecord>): void;
+    /**
+     * Called after a reactive item is destroyed.
+     */
+    onDestroy?(item: ReactiveItem): void;
+    /**
+     * Called when a computed throws during evaluation.
+     */
+    onError?(item: ReactiveItem, error: Error): void;
+}
+
 /**
  * Manages change subscriptions and lifecycle hooks for a reactive item.
  * Uses a single EventEmitter for all events: 'change' and 'destroy'.
  */
-class SubscribeController {
+declare class SubscribeController {
     /**
-     * @param {ReactiveItem} reactiveItem
+     * @param {import('../reactives/ReactiveItem.js').ReactiveItem} reactiveItem
      */
     constructor(reactiveItem: ReactiveItem);
     /**
@@ -1103,7 +2170,7 @@ class SubscribeController {
     /**
      * Subscribes a callback to the 'change' event.
      *
-     * @param {(updates: Map<string, UpdateDataRecord>) => void} fn
+     * @param {(updates: Map<string, import('./UpdateDataRecord.js').UpdateDataRecord>) => void} fn
      * @param {{ delay?: number, signal?: AbortSignal }} [options]
      * @returns {() => void}
      */
@@ -1147,17 +2214,91 @@ class SubscribeController {
      * @returns {() => void}
      */
     onDestroy(callback: () => void): () => void;
-
+    #private;
 }
 
-/* From core\UpdateDataRecord.d.ts */
-export class UpdateDataRecord {
+/**
+ * Records reactive items read during a tracked execution (inside `Computed`,
+ * `autorun`, or `reaction`).
+ *
+ * Scopes are nested: each `enable()` pushes a fresh store and each
+ * `disable()` restores the previous one. This makes nested computed
+ * construction and re-entrant tracking safe.
+ */
+export declare class Tracker {
     /**
-     * Initializes an instance of UpdateDataRecord with the provided type, old value, and new value.
-     * @param {"set"|"delete"} type - The action performed, either "set" or "delete".
-     * @param {any} oldValue - The previous value before the update.
-     * @param {any} value - The new value after the update.
-     * @param {ReactiveItem} [reactiveItem] - The reactive item that triggered the update.
+     * @param {import('../services/modeController.js').ModeControllerService} [modeController]
+     *        Used to honour `untrackMode`. Optional so that the tracker can be
+     *        constructed in isolation for tests.
+     */
+    constructor(modeController?: ModeControllerService);
+    /** @type {object} */
+    ctx: object;
+    /**
+     * Returns a copy of the currently tracked items.
+     * @returns {Set<import('../reactives/ReactiveItem.js').ReactiveItem>}
+     */
+    get data(): Set<ReactiveItem>;
+    /**
+     * Returns the currently tracked items sorted by engine id.
+     * @returns {Array<import('../reactives/ReactiveItem.js').ReactiveItem>}
+     */
+    getAsSortedArray(): Array<ReactiveItem>;
+    /**
+     * Records a reactive item if tracking is active and untracked reads are
+     * not currently suppressed.
+     * @param {import('../reactives/ReactiveItem.js').ReactiveItem} item
+     * @param {string} [_key]
+     */
+    add(item: ReactiveItem, _key?: string): void;
+    /**
+     * Registers a listener called for every tracked item.
+     * @param {(item: import('../reactives/ReactiveItem.js').ReactiveItem) => void} callback
+     * @returns {() => void}
+     */
+    onAdd(callback: (item: ReactiveItem) => void): () => void;
+    /**
+     * Returns true while tracking is active.
+     * @returns {boolean}
+     */
+    isActive(): boolean;
+    /**
+     * Pushes a new tracking scope.
+     * @param {object} [ctx]
+     */
+    enable(ctx?: object): void;
+    /**
+     * Pops the current tracking scope and restores the previous one.
+     */
+    disable(): void;
+    #private;
+}
+
+/**
+ * Runs `fn` without tracking reactive reads. Nesting is safe: the previous
+ * state is restored on exit even if `fn` throws.
+ * @template T
+ * @param {() => T} fn
+ * @returns {T}
+ */
+export declare function untrack<T>(fn: () => T): T;
+
+/**
+ * A single mutation state passed to subscribers.
+ *
+ * Every entry in the `updates` map received by a subscriber is an instance
+ * of this class.
+ *
+ * @public
+ */
+export declare class UpdateDataRecord {
+    /**
+     * Creates a new update record.
+     *
+     * @param {"set"|"delete"} type - The operation that produced the change.
+     * @param {any} oldValue - Value before the change.
+     * @param {any} value - Value after the change.
+     * @param {import('../reactives/ReactiveItem.js').ReactiveItem} [reactiveItem] - The reactive item that triggered the update.
      */
     constructor(type: "set" | "delete", oldValue: any, value: any, reactiveItem?: ReactiveItem);
     /** @type {"set"|"delete"} */
@@ -1166,927 +2307,35 @@ export class UpdateDataRecord {
     value: any;
     /** @type {any} */
     oldValue: any;
-    /** @type {ReactiveItem|undefined} */
+    /** @type {import('../reactives/ReactiveItem.js').ReactiveItem|undefined} */
     reactiveItem: ReactiveItem | undefined;
 }
-class UpdateDataRecordManager {
-    /**
-     * Initializes an instance of UpdateDataRecordManager with the given data.
-     * @param {Map<string, UpdateDataRecord>} data - The data to be managed.
-     */
-    constructor(data: Map<string, UpdateDataRecord>);
-    data: Map<string, UpdateDataRecord>;
-    /**
-     * Removes the specified item and its related sub-items from the data map.
-     * Replaces the deleted items with new UpdateDataRecord instances indicating the "delete" action.
-     * @param {string} itemName - The name of the item to be destroyed.
-     */
-    removeItem(itemName: string): void;
-}
 
-/* From core\UpdateTracker.d.ts */
 /**
- * Tracks updates and batch snapshots for a reactive item.
- * Manages the `updates` map and handles batch change detection.
- */
-export class UpdateTracker {
-    /**
-     * @param {Map<string, UpdateDataRecord>} updates - The engine's updates map.
-     * @param {ReactiveItem} reactiveItem - The owning reactive item.
-     * @param {Engine} engine - The owning engine (for version and batch snapshot access).
-     */
-    constructor(updates: Map<string, UpdateDataRecord>, reactiveItem: ReactiveItem, engine: Engine);
-    /**
-     * Determines if a change is effective (i.e., not reverted) considering batch snapshots.
-     * @param {string} property - The property key.
-     * @param {any} oldValue - The immediate previous value.
-     * @param {any} newValue - The new value.
-     * @param {CompareFunction|null} compareFn - Equality function.
-     * @returns {boolean}
-     */
-    isEffectiveChange(property: string, oldValue: any, newValue: any, compareFn: CompareFunction | null): boolean;
-    /**
-     * Adds an update record if the change is effective.
-     * @param {string} property - The property key.
-     * @param {"set"|"delete"} type - The operation type.
-     * @param {any} oldValue - The previous value (immediate).
-     * @param {any} newValue - The new value.
-     * @param {CompareFunction|null} compareFn - Equality function.
-     * @param {() => void} notifyDependentsCallback - Callback to notify dependents of a change.
-     * @param {() => void} addToChangedItemsCallback - Callback to add the item to the changed items controller.
-     * @returns {boolean} True if an update was added.
-     */
-    addUpdate(property: string, type: "set" | "delete", oldValue: any, newValue: any, compareFn: CompareFunction | null, notifyDependentsCallback: () => void, addToChangedItemsCallback: () => void): boolean;
-    /**
-     * Checks if there are any pending updates.
-     * @returns {boolean}
-     */
-    hasUpdates(): boolean;
-    /**
-     * Clears all pending updates and resets the batch snapshot.
-     */
-    clearUpdates(): void;
-    /**
-     * Processes temporary changes after batch ends.
-     * Removes updates for properties that reverted to original values.
-     * @param {(prop: string) => any} getCurrentValue - Function to get current value for a property.
-     * @returns {boolean} True if any changes remain.
-     */
-    checkChangesTemporary(getCurrentValue: (prop: string) => any): boolean;
-
-}
-
-/* From helpers\tools.d.ts */
-/**
- * Sorts reactive items by their internal id. This is used to
- * ensure that reactive items are processed in a consistent order
- * when they are notified of changes.
- * @param {ReactiveItem} a - The first item to compare
- * @param {ReactiveItem} b - The second item to compare
- * @returns {number} -1 if a should come before b, 0 if a and b are equal, 1 if a should come after b
- */
-export function sortReactiveItems(a: ReactiveItem, b: ReactiveItem): number;
-/**
- * Combines multiple reactive items or sets of reactive items into a single set,
- * ensuring that each item appears only once. The combined set is then converted
- * to an array and sorted by the internal id of the reactive items.
- *
- * @param {...(ReactiveItem|Set<ReactiveItem>)} items - Reactive items or sets of reactive items to combine and sort.
- * @returns {Array<ReactiveItem>} A sorted array of unique reactive items.
- */
-export function getSortedReactiveItems(...items: (ReactiveItem | Set<ReactiveItem>)[]): Array<ReactiveItem>;
-/**
- * Checks if a given value is a plain object.
- * @param {*} obj - The value to check.
- * @returns {boolean} true if the value is a plain object, false otherwise.
- */
-export function isPlainObject(obj: any): boolean;
-/**
- * Checks if two plain objects are equal. If the objects do not have the same set of keys, then this function returns false.
- * Otherwise, this function checks if each value of the two objects is equal, using the compareAny function.
- * @param {object} a - The first object to compare.
- * @param {object} b - The second object to compare.
- * @returns {boolean} True if the two objects are equal, false otherwise.
- */
-export function comparePlainObjects(a: object, b: object): boolean;
-/**
- * Checks if two objects are equal. If objects are arrays, then check if stringified versions of them are equal.
- * If objects are not arrays, then check if sorted stringified versions of them are equal.
- * @param {unknown} a
- * @param {unknown} b
- * @returns {boolean}
- */
-export function compareAny(a: unknown, b: unknown): boolean;
-/**
- * Debounce function that, as long as it continues to be invoked, will not be triggered.
- * @template {Function} T
- * @param {T} func - Function to be debounced
- * @param {number} wait - Time in milliseconds to wait before the function gets called.
- * @returns {T}
- * @example
-   window.addEventListener('resize', debounce((evt) => console.log(evt), 250));
- */
-export function debounce<T extends Function>(func: T, wait: number): T;
-/**
- * Clones an object. If the object is an array, the function returns a shallow copy of the array.
- * If the object is a plain object, the function returns a shallow copy of the object.
- * If the object is not an array or a plain object, the function returns the object as is.
- * @template T
- * @param {T} obj - The object to clone
- * @returns {T} A shallow copy of the object
- */
-export function clone<T>(obj: T): T;
-/**
- * A Promise-based sleep function.
- * @param {number} ms - The amount of milliseconds to sleep for.
+ * Returns a promise that resolves when `predicate` becomes true.
+ * @param {() => boolean} predicate
+ * @param {object} [options]
+ * @param {number} [options.timeout]
  * @returns {Promise<void>}
  */
-export function sleep(ms: number): Promise<void>;
+export declare function waitUntil(predicate: () => boolean, options?: {
+    timeout?: number;
+}): Promise<void>;
+
 /**
- * Gets all property descriptors of an object, including its prototype and all its ancestors.
- * The descriptors are returned as a plain object.
- * @param {object} obj - The object to get the property descriptors from.
- * @param {number} [depth=0]
- * @param {number} [maxDepth=100]
- * @returns {{[x: string]: TypedPropertyDescriptor<any>;} & { [x: string]: PropertyDescriptor;}} A plain object with all property descriptors of the object.
+ * Waits for `predicate` to become true, then runs `fn` once.
+ * @param {() => boolean} predicate
+ * @param {() => void} fn
+ * @param {object} [options]
+ * @param {number} [options.timeout]
+ * @param {number} [options.delay]
+ * @param {AbortSignal} [options.signal]
+ * @returns {() => void}
  */
-export function getAllPropertyDescriptors(obj: object, depth?: number, maxDepth?: number): {
-    [x: string]: TypedPropertyDescriptor<any>;
-} & {
-    [x: string]: PropertyDescriptor;
-};
-/**
- * Converts any value to an Error object.
- *
- * If the given value is already an instance of Error, it is returned unchanged.
- * Otherwise, a new Error object is created using the string representation of the value.
- *
- * @param {unknown} e - The value to convert into an Error.
- * @returns {Error} An Error object derived from the input value.
- *
- * @example
- * // Returns the original Error
- * const originalError = new Error('Something went wrong');
- * getError(originalError) === originalError; // true
- *
- * @example
- * // Converts a string to an Error
- * const error = getError('Network failure');
- * error.message; // 'Network failure'
- * error instanceof Error; // true
- *
- * @example
- * // Converts numbers or other types
- * getError(42).message; // '42'
- * getError(null).message; // 'null'
- * getError(undefined).message; // 'undefined'
- */
-export function getError(e: unknown): Error;
-/**
- * Extracts names (and optionally ids) from a Set of reactive items.
- * Returns an array of strings, one per item.
- *
- * @param {Set<ReactiveItem>|Iterable<ReactiveItem>} items - Collection of reactive items.
- * @param {{includeId:boolean, fallback:string, sorted:boolean}} [options] - Formatting options.
- * @returns {string[]} Array of item representations.
- *
- * @example
- * const a = new Atom(0, { name: 'counter' });
- * const b = new Computed(() => a.value * 2, { name: 'double' });
- * const set = new Set([a, b]);
- * getItemNamesFromSet(set);
- * // ['counter', 'double']
- *
- * @example
- * getItemNamesFromSet(set, { includeId: true });
- * // ['counter:5', 'double:7']
- *
- * @example
- * getItemNamesFromSet(set, { fallback: '?', sorted: false });
- */
-export function getItemNamesFromSet(items: Set<ReactiveItem> | Iterable<ReactiveItem>, options?: {
-    includeId: boolean;
-    fallback: string;
-    sorted: boolean;
-}): string[];
+export declare function when(predicate: () => boolean, fn: () => void, options?: {
+    timeout?: number;
+    delay?: number;
+    signal?: AbortSignal;
+}): () => void;
 
-/* From reactives\Atom.d.ts */
-/**
- * Atom is a reactive item that holds a value. It is the base unit of reactive state.
- * @augments ReactiveItem
- * @template T
- * @example
- * ```js
- * const a = new Atom(0); // same as const a = atom(0);
- * const b = new Atom(0);
- *
- * const c = new Computed(() => a.value + b.value);
- *
- * c.subscribe(() => {
- *     console.log(c.name, c.value);
- * });
- *
- * a.subscribe(() => {
- *     console.log(a.name, a.value);
- * });
- *
- * b.subscribe(() => {
- *     console.log(b.name, b.value);
- * });
- *
- * a.value = 1;
- * // Output:
- * //a 1
- * //c 1
- *
- * a.value = 2;
- * // Output:
- * //a 2
- * //c 2
- * b.value = 2;
- * // Output:
- * //b 2
- * //c 4
- *
- * a.value = 3;
- * // Output:
- * //a 3
- * //c 5
- *
- * a.value = 3;
- * // Output: nothing
- * ```
- */
-export class Atom<T> extends ReactiveItem {
-    /**
-     * Initializes an Atom instance with a given value.
-     * @param {T} value - The initial value of the Atom.
-     * @param {object} [options] - Options.
-     * @param {string} [options.name] - The name of the Atom.
-     * @param {((a:T, b:T)=>boolean)|null} [options.compareFunction] - A function that compares two values for equality.
-     */
-    constructor(value: T, options?: {
-        name?: string;
-        compareFunction?: ((a: T, b: T) => boolean) | null;
-    });
-    /**
-     * Sets the value of the Atom. If the new value is the same as the current value, no action is taken.
-     * Updates the current value to the new value if they are different.
-     * @param {T} value - The new value to set for the Atom.
-     */
-    set value(value: T);
-    /**
-     * Returns the current value of the Atom. If the engine is destroyed, an error is thrown.
-     * @returns {T} The current value of the Atom.
-     */
-    get value(): T;
-    /**
-     * Retrieves the current value of the Atom. If the engine is destroyed, an error is thrown.
-     * Tracks the Atom for dependency management.
-     * @param {{untracked?: boolean}} [options] - Optional options. If `untracked` is `false`, the Atom value will be added to the dependencyTracker.
-     * @returns {T} The current value of the Atom.
-     */
-    getValue(options?: {
-        untracked?: boolean;
-    }): T;
-    /**
-     * Returns the current value of the Atom without tracking it for dependency management.
-     * This is useful when you want to access the value without affecting its reactive state.
-     * @returns {T} The current value of the Atom.
-     * @example
-     * ```js
-     * const a = atom(0);
-     * const b = atom(0);
-     * const c = computed(() => a.value + b.valueUntracked, {
-     *     name: "c",
-     * });
-     *
-     * c.subscribe(() => {
-     *     console.log(c.name, c.value);
-     * });
-     * console.log("change b.value");
-     * b.value++;
-     * b.value++;
-     * console.log("change a.value");
-     * a.value++;
-     * // Output: c 3
-     * a.value++;
-     * // Output: c 4
-     * ```
-     */
-    get valueUntracked(): T;
-
-}
-
-/* From reactives\Collection.d.ts */
-/**
- * Collection is a reactive item that holds an array of values.
- * It provides reactivity for array operations (push, pop, splice, etc.)
- * and allows tracking changes to individual elements and the array length.
- *
- * @template T
- * @augments ReactiveItem
- * @example
- * ```js
- * const coll = new Collection([1, 2, 3]);
- * coll.subscribe((updates) => {
- *     console.log('Collection changed:', Array.from(updates.keys()));
- * });
- * coll.value.push(4); // triggers reactivity
- * ```
- */
-export class Collection<T> extends ReactiveItem {
-    /**
-     * Initializes a Collection instance with an initial array.
-     *
-     * @param {T[]} value - The initial array value.
-     * @param {object} [options] - Configuration options.
-     * @param {string} [options.name] - The name of the Collection (for debugging).
-     * @param {CompareFunction|null} [options.compareFunction] - Custom equality function for values.
-     */
-    constructor(value: T[], options?: {
-        name?: string;
-        compareFunction?: CompareFunction | null;
-    });
-    /**
-     * Sets the entire array, replacing all elements.
-     * Only triggers reactivity if the new array differs from the current one.
-     *
-     * @param {T[]} value - The new array value.
-     */
-    set value(value: T[]);
-    /**
-     * Returns the proxied array value (same as getValue()).
-     *
-     * @returns {T[]} The reactive array proxy.
-     */
-    get value(): T[];
-    /**
-     * Returns the proxied array value.
-     * Tracks this Collection as a dependency when accessed.
-     *
-     * @param {{untracked?: boolean}} [options] - If `untracked` is true, does not add to dependency tracker.
-     * @returns {T[]} The reactive array proxy.
-     */
-    getValue(options?: {
-        untracked?: boolean;
-    }): T[];
-    /**
-     * Returns the raw, unproxied target array.
-     * Warning: Mutating the raw array directly does NOT trigger reactivity.
-     *
-     * @returns {T[]} The raw array.
-     */
-    getRawValue(): T[];
-
-}
-
-/* From reactives\Computed.d.ts */
-/**
- * Computed is a reactive item that holds a value that is computed from other reactive values.
- * It is the base unit of reactive state.
- * @augments ReactiveItem
- * @template {unknown} T
- * @example
- * ```js
- * const a = new Atom(0); // same as const a = atom(0);
- * const b = new Atom(0);
- *
- * const c = new Computed(() => a.value + b.value);
- *
- * c.subscribe(() => {
- *     console.log("c", c.value);
- * });
- *
- * a.subscribe(() => {
- *     console.log("a", a.value);
- * });
- *
- * b.subscribe(() => {
- *     console.log("b", b.value);
- * });
- *
- * a.value = 1;
- * // Output:
- * //a 1
- * //c 1
- *
- * a.value = 2;
- * // Output:
- * //a 2
- * //c 2
- * b.value = 2;
- * // Output:
- * //b 2
- * //c 4
- *
- * a.value = 3;
- * // Output:
- * //a 3
- * //c 5
- *
- * a.value = 3;
- * // Output: nothing
- * ```
- */
-export class Computed<T extends unknown> extends ReactiveItem {
-    /**
-     * Initializes an Atom instance with a given value.
-     * @param {function():T} fn - function that returns the value of the Computed
-     * @param {object} [options] - Options
-     * @param {string} [options.name] - The name of the Computed instance.
-     * @param {((a:T, b:T)=>boolean)|null} [options.compareFunction] - A function that compares two values for equality.
-     * @param {boolean} [options.smartRecompute] - When true, the computed value will be
-     *        recalculated only when the version string of its dependencies changes,
-     *        rather than on every dependency notification. This avoids unnecessary
-     *        recalculations when dependencies change but their final values remain
-     *        the same (e.g., toggling back and forth). Defaults to false.
-     */
-    constructor(fn: () => T, options?: {
-        name?: string;
-        compareFunction?: ((a: T, b: T) => boolean) | null;
-        smartRecompute?: boolean;
-    });
-    /** @type {string} */
-    __cachedDependentsVersionString: string;
-    options: {
-        smartRecompute: boolean;
-    };
-    /**
-     * Checks whether the Computed value needs to be recalculated. A recalculation is needed if the engine's shouldRecalc
-     * property is true, if the engine has an error, or if the version string of the dependencies has changed.
-     * @returns {boolean} true if the Computed value needs to be recalculated, false if it does not.
-     */
-    isStale(): boolean;
-    /**
-     * @param {{untracked?: boolean}} [options] - Optional options. If `untracked` is `false`, the Computed value will be added to the dependencyTracker.
-     * @returns {T} The current value of the Computed value.
-     */
-    getValue(options?: {
-        untracked?: boolean;
-    }): T;
-    /**
-     * Returns the current value of the Computed value.
-     * @returns {T} The current value of the Computed value.
-     */
-    get value(): T;
-    /**
-     * Returns the current cached value of the computed without triggering a recalculation
-     * and without tracking dependencies.
-     *
-     * Unlike the `value` getter, this method does not check if dependencies have changed
-     * and does not recompute the value if it's stale. It simply returns the last
-     * computed value. This is useful for debugging or for accessing the value
-     * without causing side effects (e.g., inside an untracked context).
-     *
-     * If the computed has an error, this method will still return the last cached
-     * value (which may be undefined or a previous value) without rethrowing the error.
-     *
-     * @override
-     * @returns {T} The cached value.
-     *
-     * @example
-     * ```js
-     * const a = atom(1);
-     * const b = computed(() => a.value * 2);
-     *
-     * console.log(b.peekValue()); // 2 (without tracking dependencies)
-     * a.value = 2;
-     * console.log(b.peekValue()); // still 2 (stale, not recomputed)
-     * console.log(b.value);       // 4 (recomputed now)
-     * ```
-     */
-    override peekValue(): T;
-    /**
-     * Returns the current value of the Computed value without tracking it for dependency management.
-     * This is useful when you want to access the value without affecting its reactive state.
-     * @returns {T} The current value of the Computed value.
-     * @example
-     * ```js
-     * const a = atom(0);
-     * const b = atom(0);
-     * const c = computed(() => a.value + 1);
-     * const d = computed(() => c.valueUntracked + b.value);
-     *
-     * d.subscribe(() => {
-     *     console.log(`d = ${d.value}`);
-     * });
-     *
-     * console.log(`c = ${c.value}`);
-     * // Outputs: c = 1
-     * a.value++;
-     * // a = 1
-     * // Outputs: nothing
-     * console.log(`c = ${c.value}`);
-     * // Outputs: c = 2
-     *
-     * b.value++;
-     * // Outputs: d = 3
-     * ```
-     */
-    get valueUntracked(): T;
-
-}
-
-/* From reactives\ReactiveItem.d.ts */
-/**
- * ReactiveItem is the base class for all reactive items. It provides methods for subscribing to changes,
- * getting the current value, and checking for errors.
- * @private
- */
-export class ReactiveItem {
-    /**
-     *
-     * @param {1|2|3|4} type
-     */
-    constructor(type: 1 | 2 | 3 | 4);
-    /** @type {Engine} */
-    engine: Engine;
-    name: string;
-    /**
-     * Subscribes a function to be called whenever the value of this reactive item changes.
-     * @param {(updates: Map<string, UpdateDataRecord>)=>void} fn - The function to be called whenever the value of this reactive item changes.
-     * @param {object} [options] - Optional options.
-     * @param {number} [options.delay] - The delay in milliseconds before the function is called.
-     * @param {AbortSignal} [options.signal] - The signal to abort the subscription.
-     * @returns {()=>void}
-     */
-    subscribe(fn: (updates: Map<string, UpdateDataRecord>) => void, options?: {
-        delay?: number;
-        signal?: AbortSignal;
-    }): () => void;
-    /**
-     * Removes all "change" subscribers. Listeners for "#has-subscribers" and "#no-subscribers" are not removed.
-     */
-    clearSubscribers(): void;
-    /**
-     * Removes all subscribers, including listeners for "#has-subscribers" and "#no-subscribers" events.
-     */
-    clearAllSubscribers(): void;
-    /**
-     * Returns true if there are any subscribers, false otherwise.
-     * @returns {boolean} Whether there are any subscribers.
-     */
-    hasSubscribers(): boolean;
-    /**
-     * Retrieves the current value of the reactive item.
-     * @param {object} [options] - Optional options.
-     * @param {boolean} [options.untracked=false] - If `true`, the value will not be added to the dependencyTracker.
-     * @returns {any} The current value of the reactive item.
-     */
-    getValue(options?: {
-        untracked?: boolean;
-    }): any;
-    /**
-     * Retrieves the current value of the reactive item.
-     * @returns {any} The current value of the reactive item.
-     */
-    peekValue(): any;
-    /**
-     * Returns the last error that occurred while calculating the value of the reactive item,
-     * or null if there is no error.
-     * @returns {Error|null} The last error that occurred, or null if there is no error.
-     */
-    getLastError(): Error | null;
-    /**
-     * Returns true if there has been an error while calculating the value of the reactive item,
-     * false otherwise. This method returns true if the reactive item has been destroyed, if the
-     * reactive item has an error, or if the calculation of the value of the reactive item has
-     * thrown an error.
-     * @returns {boolean} Whether there has been an error while calculating the value of the
-     * reactive item.
-     */
-    hasError(): boolean;
-    /**
-     * Subscribes a function to be called whenever a subscriber is added to the reactive item.
-     * The function is called with no arguments.
-     * @param {function():void} fn - The function to be called.
-     * @returns {()=>void} A function that unsubscribes the given function.
-     */
-    onHasSubscribers(fn: () => void): () => void;
-    /**
-     * Subscribes a function to be called whenever there are no longer any subscribers.
-     * The function is called with no arguments.
-     * @param {function():void} fn - The function to be called.
-     * @returns {()=>void} A function that unsubscribes the given function.
-     */
-    onNoSubscribers(fn: () => void): () => void;
-    /**
-     * Subscribes a function to be called when the reactive item is destroyed.
-     * The function is called with no arguments.
-     * @param {(reactiveItem:ReactiveItem)=>void} fn - The function to be called.
-     * @returns {()=>void} A function that unsubscribes the given function.
-     */
-    onDestroy(fn: (reactiveItem: ReactiveItem) => void): () => void;
-    /**
-     * Destroys the reactive item. This method is useful for cleaning up after a reactive item
-     * that is no longer needed. It calls destroy on the engine of the reactive item, which
-     * removes all dependencies, dependents and subscribers, and marks the engine as destroyed.
-     */
-    destroy(): void;
-    /**
-     * Checks if two values are equal. If the compareFn property is a function, it is used to compare the two values.
-     * If the compareFn property is not a function, the values are compared using the === operator.
-     * If the optional second argument is not provided, the value of the reactive item is used.
-     * @param {any} a - The first value to compare.
-     * @param {any} [b] - The second value to compare. If not provided, the value of the reactive item is used.
-     * @returns {boolean} True if the two values are equal, false otherwise.
-     */
-    equals(a: any, b?: any): boolean;
-    /**
-     * @returns {boolean} True if the reactive item has been destroyed, false otherwise.
-     */
-    get isDestroyed(): boolean;
-}
-
-/* From reactives\ShallowReactive.d.ts */
-/**
- * ShallowReactive is a reactive item that holds a shallow object. It is the base unit of reactive state.
- * It is a shallow reactive object, meaning that it only tracks changes to the properties of the object itself, not its nested properties.
- * @augments ReactiveItem
- * @template {{[key:string]:any}} T
- *  * @example
- * ```js
- * const b = new ShallowReactive({ foo: 1 });
- *
- * let bar = 0;
- *
- * b.subscribe(() => {
- *     bar += 1;
- * });
- *
- * const props = b.value;
- * props.foo = 2;
- *
- * console.log(bar);
- * // Outputs: 1
- * ```
- *
- * @example
- * ```js
- * class A {
- *     foo = 1;
- *
- *     inc() {
- *         this.foo++;
- *     }
- * }
- *
- * let bar = 0;
- * const b = new ShallowReactive(new A(), { name: "b" });
- *
- * b.subscribe(() => {
- *     bar++;
- * });
- *
- * console.log(b.value.foo);
- * // Outputs: 1
- *
- * b.value.foo = 2;
- * console.log(b.value.foo);
- * // Outputs: 2
- *
- * console.log(bar);
- * // Outputs: 1
- *
- * b.value.inc();
- * console.log(b.value.foo);
- * // Outputs: 3
- * console.log(bar);
- * // Outputs: 2
- * ```
- */
-export class ShallowReactive<T extends {
-    [key: string]: any;
-}> extends ReactiveItem {
-    /**
-     * Initializes a ShallowReactive instance with a given value.
-     * @param {T} value - The initial value of the ShallowReactive.
-     * @param {object} [options] - Options.
-     * @param {string} [options.name] - The name of the ShallowReactive.
-     */
-    constructor(value: T, options?: {
-        name?: string;
-    });
-    /**
-     * Retrieves the proxied value of the ShallowReactive. If the engine is destroyed, an error is thrown.
-     * Tracks the ShallowReactive for dependency management.
-     * @param {{untracked?: boolean}} [options] - Optional options. If `untracked` is `false`, the ShallowReactive value will be added to the dependencyTracker.
-     * @returns {T} The proxied value of the ShallowReactive.
-     */
-    getValue(options?: {
-        untracked?: boolean;
-    }): T;
-    /**
-     * Sets the value of the ShallowReactive. If the value is an object, it will be proxied and reactive.
-     * @param {T} value - The new value of the ShallowReactive.
-     */
-    setValue(value: T): void;
-    /**
-     * Sets the value of the ShallowReactive. If the value is an object, it will be proxied and reactive.
-     * @param {T} value - The new value of the ShallowReactive.
-     */
-    set value(value: T);
-    /**
-     * Retrieves the proxied value of the ShallowReactive. If the engine is destroyed, an error is thrown.
-     * Tracks the ShallowReactive for dependency management.
-     * @returns {T} The proxied value of the ShallowReactive.
-     */
-    get value(): T;
-    /**
-     * Returns the raw, unproxied value of the ShallowReactive. This is generally not recommended as it breaks reactivity.
-     * @returns {T} The raw, unproxied value of the ShallowReactive.
-     */
-    getRawValue(): T;
-
-}
-
-/* From services\changedItemsController.d.ts */
-const changedItemsController: ChangedItemsController;
-/**
- * Controller that manages changed reactive items and coordinates subscriber notifications.
- * Handles batching, dependency recalculation, and error aggregation.
- */
-declare class ChangedItemsController {
-    /** @type {Set<ReactiveItem>} */
-    items: Set<ReactiveItem>;
-    /**
-     * Adds a reactive item to the set of changed items.
-     * If not in batch mode, immediately runs subscribers and clears the set.
-     * @param {ReactiveItem} item - The reactive item that changed.
-     */
-    addItem(item: ReactiveItem): void;
-    /**
-     * @param {ReactiveItem} item
-     */
-    removeItem(item: ReactiveItem): void;
-    /**
-     * Removes all items from the changed items set.
-     */
-    clear(): void;
-    /**
-     * Runs all subscribers for the changed items.
-     * Processes dependency trees, recalculates stale computed values,
-     * and invokes subscriber callbacks with update records.
-     * Handles errors and aggregates them if multiple occur.
-     *
-     * The while-loop ensures that any new changes that are added
-     * (via changedItemsController.addItem) during subscriber execution
-     * are processed in the next iteration, preventing lost updates.
-     */
-    runSubscribers(): void;
-}
-export {};
-
-/* From services\dependencyTracker.d.ts */
-/**
- * Executes the specified function and tracks reactive items.
- * Returns a sorted array of used reactive items.
- * @param {Function} fn - The function to execute and track.
- * @param {...any} args - Arguments to pass to the function.
- * @returns {Array<ReactiveItem>} Sorted array of reactive items accessed.
- */
-function getArrayOfUsedReactiveItems(fn: Function, ...args: any[]): Array<ReactiveItem>;
-/**
- * Executes the specified function and tracks reactive items.
- * Returns a Set of used reactive items.
- * @param {Function} fn - The function to execute and track.
- * @param {...any} args - Arguments to pass to the function.
- * @returns {Set<ReactiveItem>} Set of reactive items accessed.
- */
-function getSetOfUsedReactiveItems(fn: Function, ...args: any[]): Set<ReactiveItem>;
-/**
- * The dependencyTracker is a utility instance that monitors reactive items that are used when a computed item is created. It is used
- * to track the dependencies of a computed item, so that it can be recalculated when any of the dependencies change.
- */
-const dependencyTracker: Tracker;
-declare class Tracker {
-    /** @type {object} */
-    ctx: object;
-    /**
-     * Returns the current contents of the tracker's store, which is a set of all reactive items that have been
-     * accessed since the tracker was last turned on. This is useful for debugging and testing purposes.
-     * @returns {Set<ReactiveItem>} The current contents of the tracker's store.
-     */
-    get data(): Set<ReactiveItem>;
-    /**
-     * Returns a sorted array of all reactive items in the tracker's store. The items are sorted by their internal id,
-     * ensuring consistent processing order when notified of changes.
-     * @returns {Array<ReactiveItem>} A sorted array of reactive items.
-     */
-    getAsSortedArray(): Array<ReactiveItem>;
-    /**
-     * Adds a reactive item to the tracker's store if the tracker is turned on. If the tracker is not turned on, this
-     * method does nothing.
-     * @param {ReactiveItem} item - The reactive item to add to the tracker's store.
-     * @param {string} [_key=""]
-     */
-    add(item: ReactiveItem, _key?: string): void;
-    /**
-     *
-     * @param {(reactiveItem:ReactiveItem)=>void} callback
-     * @returns {()=>void}
-     */
-    onAdd(callback: (reactiveItem: ReactiveItem) => void): () => void;
-    /**
-     * Returns whether the tracker is currently turned on or not.
-     * @returns {boolean} true if the tracker is on, false if it is off.
-     */
-    isActive(): boolean;
-    /**
-     * Turns the tracker on and clears its store. If the tracker is already turned on, an error is thrown.
-     * @param {object} [ctx={}] - The context to use when the tracker is turned on.
-     * are tracked. If filter is a function, it is called with each reactive item as its argument, and if it returns false, the
-     * reactive item is not tracked.
-     */
-    enable(ctx?: object): void;
-    /**
-     * Disables the tracker. When the tracker is disabled, it will not watch any set operations and will not report
-     * anything to any registered listeners. The tracker is off by default.
-     */
-    disable(): void;
-
-}
-export {};
-
-/* From services\idService.d.ts */
-const idService: IdService;
-/**
- * A service that generates unique numeric identifiers for reactive items.
- * Ensures deterministic ordering based on creation time.
- */
-declare class IdService {
-    /**
-     * Generates a new unique numeric identifier.
-     * @returns {number} A new unique number.
-     */
-    generateId(): number;
-    /**
-     * Compares two numeric identifiers.
-     * @param {number} a - First identifier.
-     * @param {number} b - Second identifier.
-     * @returns {number} Negative if a < b, positive if a > b, zero if equal.
-     */
-    compareIds(a: number, b: number): number;
-    /**
-     * Resets the counter to zero (useful for testing).
-     */
-    reset(): void;
-
-}
-export {};
-
-/* From services\modeController.d.ts */
-const modeController: ModeControllerService;
-declare class ModeControllerService {
-    isComputing: boolean;
-    untrackMode: boolean;
-    throwErrorInSubscribers: boolean;
-    /** @type {EventEmitterLite<"batchModeStart"|"batchModeEnd"|"beforeBatchModeEnd">} */
-    batchModeEvents: EventEmitterLite<"batchModeStart" | "batchModeEnd" | "beforeBatchModeEnd">;
-    /** @type {EventEmitterLite<"subscribersModeEnd">} */
-    subscribersModeEvents: EventEmitterLite<"subscribersModeEnd">;
-    /**
-     * Subscribes a function to be called whenever the given event is triggered.
-     * @param {"batchModeStart"|"batchModeEnd"|"beforeBatchModeEnd"} event - The event to subscribe to.
-     * @param {function():void} callback - The function to be called.
-     * @returns {()=>void} A function that unsubscribes the given function.
-     */
-    on(event: "batchModeStart" | "batchModeEnd" | "beforeBatchModeEnd", callback: () => void): () => void;
-    /**
-     * Returns true if currently inside a batch (batch depth > 0).
-     * @returns {boolean}
-     */
-    get batchMode(): boolean;
-    /**
-     * Enters a batch mode. Increments the batch depth.
-     * Emits "batchModeStart" when entering the first batch.
-     */
-    enterBatch(): void;
-    /**
-     * Exits a batch mode. Decrements the batch depth.
-     * If exiting the last batch, emits "beforeBatchModeEnd" and then "batchModeEnd".
-     */
-    exitBatch(): void;
-    /**
-     * Retrieves whether any subscribers are currently running.
-     * @returns {boolean}
-     */
-    get subscribersMode(): boolean;
-    /**
-     * Sets the state to indicate that subscribers are currently running.
-     */
-    startSubscribersMode(): void;
-    /**
-     * Sets the state to indicate that no subscribers are currently running.
-     */
-    endSubscribersMode(): void;
-    /**
-     * Subscribes a function to be called once after all subscribers have finished running.
-     * @param {Function} callback
-     */
-    runAfterSubscribers(callback: Function): void;
-
-}
-
-export {};
+export { }

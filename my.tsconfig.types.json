@@ -4,6 +4,7 @@
         "checkJs": true,
         "resolveJsonModule": true,
         "emitDeclarationOnly": true,
+        "stripInternal": true,
         "declaration": true,
         "outDir": "./dist/types-temp",
         "rootDir": ".",
@@ -12,6 +13,6 @@
         "skipLibCheck": true,
         "types": []
     },
-    "include": ["src/types.d.ts", "src/**/*.js"],
-    "exclude": ["node_modules/*"]
+    "include": ["src/types.js", "src/**/*.js"],
+    "exclude": ["node_modules/*", "tests/*"]
 }

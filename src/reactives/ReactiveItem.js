@@ -2,66 +2,126 @@
 
 import { Engine } from '../core/Engine.js';
 import { compareAny, getError } from '../helpers/tools.js';
-import { dependencyTracker } from '../services/dependencyTracker.js';
 
 /**
- * ReactiveItem is the base class for all reactive items. It provides methods for subscribing to changes,
- * getting the current value, and checking for errors.
- * @private
+ * ReactiveItem is the base class for all reactive items. It provides methods
+ * for subscribing to changes, reading values, and lifecycle management.
+ *
+ * Concrete subclasses are `Atom`, `Computed`, `Collection`, and
+ * `ShallowReactive`. User code rarely instantiates this class directly; use
+ * the factory functions exported from the package root instead.
+ *
+ * @public
  */
 class ReactiveItem {
-    /** @type {Engine} */
+    /**
+     * The reactive engine driving this item. Internal coordination only.
+     * @type {Engine}
+     * @internal
+     */
     engine;
 
+    /**
+     * Debug name assigned at construction. Used in error messages and
+     * DevTools listings. Empty string when not set.
+     * @type {string}
+     */
     name = '';
 
     /**
+     * Local path assigned by the immediate container. Top-level items get a
+     * path equal to their key in the root store; standalone items keep `''`.
+     * @type {string}
+     */
+    path = '';
+
+    /**
+     * Creates a new reactive item. Subclasses pass their own type tag.
      *
-     * @param {1|2|3|4} type
+     * @param {import('../types.js').ReactiveItemType} type
      */
     constructor(type) {
         this.engine = new Engine(this, type);
     }
 
     /**
-     * Subscribes a function to be called whenever the value of this reactive item changes.
-     * @param {(updates: Map<string, import('../types.d.ts').UpdateDataRecord>)=>void} fn - The function to be called whenever the value of this reactive item changes.
-     * @param {object} [options] - Optional options.
-     * @param {number} [options.delay] - The delay in milliseconds before the function is called.
-     * @param {AbortSignal} [options.signal] - The signal to abort the subscription.
-     * @returns {()=>void}
+     * The numeric type tag of this item: `1` for `Atom`, `2` for `Computed`,
+     * `3` for `Collection`, `4` for `ShallowReactive`.
+     *
+     * @returns {import('../types.js').ReactiveItemType}
+     */
+    get type() {
+        return this.engine.type;
+    }
+
+    /**
+     * Monotonic version counter, bumped on every effective change.
+     *
+     * Useful as a stable token for `useSyncExternalStore` and for cache
+     * invalidation: comparing two `getVersion()` results tells you whether
+     * the value changed, without reading it.
+     *
+     * @returns {number}
+     */
+    getVersion() {
+        return this.engine.version;
+    }
+
+    /**
+     * Subscribes a function to changes of this item.
+     *
+     * The callback receives a `Map` of property paths to
+     * `UpdateDataRecord` instances. It is invoked once per batch of
+     * effective changes.
+     *
+     * @param {(updates: Map<string, import('../core/UpdateDataRecord.js').UpdateDataRecord>) => void} fn
+     * @param {object} [options]
+     * @param {number} [options.delay] - Debounce delay in milliseconds.
+     * @param {AbortSignal} [options.signal] - Cancels the subscription when aborted.
+     * @returns {() => void} An unsubscribe function.
      */
     subscribe(fn, options) {
         return this.engine.subscribeController.subscribe(fn, options);
     }
 
     /**
-     * Removes all "change" subscribers. Listeners for "#has-subscribers" and "#no-subscribers" are not removed.
+     * Removes all change subscribers, keeping lifecycle listeners
+     * registered via `onHasSubscribers`, `onNoSubscribers`, and
+     * `onDestroy`.
      */
     clearSubscribers() {
         this.engine.subscribeController.clearSubscribers();
     }
 
     /**
-     * Removes all subscribers, including listeners for "#has-subscribers" and "#no-subscribers" events.
+     * Removes all subscribers, including lifecycle listeners.
+     *
+     * After this call, the item no longer invokes any user callbacks until
+     * a new subscription is made.
      */
     clearAllSubscribers() {
         this.engine.subscribeController.clearAllSubscribers();
     }
 
     /**
-     * Returns true if there are any subscribers, false otherwise.
-     * @returns {boolean} Whether there are any subscribers.
+     * Returns `true` if at least one change subscriber is currently
+     * registered.
+     *
+     * @returns {boolean}
      */
     hasSubscribers() {
         return this.engine.subscribeController.hasSubscribers();
     }
 
     /**
-     * Retrieves the current value of the reactive item.
-     * @param {object} [options] - Optional options.
-     * @param {boolean} [options.untracked=false] - If `true`, the value will not be added to the dependencyTracker.
-     * @returns {any} The current value of the reactive item.
+     * Reads the current value, tracking the item as a dependency unless
+     * `untracked` is `true`.
+     *
+     * Throws if the item has been destroyed.
+     *
+     * @param {object} [options]
+     * @param {boolean} [options.untracked=false]
+     * @returns {any}
      */
     getValue(options) {
         if (this.engine.isDestroyed) {
@@ -71,34 +131,42 @@ class ReactiveItem {
         const _options = Object.assign({ untracked: false }, options);
 
         if (_options.untracked === false) {
-            dependencyTracker.add(this);
+            this.engine.context.dependencyTracker.add(this);
         }
     }
 
     /**
-     * Retrieves the current value of the reactive item.
-     * @returns {any} The current value of the reactive item.
+     * Returns the current value without registering a dependency and
+     * without triggering recalculation for `Computed`.
+     *
+     * For `Computed`, this returns the last cached value even if it is
+     * stale. To force a fresh value, use `.value` or `.getValue()`.
+     *
+     * @returns {any}
      */
     peekValue() {
         return this.getValue({ untracked: true });
     }
 
     /**
-     * Returns the last error that occurred while calculating the value of the reactive item,
-     * or null if there is no error.
-     * @returns {Error|null} The last error that occurred, or null if there is no error.
+     * Returns the last error produced by this item, or `null`.
+     *
+     * For `Computed`, this is the error thrown during the most recent
+     * evaluation. The error is preserved until a dependency changes.
+     *
+     * @returns {Error | null}
      */
     getLastError() {
         return this.engine.error;
     }
 
     /**
-     * Returns true if there has been an error while calculating the value of the reactive item,
-     * false otherwise. This method returns true if the reactive item has been destroyed, if the
-     * reactive item has an error, or if the calculation of the value of the reactive item has
-     * thrown an error.
-     * @returns {boolean} Whether there has been an error while calculating the value of the
-     * reactive item.
+     * Returns `true` if reading the value currently throws or has thrown.
+     *
+     * For `Computed`, this forces a read to determine whether the current
+     * dependencies are valid.
+     *
+     * @returns {boolean}
      */
     hasError() {
         try {
@@ -111,30 +179,40 @@ class ReactiveItem {
     }
 
     /**
-     * Subscribes a function to be called whenever a subscriber is added to the reactive item.
-     * The function is called with no arguments.
-     * @param {function():void} fn - The function to be called.
-     * @returns {()=>void} A function that unsubscribes the given function.
+     * Registers a callback that fires when the first change subscriber is
+     * added.
+     *
+     * Useful for lazy initialisation: start expensive work only when
+     * somebody actually listens.
+     *
+     * @param {() => void} fn
+     * @returns {() => void} An unsubscribe function.
      */
     onHasSubscribers(fn) {
         return this.engine.subscribeController.onHasSubscribers(fn);
     }
 
     /**
-     * Subscribes a function to be called whenever there are no longer any subscribers.
-     * The function is called with no arguments.
-     * @param {function():void} fn - The function to be called.
-     * @returns {()=>void} A function that unsubscribes the given function.
+     * Registers a callback that fires when the last change subscriber is
+     * removed.
+     *
+     * Useful for cleanup: stop timers or subscriptions that only make sense
+     * while somebody is listening.
+     *
+     * @param {() => void} fn
+     * @returns {() => void} An unsubscribe function.
      */
     onNoSubscribers(fn) {
         return this.engine.subscribeController.onNoSubscribers(fn);
     }
 
     /**
-     * Subscribes a function to be called when the reactive item is destroyed.
-     * The function is called with no arguments.
-     * @param {(reactiveItem:ReactiveItem)=>void} fn - The function to be called.
-     * @returns {()=>void} A function that unsubscribes the given function.
+     * Registers a callback that fires when the item is destroyed.
+     *
+     * The callback receives the destroyed item as its only argument.
+     *
+     * @param {(reactiveItem: ReactiveItem) => void} fn
+     * @returns {() => void} An unsubscribe function.
      */
     onDestroy(fn) {
         const that = this;
@@ -142,26 +220,31 @@ class ReactiveItem {
             fn(that);
         };
 
-        const unsubscriber = this.engine.subscribeController.onDestroy(callback);
-        return unsubscriber;
+        return this.engine.subscribeController.onDestroy(callback);
     }
 
     /**
-     * Destroys the reactive item. This method is useful for cleaning up after a reactive item
-     * that is no longer needed. It calls destroy on the engine of the reactive item, which
-     * removes all dependencies, dependents and subscribers, and marks the engine as destroyed.
+     * Destroys the item and tears down its dependency graph.
+     *
+     * All subscribers are detached, all dependencies are released, and any
+     * further read or write throws. Idempotent — subsequent calls are
+     * no-ops.
      */
     destroy() {
         this.engine.destroy();
     }
 
     /**
-     * Checks if two values are equal. If the compareFn property is a function, it is used to compare the two values.
-     * If the compareFn property is not a function, the values are compared using the === operator.
-     * If the optional second argument is not provided, the value of the reactive item is used.
-     * @param {any} a - The first value to compare.
-     * @param {any} [b] - The second value to compare. If not provided, the value of the reactive item is used.
-     * @returns {boolean} True if the two values are equal, false otherwise.
+     * Returns `true` if the two values are considered equal by this item's
+     * comparator.
+     *
+     * When the second argument is omitted, it is compared against the
+     * item's current value. Uses the custom `compareFunction` if one was
+     * provided at construction, otherwise falls back to shallow equality.
+     *
+     * @param {any} a
+     * @param {any} [b]
+     * @returns {boolean}
      */
     equals(a, b) {
         if (b === undefined) {
@@ -176,10 +259,42 @@ class ReactiveItem {
     }
 
     /**
-     * @returns {boolean} True if the reactive item has been destroyed, false otherwise.
+     * Returns `true` if `destroy()` has been called.
+     *
+     * After destruction, reads and writes throw. This getter is the only
+     * operation that remains safe to call.
+     *
+     * @returns {boolean}
      */
     get isDestroyed() {
         return this.engine.isDestroyed;
+    }
+
+    /**
+     * Returns a plain data representation suitable for storage or transport.
+     *
+     * The base implementation returns `null`, signalling that the item must
+     * not be persisted. `Atom`, `Collection`, `ShallowReactive`, and `Store`
+     * override this method. `Computed` deliberately keeps the `null`
+     * default — derived state is recalculated on hydration, never restored.
+     *
+     * @returns {any}
+     */
+    serialize() {
+        return null;
+    }
+
+    /**
+     * Restores state previously produced by `serialize()`.
+     *
+     * The base implementation is a no-op. Subclasses override this to apply
+     * the given data. Implementations must be idempotent and must not throw
+     * on malformed input — silently ignore what they cannot apply.
+     *
+     * @param {any} _data
+     */
+    hydrate(_data) {
+        // no-op by default
     }
 }
 

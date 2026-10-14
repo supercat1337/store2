@@ -5,61 +5,31 @@ import { clone } from '../helpers/tools.js';
 import { ReactiveItem } from './ReactiveItem.js';
 
 /**
- * Atom is a reactive item that holds a value. It is the base unit of reactive state.
+ * Atom is a reactive item that holds a single value.
+ *
+ * It is the base unit of reactive state — a single mutable cell. Reads
+ * inside a tracked scope (a `Computed` body, an `autorun`, or a `reaction`)
+ * register a dependency; writes schedule a change notification.
+ *
+ * Objects assigned to an Atom are shallow-cloned, so mutating nested
+ * properties does not trigger reactivity. Use `Collection` or
+ * `ShallowReactive` for structures that need deep updates.
+ *
  * @augments ReactiveItem
  * @template T
- * @example
- * ```js
- * const a = new Atom(0); // same as const a = atom(0);
- * const b = new Atom(0);
- *
- * const c = new Computed(() => a.value + b.value);
- *
- * c.subscribe(() => {
- *     console.log(c.name, c.value);
- * });
- *
- * a.subscribe(() => {
- *     console.log(a.name, a.value);
- * });
- *
- * b.subscribe(() => {
- *     console.log(b.name, b.value);
- * });
- *
- * a.value = 1;
- * // Output:
- * //a 1
- * //c 1
- *
- * a.value = 2;
- * // Output:
- * //a 2
- * //c 2
- * b.value = 2;
- * // Output:
- * //b 2
- * //c 4
- *
- * a.value = 3;
- * // Output:
- * //a 3
- * //c 5
- *
- * a.value = 3;
- * // Output: nothing
- * ```
+ * @public
  */
 class Atom extends ReactiveItem {
     /** @type {T} */
     #currentValue;
 
     /**
-     * Initializes an Atom instance with a given value.
-     * @param {T} value - The initial value of the Atom.
-     * @param {object} [options] - Options.
-     * @param {string} [options.name] - The name of the Atom.
-     * @param {((a:T, b:T)=>boolean)|null} [options.compareFunction] - A function that compares two values for equality.
+     * Creates a new Atom with the given initial value.
+     *
+     * @param {T} value - The initial value.
+     * @param {object} [options]
+     * @param {string} [options.name] - Debug name used in error messages.
+     * @param {((a: T, b: T) => boolean) | null} [options.compareFunction] - Custom equality function. Defaults to shallow comparison.
      */
     constructor(
         value,
@@ -81,11 +51,6 @@ class Atom extends ReactiveItem {
         this.#currentValue = value;
     }
 
-    /**
-     * Sets the value of the Atom. If the new value is the same as the current value, no action is taken.
-     * Updates the current value to the new value if they are different.
-     * @param {T} value - The new value to set for the Atom.
-     */
     set value(value) {
         if (value instanceof ReactiveItem) {
             throw new Error(
@@ -94,7 +59,6 @@ class Atom extends ReactiveItem {
         }
 
         const engine = this.engine;
-
         engine.prepareSetValue();
 
         if (this.equals(value, this.#currentValue)) {
@@ -111,10 +75,14 @@ class Atom extends ReactiveItem {
     }
 
     /**
-     * Retrieves the current value of the Atom. If the engine is destroyed, an error is thrown.
-     * Tracks the Atom for dependency management.
-     * @param {{untracked?: boolean}} [options] - Optional options. If `untracked` is `false`, the Atom value will be added to the dependencyTracker.
-     * @returns {T} The current value of the Atom.
+     * Returns the current value.
+     *
+     * When `options.untracked` is `false` (the default), registers this
+     * atom as a dependency of the enclosing tracked scope. Pass
+     * `{ untracked: true }` to read without creating a dependency.
+     *
+     * @param {{ untracked?: boolean }} [options]
+     * @returns {T}
      */
     getValue(options) {
         super.getValue(options);
@@ -122,40 +90,55 @@ class Atom extends ReactiveItem {
     }
 
     /**
-     * Returns the current value of the Atom. If the engine is destroyed, an error is thrown.
-     * @returns {T} The current value of the Atom.
+     * The current value.
+     *
+     * Reading this property inside a tracked scope registers a dependency.
+     * Writing it schedules a change if the new value differs from the
+     * current one.
+     *
+     * @returns {T}
      */
     get value() {
         return this.getValue();
     }
 
     /**
-     * Returns the current value of the Atom without tracking it for dependency management.
-     * This is useful when you want to access the value without affecting its reactive state.
-     * @returns {T} The current value of the Atom.
-     * @example
-     * ```js
-     * const a = atom(0);
-     * const b = atom(0);
-     * const c = computed(() => a.value + b.valueUntracked, {
-     *     name: "c",
-     * });
+     * Returns the current value without registering a dependency.
      *
-     * c.subscribe(() => {
-     *     console.log(c.name, c.value);
-     * });
-     * console.log("change b.value");
-     * b.value++;
-     * b.value++;
-     * console.log("change a.value");
-     * a.value++;
-     * // Output: c 3
-     * a.value++;
-     * // Output: c 4
-     * ```
+     * Shorthand for `getValue({ untracked: true })`. Useful when you need
+     * to peek at an atom inside a `Computed` or `autorun` without making it
+     * re-run when the atom changes.
+     *
+     * @returns {T}
      */
     get valueUntracked() {
         return this.getValue({ untracked: true });
+    }
+
+    /**
+     * Returns a serializable representation of the current value.
+     *
+     * @returns {any}
+     */
+    serialize() {
+        return {
+            type: 'atom',
+            value: this.#currentValue,
+        };
+    }
+
+    /**
+     * Applies data previously produced by `serialize()`.
+     *
+     * Silently ignores malformed input.
+     *
+     * @param {any} data
+     */
+    hydrate(data) {
+        if (data && typeof data === 'object' && 'value' in data) {
+            // @ts-ignore
+            this.value = data.value;
+        }
     }
 }
 
