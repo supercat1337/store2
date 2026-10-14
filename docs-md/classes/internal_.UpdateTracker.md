@@ -37,11 +37,11 @@ Manages the `updates` map and handles batch change detection.
 
 #### Parameters
 
-| Name | Type | Description |
-| :------ | :------ | :------ |
-| `updates` | `Map`\<`string`, [`UpdateDataRecord`](internal_.UpdateDataRecord.md)\> | The engine's updates map. |
-| `reactiveItem` | [`ReactiveItem`](ReactiveItem.md) | The owning reactive item. |
-| `engine` | [`Engine`](internal_.Engine.md) | The owning engine (for version and batch snapshot access). |
+| Name | Type |
+| :------ | :------ |
+| `updates` | `Map`\<`string`, [`UpdateDataRecord`](internal_.UpdateDataRecord.md)\> |
+| `reactiveItem` | [`ReactiveItem`](ReactiveItem.md) |
+| `engine` | [`Engine`](Engine.md) |
 
 #### Returns
 
@@ -49,7 +49,7 @@ Manages the `updates` map and handles batch change detection.
 
 #### Defined in
 
-src/core/UpdateTracker.js:26
+[src/core/UpdateTracker.js:28](https://github.com/supercat1337/store2/blob/16b98b1eeb525c194544e8c7935c505c824c9de2/src/core/UpdateTracker.js#L28)
 
 ## Properties
 
@@ -59,17 +59,17 @@ src/core/UpdateTracker.js:26
 
 #### Defined in
 
-src/core/UpdateTracker.js:17
+[src/core/UpdateTracker.js:18](https://github.com/supercat1337/store2/blob/16b98b1eeb525c194544e8c7935c505c824c9de2/src/core/UpdateTracker.js#L18)
 
 ___
 
 ### #engine
 
-• `Private` **#engine**: [`Engine`](internal_.Engine.md)
+• `Private` **#engine**: [`Engine`](Engine.md)
 
 #### Defined in
 
-src/core/UpdateTracker.js:19
+[src/core/UpdateTracker.js:21](https://github.com/supercat1337/store2/blob/16b98b1eeb525c194544e8c7935c505c824c9de2/src/core/UpdateTracker.js#L21)
 
 ___
 
@@ -79,7 +79,7 @@ ___
 
 #### Defined in
 
-src/core/UpdateTracker.js:15
+[src/core/UpdateTracker.js:15](https://github.com/supercat1337/store2/blob/16b98b1eeb525c194544e8c7935c505c824c9de2/src/core/UpdateTracker.js#L15)
 
 ___
 
@@ -89,7 +89,7 @@ ___
 
 #### Defined in
 
-src/core/UpdateTracker.js:13
+[src/core/UpdateTracker.js:12](https://github.com/supercat1337/store2/blob/16b98b1eeb525c194544e8c7935c505c824c9de2/src/core/UpdateTracker.js#L12)
 
 ## Methods
 
@@ -97,14 +97,14 @@ src/core/UpdateTracker.js:13
 
 ▸ **#recordChange**(`property`, `oldValue`): `void`
 
-Records a change attempt. In batch mode, stores the original value in a snapshot.
+In batch mode, stores the original value in a snapshot.
 
 #### Parameters
 
-| Name | Type | Description |
-| :------ | :------ | :------ |
-| `property` | `string` | The property key. |
-| `oldValue` | `any` | The value before the change. |
+| Name | Type |
+| :------ | :------ |
+| `property` | `string` |
+| `oldValue` | `any` |
 
 #### Returns
 
@@ -112,7 +112,7 @@ Records a change attempt. In batch mode, stores the original value in a snapshot
 
 #### Defined in
 
-src/core/UpdateTracker.js:37
+[src/core/UpdateTracker.js:39](https://github.com/supercat1337/store2/blob/16b98b1eeb525c194544e8c7935c505c824c9de2/src/core/UpdateTracker.js#L39)
 
 ___
 
@@ -124,25 +124,23 @@ Adds an update record if the change is effective.
 
 #### Parameters
 
-| Name | Type | Description |
-| :------ | :------ | :------ |
-| `property` | `string` | The property key. |
-| `type` | ``"set"`` \| ``"delete"`` | The operation type. |
-| `oldValue` | `any` | The previous value (immediate). |
-| `newValue` | `any` | The new value. |
-| `compareFn` | [`CompareFunction`](../modules/internal_.md#comparefunction) | Equality function. |
-| `notifyDependentsCallback` | () => `void` | Callback to notify dependents of a change. |
-| `addToChangedItemsCallback` | () => `void` | Callback to add the item to the changed items controller. |
+| Name | Type |
+| :------ | :------ |
+| `property` | `string` |
+| `type` | ``"set"`` \| ``"delete"`` |
+| `oldValue` | `any` |
+| `newValue` | `any` |
+| `compareFn` | [`CompareFunction`](../modules/internal_.md#comparefunction) |
+| `notifyDependentsCallback` | () => `void` |
+| `addToChangedItemsCallback` | () => `void` |
 
 #### Returns
 
 `boolean`
 
-True if an update was added.
-
 #### Defined in
 
-src/core/UpdateTracker.js:79
+[src/core/UpdateTracker.js:85](https://github.com/supercat1337/store2/blob/16b98b1eeb525c194544e8c7935c505c824c9de2/src/core/UpdateTracker.js#L85)
 
 ___
 
@@ -150,24 +148,21 @@ ___
 
 ▸ **checkChangesTemporary**(`getCurrentValue`): `boolean`
 
-Processes temporary changes after batch ends.
-Removes updates for properties that reverted to original values.
+Removes updates for properties that reverted to their original values.
 
 #### Parameters
 
-| Name | Type | Description |
-| :------ | :------ | :------ |
-| `getCurrentValue` | (`prop`: `string`) => `any` | Function to get current value for a property. |
+| Name | Type |
+| :------ | :------ |
+| `getCurrentValue` | (`prop`: `string`) => `any` |
 
 #### Returns
 
 `boolean`
 
-True if any changes remain.
-
 #### Defined in
 
-src/core/UpdateTracker.js:160
+[src/core/UpdateTracker.js:157](https://github.com/supercat1337/store2/blob/16b98b1eeb525c194544e8c7935c505c824c9de2/src/core/UpdateTracker.js#L157)
 
 ___
 
@@ -183,7 +178,7 @@ Clears all pending updates and resets the batch snapshot.
 
 #### Defined in
 
-src/core/UpdateTracker.js:146
+[src/core/UpdateTracker.js:144](https://github.com/supercat1337/store2/blob/16b98b1eeb525c194544e8c7935c505c824c9de2/src/core/UpdateTracker.js#L144)
 
 ___
 
@@ -191,15 +186,13 @@ ___
 
 ▸ **hasUpdates**(): `boolean`
 
-Checks if there are any pending updates.
-
 #### Returns
 
 `boolean`
 
 #### Defined in
 
-src/core/UpdateTracker.js:139
+[src/core/UpdateTracker.js:137](https://github.com/supercat1337/store2/blob/16b98b1eeb525c194544e8c7935c505c824c9de2/src/core/UpdateTracker.js#L137)
 
 ___
 
@@ -207,16 +200,17 @@ ___
 
 ▸ **isEffectiveChange**(`property`, `oldValue`, `newValue`, `compareFn`): `boolean`
 
-Determines if a change is effective (i.e., not reverted) considering batch snapshots.
+Determines whether a change is effective (i.e. not reverted) considering
+batch snapshots.
 
 #### Parameters
 
-| Name | Type | Description |
-| :------ | :------ | :------ |
-| `property` | `string` | The property key. |
-| `oldValue` | `any` | The immediate previous value. |
-| `newValue` | `any` | The new value. |
-| `compareFn` | [`CompareFunction`](../modules/internal_.md#comparefunction) | Equality function. |
+| Name | Type |
+| :------ | :------ |
+| `property` | `string` |
+| `oldValue` | `any` |
+| `newValue` | `any` |
+| `compareFn` | [`CompareFunction`](../modules/internal_.md#comparefunction) |
 
 #### Returns
 
@@ -224,4 +218,4 @@ Determines if a change is effective (i.e., not reverted) considering batch snaps
 
 #### Defined in
 
-src/core/UpdateTracker.js:54
+[src/core/UpdateTracker.js:57](https://github.com/supercat1337/store2/blob/16b98b1eeb525c194544e8c7935c505c824c9de2/src/core/UpdateTracker.js#L57)

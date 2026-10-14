@@ -52,7 +52,7 @@ Handles adding/removing dependencies and dependents, and propagating messages th
 
 #### Defined in
 
-src/core/DependencyGraph.js:22
+[src/core/DependencyGraph.js:22](https://github.com/supercat1337/store2/blob/16b98b1eeb525c194544e8c7935c505c824c9de2/src/core/DependencyGraph.js#L22)
 
 ## Properties
 
@@ -62,7 +62,7 @@ src/core/DependencyGraph.js:22
 
 #### Defined in
 
-src/core/DependencyGraph.js:11
+[src/core/DependencyGraph.js:11](https://github.com/supercat1337/store2/blob/16b98b1eeb525c194544e8c7935c505c824c9de2/src/core/DependencyGraph.js#L11)
 
 ___
 
@@ -72,7 +72,7 @@ ___
 
 #### Defined in
 
-src/core/DependencyGraph.js:13
+[src/core/DependencyGraph.js:13](https://github.com/supercat1337/store2/blob/16b98b1eeb525c194544e8c7935c505c824c9de2/src/core/DependencyGraph.js#L13)
 
 ___
 
@@ -82,7 +82,7 @@ ___
 
 #### Defined in
 
-src/core/DependencyGraph.js:15
+[src/core/DependencyGraph.js:15](https://github.com/supercat1337/store2/blob/16b98b1eeb525c194544e8c7935c505c824c9de2/src/core/DependencyGraph.js#L15)
 
 ## Methods
 
@@ -104,7 +104,7 @@ Adds multiple dependencies, sorted by id, and registers this reactive item as a 
 
 #### Defined in
 
-src/core/DependencyGraph.js:42
+[src/core/DependencyGraph.js:42](https://github.com/supercat1337/store2/blob/16b98b1eeb525c194544e8c7935c505c824c9de2/src/core/DependencyGraph.js#L42)
 
 ___
 
@@ -126,7 +126,7 @@ Adds a single dependency.
 
 #### Defined in
 
-src/core/DependencyGraph.js:32
+[src/core/DependencyGraph.js:32](https://github.com/supercat1337/store2/blob/16b98b1eeb525c194544e8c7935c505c824c9de2/src/core/DependencyGraph.js#L32)
 
 ___
 
@@ -150,7 +150,7 @@ True if the dependent was added (i.e., not already present).
 
 #### Defined in
 
-src/core/DependencyGraph.js:69
+[src/core/DependencyGraph.js:69](https://github.com/supercat1337/store2/blob/16b98b1eeb525c194544e8c7935c505c824c9de2/src/core/DependencyGraph.js#L69)
 
 ___
 
@@ -166,7 +166,7 @@ Clears the graph (removes all dependencies and dependents).
 
 #### Defined in
 
-src/core/DependencyGraph.js:157
+[src/core/DependencyGraph.js:157](https://github.com/supercat1337/store2/blob/16b98b1eeb525c194544e8c7935c505c824c9de2/src/core/DependencyGraph.js#L157)
 
 ___
 
@@ -182,7 +182,7 @@ Returns all dependents of this reactive item (direct and indirect).
 
 #### Defined in
 
-src/core/DependencyGraph.js:81
+[src/core/DependencyGraph.js:81](https://github.com/supercat1337/store2/blob/16b98b1eeb525c194544e8c7935c505c824c9de2/src/core/DependencyGraph.js#L81)
 
 ___
 
@@ -198,7 +198,7 @@ Returns sorted array of deep dependents.
 
 #### Defined in
 
-src/core/DependencyGraph.js:103
+[src/core/DependencyGraph.js:103](https://github.com/supercat1337/store2/blob/16b98b1eeb525c194544e8c7935c505c824c9de2/src/core/DependencyGraph.js#L103)
 
 ___
 
@@ -223,7 +223,7 @@ Notifies all dependencies of a message.
 
 #### Defined in
 
-src/core/DependencyGraph.js:126
+[src/core/DependencyGraph.js:126](https://github.com/supercat1337/store2/blob/16b98b1eeb525c194544e8c7935c505c824c9de2/src/core/DependencyGraph.js#L126)
 
 ___
 
@@ -248,7 +248,7 @@ Notifies all dependents of a message.
 
 #### Defined in
 
-src/core/DependencyGraph.js:114
+[src/core/DependencyGraph.js:114](https://github.com/supercat1337/store2/blob/16b98b1eeb525c194544e8c7935c505c824c9de2/src/core/DependencyGraph.js#L114)
 
 ___
 
@@ -270,7 +270,7 @@ Removes a dependent from the dependents set.
 
 #### Defined in
 
-src/core/DependencyGraph.js:60
+[src/core/DependencyGraph.js:60](https://github.com/supercat1337/store2/blob/16b98b1eeb525c194544e8c7935c505c824c9de2/src/core/DependencyGraph.js#L60)
 
 ___
 
@@ -292,4 +292,4 @@ Updates the dependency set to a new set.
 
 #### Defined in
 
-src/core/DependencyGraph.js:137
+[src/core/DependencyGraph.js:137](https://github.com/supercat1337/store2/blob/16b98b1eeb525c194544e8c7935c505c824c9de2/src/core/DependencyGraph.js#L137)

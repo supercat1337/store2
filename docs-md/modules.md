@@ -13,13 +13,22 @@
 - [Atom](classes/Atom.md)
 - [Collection](classes/Collection.md)
 - [Computed](classes/Computed.md)
+- [Engine](classes/Engine.md)
 - [ReactiveItem](classes/ReactiveItem.md)
 - [ReactiveList](classes/ReactiveList.md)
 - [ShallowReactive](classes/ShallowReactive.md)
 - [Store](classes/Store.md)
+- [Store2Context](classes/Store2Context.md)
+
+### Variables
+
+- [PLUGIN\_API\_VERSION](modules.md#plugin_api_version)
+- [SNAPSHOT\_VERSION](modules.md#snapshot_version)
+- [defaultContext](modules.md#defaultcontext)
 
 ### Functions
 
+- [action](modules.md#action)
 - [atom](modules.md#atom)
 - [autorun](modules.md#autorun)
 - [batch](modules.md#batch)
@@ -28,10 +37,12 @@
 - [compareAny](modules.md#compareany)
 - [comparePlainObjects](modules.md#compareplainobjects)
 - [computed](modules.md#computed)
+- [createStore2Context](modules.md#createstore2context)
 - [debounce](modules.md#debounce)
 - [extendObservable](modules.md#extendobservable)
 - [fromPromise](modules.md#frompromise)
 - [getAllPropertyDescriptors](modules.md#getallpropertydescriptors)
+- [getCurrentContext](modules.md#getcurrentcontext)
 - [getError](modules.md#geterror)
 - [getItemNamesFromSet](modules.md#getitemnamesfromset)
 - [getNow](modules.md#getnow)
@@ -41,6 +52,8 @@
 - [makeObservable](modules.md#makeobservable)
 - [reaction](modules.md#reaction)
 - [runInAction](modules.md#runinaction)
+- [runWithContext](modules.md#runwithcontext)
+- [runWithContextAsync](modules.md#runwithcontextasync)
 - [shallowReactive](modules.md#shallowreactive)
 - [sleep](modules.md#sleep)
 - [sortReactiveItems](modules.md#sortreactiveitems)
@@ -48,14 +61,81 @@
 - [waitUntil](modules.md#waituntil)
 - [when](modules.md#when)
 
+## Variables
+
+### PLUGIN\_API\_VERSION
+
+• `Const` **PLUGIN\_API\_VERSION**: ``1``
+
+Plugin API version. Bumped whenever the plugin hook contract changes in
+a way that existing plugins cannot survive unchanged. Plugins that
+declare an `apiVersion` are rejected if it does not match.
+
+#### Defined in
+
+[src/core/context.js:26](https://github.com/supercat1337/store2/blob/16b98b1eeb525c194544e8c7935c505c824c9de2/src/core/context.js#L26)
+
+___
+
+### SNAPSHOT\_VERSION
+
+• `Const` **SNAPSHOT\_VERSION**: ``1``
+
+Current snapshot format version.
+
+#### Defined in
+
+[src/core/context.js:19](https://github.com/supercat1337/store2/blob/16b98b1eeb525c194544e8c7935c505c824c9de2/src/core/context.js#L19)
+
+___
+
+### defaultContext
+
+• `Const` **defaultContext**: [`Store2Context`](classes/Store2Context.md)
+
+The default context adopts the process-wide service singletons so that
+legacy code paths that import them directly continue to observe the same
+state as the context-aware engine.
+
+#### Defined in
+
+[src/core/context.js:628](https://github.com/supercat1337/store2/blob/16b98b1eeb525c194544e8c7935c505c824c9de2/src/core/context.js#L628)
+
 ## Functions
+
+### action
+
+▸ **action**(`name`, `fn`, `payload?`): `Promise`\<`any`\>
+
+Runs `fn` as a named, optionally asynchronous action. Middleware installed
+on the current context is applied around the body.
+
+#### Parameters
+
+| Name | Type |
+| :------ | :------ |
+| `name` | `string` |
+| `fn` | (`action`: [`ActionInfo`](interfaces/internal_.ActionInfo.md)) => `any` |
+| `payload?` | `any` |
+
+#### Returns
+
+`Promise`\<`any`\>
+
+#### Defined in
+
+[src/api/api.js:360](https://github.com/supercat1337/store2/blob/16b98b1eeb525c194544e8c7935c505c824c9de2/src/api/api.js#L360)
+
+___
 
 ### atom
 
 ▸ **atom**\<`T`\>(`value`, `options?`): [`Atom`](classes/Atom.md)\<`T`\>
 
-Creates a new Atom instance. An Atom is a reactive item that holds a value. Same as `atom` but
-returns a new Atom instance.
+Creates a new reactive Atom holding the given value.
+
+An Atom is the base unit of reactive state — a single mutable cell. Reads
+inside tracked contexts register a dependency; writes schedule a change.
 
 #### Type parameters
 
@@ -65,34 +145,20 @@ returns a new Atom instance.
 
 #### Parameters
 
-| Name | Type | Description |
-| :------ | :------ | :------ |
-| `value` | `T` | The initial value of the Atom. |
-| `options?` | `Object` | Options |
-| `options.compareFunction` | (`a`: `T`, `b`: `T`) => `boolean` | A function that compares two values to determine if they are equal. |
-| `options.name` | `string` | The name of Atom. |
+| Name | Type |
+| :------ | :------ |
+| `value` | `T` |
+| `options?` | `Object` |
+| `options.compareFunction` | (`a`: `T`, `b`: `T`) => `boolean` |
+| `options.name` | `string` |
 
 #### Returns
 
 [`Atom`](classes/Atom.md)\<`T`\>
 
-A new Atom instance with the given value and options.
-
-**`Example`**
-
-```js
-const count = atom(0);
-
-count.subscribe(() => {
-    console.log(count.value);
-});
-
-count.value = 1;
-```
-
 #### Defined in
 
-[src/api/api.js:621](https://github.com/supercat1337/store2/blob/c65c4382ec22e2f61bbc31b786846fc524db2820/src/api/api.js#L621)
+[src/api/api.js:503](https://github.com/supercat1337/store2/blob/16b98b1eeb525c194544e8c7935c505c824c9de2/src/api/api.js#L503)
 
 ___
 
@@ -100,27 +166,24 @@ ___
 
 ▸ **autorun**(`fn`, `options?`): () => `void`
 
-Autorun – runs the effect immediately (during initial dependency collection)
-and re‑runs it on any dependency change.
-Dependencies are re‑collected on every run by default.
+Autorun – runs the effect immediately and re-runs it on any dependency
+change.
 
 #### Parameters
 
-| Name | Type | Description |
-| :------ | :------ | :------ |
-| `fn` | () => `void` | The effect function. |
-| `options?` | `Object` | Options. |
-| `options.delay` | `number` | Debounce delay (ms). |
-| `options.name` | `string` | Debug name. |
-| `options.onError` | `Function` | Error handler. |
-| `options.recomputeDependencies` | `boolean` | Re‑collect dependencies each run. |
-| `options.signal` | `AbortSignal` | AbortSignal. |
+| Name | Type |
+| :------ | :------ |
+| `fn` | () => `void` |
+| `options?` | `Object` |
+| `options.delay` | `number` |
+| `options.name` | `string` |
+| `options.onError` | `Function` |
+| `options.recomputeDependencies` | `boolean` |
+| `options.signal` | `AbortSignal` |
 
 #### Returns
 
 `fn`
-
-Unsubscribe function.
 
 ▸ (): `void`
 
@@ -130,56 +193,33 @@ Unsubscribe function.
 
 #### Defined in
 
-[src/api/api.js:194](https://github.com/supercat1337/store2/blob/c65c4382ec22e2f61bbc31b786846fc524db2820/src/api/api.js#L194)
+[src/api/api.js:209](https://github.com/supercat1337/store2/blob/16b98b1eeb525c194544e8c7935c505c824c9de2/src/api/api.js#L209)
 
 ___
 
 ### batch
 
-▸ **batch**(`fn`): `void`
+▸ **batch**(`nameOrFn`, `fn?`): `any`
 
-Executes the specified function while batching notifications to reactive items.
-This is useful for operations that make multiple changes to reactive items, as
-it prevents the notifications from being sent until all changes have been made.
-Supports nested batch calls.
+Groups multiple updates into a single notification round.
+
+    batch(() => { ... })
+    batch('update todos', () => { ... })
 
 #### Parameters
 
-| Name | Type | Description |
-| :------ | :------ | :------ |
-| `fn` | `Function` | The function to execute while batching notifications. |
+| Name | Type |
+| :------ | :------ |
+| `nameOrFn` | `string` \| `Function` |
+| `fn?` | `Function` |
 
 #### Returns
 
-`void`
-
-**`Example`**
-
-```js
-const a = atom(0);
-const b = atom(0);
-
-let foo = 0;
-
-autorun(() => {
-    a.value;
-    b.value;
-    foo++;
-});
-
-console.log(a.value, b.value, foo); // 0 0 1
-
-batch(() => {
-    a.value++;
-    b.value++;
-});
-
-console.log(a.value, b.value, foo); // 1 1 2
-```
+`any`
 
 #### Defined in
 
-[src/api/api.js:405](https://github.com/supercat1337/store2/blob/c65c4382ec22e2f61bbc31b786846fc524db2820/src/api/api.js#L405)
+[src/api/api.js:347](https://github.com/supercat1337/store2/blob/16b98b1eeb525c194544e8c7935c505c824c9de2/src/api/api.js#L347)
 
 ___
 
@@ -187,9 +227,7 @@ ___
 
 ▸ **clone**\<`T`\>(`obj`): `T`
 
-Clones an object. If the object is an array, the function returns a shallow copy of the array.
-If the object is a plain object, the function returns a shallow copy of the object.
-If the object is not an array or a plain object, the function returns the object as is.
+Clones an object shallowly.
 
 #### Type parameters
 
@@ -199,19 +237,17 @@ If the object is not an array or a plain object, the function returns the object
 
 #### Parameters
 
-| Name | Type | Description |
-| :------ | :------ | :------ |
-| `obj` | `T` | The object to clone |
+| Name | Type |
+| :------ | :------ |
+| `obj` | `T` |
 
 #### Returns
 
 `T`
 
-A shallow copy of the object
-
 #### Defined in
 
-[src/helpers/tools.js:175](https://github.com/supercat1337/store2/blob/c65c4382ec22e2f61bbc31b786846fc524db2820/src/helpers/tools.js#L175)
+[src/helpers/tools.js:168](https://github.com/supercat1337/store2/blob/16b98b1eeb525c194544e8c7935c505c824c9de2/src/helpers/tools.js#L168)
 
 ___
 
@@ -219,13 +255,11 @@ ___
 
 ▸ **collection**\<`T`\>(`value`, `options?`): [`Collection`](classes/Collection.md)\<`T`\>
 
-Creates a new reactive Collection instance that holds an array.
-The Collection provides reactivity for array mutations (push, pop, splice, etc.)
-and allows subscribing to changes.
+Creates a new reactive Collection wrapping an array.
 
-Unlike the `Atom` and `Computed` factories, this function returns the actual
-`Collection` instance, not just the proxied array. To access the reactive array,
-use the `.value` property.
+Array mutations (`push`, `pop`, `splice`, index assignment) trigger
+reactivity. The `.value` property returns a Proxy; direct mutations
+through it are tracked.
 
 #### Type parameters
 
@@ -235,38 +269,20 @@ use the `.value` property.
 
 #### Parameters
 
-| Name | Type | Description |
-| :------ | :------ | :------ |
-| `value` | `T`[] | The initial array to observe. |
-| `options?` | `Object` | Configuration options. |
-| `options.compareFunction` | (`a`: `T`, `b`: `T`) => `boolean` | Custom equality function. |
-| `options.name` | `string` | The name of the Collection (used for debugging). |
+| Name | Type |
+| :------ | :------ |
+| `value` | `T`[] |
+| `options?` | `Object` |
+| `options.compareFunction` | (`a`: `T`, `b`: `T`) => `boolean` |
+| `options.name` | `string` |
 
 #### Returns
 
 [`Collection`](classes/Collection.md)\<`T`\>
 
-The Collection instance.
-
-**`Example`**
-
-```js
-const coll = collection([1, 2, 3]);
-
-// Subscribe to changes
-coll.subscribe(() => console.log('changed'));
-
-// Mutate the array via .value
-coll.value.push(4); // triggers subscriber
-console.log(coll.value); // [1, 2, 3, 4]
-
-// Direct property access also works (proxied)
-coll.value[0] = 10; // triggers subscriber
-```
-
 #### Defined in
 
-[src/api/api.js:682](https://github.com/supercat1337/store2/blob/c65c4382ec22e2f61bbc31b786846fc524db2820/src/api/api.js#L682)
+[src/api/api.js:541](https://github.com/supercat1337/store2/blob/16b98b1eeb525c194544e8c7935c505c824c9de2/src/api/api.js#L541)
 
 ___
 
@@ -274,8 +290,7 @@ ___
 
 ▸ **compareAny**(`a`, `b`): `boolean`
 
-Checks if two objects are equal. If objects are arrays, then check if stringified versions of them are equal.
-If objects are not arrays, then check if sorted stringified versions of them are equal.
+Checks if two values are equal.
 
 #### Parameters
 
@@ -290,7 +305,7 @@ If objects are not arrays, then check if sorted stringified versions of them are
 
 #### Defined in
 
-[src/helpers/tools.js:115](https://github.com/supercat1337/store2/blob/c65c4382ec22e2f61bbc31b786846fc524db2820/src/helpers/tools.js#L115)
+[src/helpers/tools.js:111](https://github.com/supercat1337/store2/blob/16b98b1eeb525c194544e8c7935c505c824c9de2/src/helpers/tools.js#L111)
 
 ___
 
@@ -298,25 +313,22 @@ ___
 
 ▸ **comparePlainObjects**(`a`, `b`): `boolean`
 
-Checks if two plain objects are equal. If the objects do not have the same set of keys, then this function returns false.
-Otherwise, this function checks if each value of the two objects is equal, using the compareAny function.
+Checks if two plain objects are equal.
 
 #### Parameters
 
-| Name | Type | Description |
-| :------ | :------ | :------ |
-| `a` | `any` | The first object to compare. |
-| `b` | `any` | The second object to compare. |
+| Name | Type |
+| :------ | :------ |
+| `a` | `any` |
+| `b` | `any` |
 
 #### Returns
 
 `boolean`
 
-True if the two objects are equal, false otherwise.
-
 #### Defined in
 
-[src/helpers/tools.js:77](https://github.com/supercat1337/store2/blob/c65c4382ec22e2f61bbc31b786846fc524db2820/src/helpers/tools.js#L77)
+[src/helpers/tools.js:74](https://github.com/supercat1337/store2/blob/16b98b1eeb525c194544e8c7935c505c824c9de2/src/helpers/tools.js#L74)
 
 ___
 
@@ -324,7 +336,12 @@ ___
 
 ▸ **computed**\<`T`\>(`fn`, `options?`): [`Computed`](classes/Computed.md)\<`T`\>
 
-Creates a new Computed instance. Computed is a reactive item that holds a value that is computed from other reactive values.
+Creates a new reactive Computed whose value is derived from other
+reactive sources.
+
+The function passed as `fn` runs once at construction, then again
+whenever one of its dependencies changes and the recomputed value
+differs.
 
 #### Type parameters
 
@@ -334,37 +351,43 @@ Creates a new Computed instance. Computed is a reactive item that holds a value 
 
 #### Parameters
 
-| Name | Type | Description |
-| :------ | :------ | :------ |
-| `fn` | () => `T` | The function that returns the value of the Computed |
-| `options?` | `Object` | Options |
-| `options.compareFunction` | (`a`: `T`, `b`: `T`) => `boolean` | A function that compares two values to determine if they are equal. |
-| `options.name` | `string` | The name of Computed. |
-| `options.smartRecompute` | `boolean` | Whether the function is a hard function. If true, it prevents calling the function by comparing the string representation of the dependencies. |
+| Name | Type |
+| :------ | :------ |
+| `fn` | () => `T` |
+| `options?` | `Object` |
+| `options.compareFunction` | (`a`: `T`, `b`: `T`) => `boolean` |
+| `options.name` | `string` |
+| `options.smartRecompute` | `boolean` |
 
 #### Returns
 
 [`Computed`](classes/Computed.md)\<`T`\>
 
-A new Computed instance with the given function and options.
+#### Defined in
 
-**`Example`**
+[src/api/api.js:523](https://github.com/supercat1337/store2/blob/16b98b1eeb525c194544e8c7935c505c824c9de2/src/api/api.js#L523)
 
-```js
-const a = atom(0);
-const b = computed(() => a.value + 1);
+___
 
-b.subscribe(() => {
-    console.log(b.value);
-});
+### createStore2Context
 
-a.value = 1;
-// b = 2
-```
+▸ **createStore2Context**(`options?`): [`Store2Context`](classes/Store2Context.md)
+
+Creates a new isolated context.
+
+#### Parameters
+
+| Name | Type |
+| :------ | :------ |
+| `options?` | `any` |
+
+#### Returns
+
+[`Store2Context`](classes/Store2Context.md)
 
 #### Defined in
 
-[src/api/api.js:647](https://github.com/supercat1337/store2/blob/c65c4382ec22e2f61bbc31b786846fc524db2820/src/api/api.js#L647)
+[src/core/context.js:705](https://github.com/supercat1337/store2/blob/16b98b1eeb525c194544e8c7935c505c824c9de2/src/core/context.js#L705)
 
 ___
 
@@ -372,7 +395,7 @@ ___
 
 ▸ **debounce**\<`T`\>(`func`, `wait`): `T`
 
-Debounce function that, as long as it continues to be invoked, will not be triggered.
+Debounce function.
 
 #### Type parameters
 
@@ -382,32 +405,24 @@ Debounce function that, as long as it continues to be invoked, will not be trigg
 
 #### Parameters
 
-| Name | Type | Description |
-| :------ | :------ | :------ |
-| `func` | `T` | Function to be debounced |
-| `wait` | `number` | Time in milliseconds to wait before the function gets called. |
+| Name | Type |
+| :------ | :------ |
+| `func` | `T` |
+| `wait` | `number` |
 
 #### Returns
 
 `T`
 
-**`Example`**
-
-```ts
-window.addEventListener('resize', debounce((evt) => console.log(evt), 250));
-```
-
 #### Defined in
 
-[src/helpers/tools.js:148](https://github.com/supercat1337/store2/blob/c65c4382ec22e2f61bbc31b786846fc524db2820/src/helpers/tools.js#L148)
+[src/helpers/tools.js:143](https://github.com/supercat1337/store2/blob/16b98b1eeb525c194544e8c7935c505c824c9de2/src/helpers/tools.js#L143)
 
 ___
 
 ### extendObservable
 
 ▸ **extendObservable**\<`T`, `R`\>(`target`, `properties`, `overrides?`, `options?`): `T` & `R`
-
-Extends an object with new properties and makes them observable.
 
 #### Type parameters
 
@@ -418,51 +433,21 @@ Extends an object with new properties and makes them observable.
 
 #### Parameters
 
-| Name | Type | Description |
-| :------ | :------ | :------ |
-| `target` | `T` | The object to be extended and observed. |
-| `properties` | `R` | The properties to add to the target object. |
-| `overrides?` | `Object` | Optional overrides to define the type of the reactive property. If an override is false, the key will be ignored. |
-| `options?` | `Object` | Options to configure the observable behavior. |
-| `options.name` | `string` | The name of the observable object. Defaults to an empty string. Using as prefix for reactive property names. |
+| Name | Type |
+| :------ | :------ |
+| `target` | `T` |
+| `properties` | `R` |
+| `overrides?` | `Object` |
+| `options?` | `Object` |
+| `options.name` | `string` |
 
 #### Returns
 
 `T` & `R`
 
-The extended object with observable properties.
-
-**`Example`**
-
-```js
-let object = {
-    value: 0,
-    get double() {
-        return this.value * 2;
-    },
-    increment() {
-        this.value++;
-    },
-};
-
-makeObservable(object, { value: "atom", double: "computed" });
-extendObservable(object, {a: 1, b: 2});
-
-let foo = 0;
-
-autorun(() => {
-    foo++;
-    object.a;
-});
-
-console.log(foo); // 1
-object.a++;
-console.log(foo); // 2
-```
-
 #### Defined in
 
-[src/api/api.js:926](https://github.com/supercat1337/store2/blob/c65c4382ec22e2f61bbc31b786846fc524db2820/src/api/api.js#L926)
+[src/api/api.js:661](https://github.com/supercat1337/store2/blob/16b98b1eeb525c194544e8c7935c505c824c9de2/src/api/api.js#L661)
 
 ___
 
@@ -470,10 +455,8 @@ ___
 
 ▸ **fromPromise**\<`T`\>(`promise`): `Object`
 
-Creates an object that provides a way to handle the result of a Promise.
-The object has a single method called `case` which takes an object with
-three optional methods: `resolved`, `rejected`, and `pending`. The appropriate
-method will be called based on the state of the promise.
+Observes a promise's state. The returned object exposes a single method
+`case({ pending, resolved, rejected })`.
 
 #### Type parameters
 
@@ -483,74 +466,66 @@ method will be called based on the state of the promise.
 
 #### Parameters
 
-| Name | Type | Description |
-| :------ | :------ | :------ |
-| `promise` | `Promise`\<`T`\> | The promise to handle. |
+| Name | Type |
+| :------ | :------ |
+| `promise` | `Promise`\<`T`\> |
 
 #### Returns
 
 `Object`
 
-An object with a single method called `case`.
-
 | Name | Type |
 | :------ | :------ |
 | `case` | (`param0`: \{ `pending?`: () => `void` ; `rejected?`: (`error`: `Error`) => `void` ; `resolved?`: (`value`: `T`) => `void`  }) => `Promise`\<`void`\> |
 
-**`Example`**
-
-```js
-const promise = new Promise((resolve, reject) => {
-    setTimeout(() => {
-        resolve("Hello, world!");
-    }, 1000);
-});
-
-const fromPromiseResult = fromPromise(promise);
-
-await fromPromiseResult.case({
-    resolved: (value) => {
-        console.log("Resolved:", value); // Resolved: Hello, world!
-    },
-    rejected: () => {
-        console.log("Rejected");
-    },
-    pending: () => {
-        console.log("Pending"); // Pending
-    },
-});
-```
-
 #### Defined in
 
-[src/api/api.js:534](https://github.com/supercat1337/store2/blob/c65c4382ec22e2f61bbc31b786846fc524db2820/src/api/api.js#L534)
+[src/api/api.js:425](https://github.com/supercat1337/store2/blob/16b98b1eeb525c194544e8c7935c505c824c9de2/src/api/api.js#L425)
 
 ___
 
 ### getAllPropertyDescriptors
 
-▸ **getAllPropertyDescriptors**(`obj`, `depth?`, `maxDepth?`): \{ `[x: string]`: [`TypedPropertyDescriptor`](interfaces/internal_.TypedPropertyDescriptor.md)\<`any`\>;  } & \{ `[x: string]`: [`PropertyDescriptor`](interfaces/internal_.PropertyDescriptor.md);  }
+▸ **getAllPropertyDescriptors**(`obj`, `depth?`, `maxDepth?`): `Object`
 
 Gets all property descriptors of an object, including its prototype and all its ancestors.
 The descriptors are returned as a plain object.
 
 #### Parameters
 
-| Name | Type | Default value | Description |
-| :------ | :------ | :------ | :------ |
-| `obj` | `any` | `undefined` | The object to get the property descriptors from. |
-| `depth?` | `number` | `0` |  |
-| `maxDepth?` | `number` | `100` |  |
+| Name | Type | Default value |
+| :------ | :------ | :------ |
+| `obj` | `any` | `undefined` |
+| `depth?` | `number` | `0` |
+| `maxDepth?` | `number` | `100` |
 
 #### Returns
 
-\{ `[x: string]`: [`TypedPropertyDescriptor`](interfaces/internal_.TypedPropertyDescriptor.md)\<`any`\>;  } & \{ `[x: string]`: [`PropertyDescriptor`](interfaces/internal_.PropertyDescriptor.md);  }
-
-A plain object with all property descriptors of the object.
+`Object`
 
 #### Defined in
 
-[src/helpers/tools.js:203](https://github.com/supercat1337/store2/blob/c65c4382ec22e2f61bbc31b786846fc524db2820/src/helpers/tools.js#L203)
+[src/helpers/tools.js:196](https://github.com/supercat1337/store2/blob/16b98b1eeb525c194544e8c7935c505c824c9de2/src/helpers/tools.js#L196)
+
+___
+
+### getCurrentContext
+
+▸ **getCurrentContext**(): [`Store2Context`](classes/Store2Context.md)
+
+Returns the currently installed context, or the default one.
+
+On runtimes with `AsyncLocalStorage`, returns the context associated
+with the current async chain — safe to call from server-render
+components after an `await`.
+
+#### Returns
+
+[`Store2Context`](classes/Store2Context.md)
+
+#### Defined in
+
+[src/core/context.js:648](https://github.com/supercat1337/store2/blob/16b98b1eeb525c194544e8c7935c505c824c9de2/src/core/context.js#L648)
 
 ___
 
@@ -560,50 +535,19 @@ ___
 
 Converts any value to an Error object.
 
-If the given value is already an instance of Error, it is returned unchanged.
-Otherwise, a new Error object is created using the string representation of the value.
-
 #### Parameters
 
-| Name | Type | Description |
-| :------ | :------ | :------ |
-| `e` | `unknown` | The value to convert into an Error. |
+| Name | Type |
+| :------ | :------ |
+| `e` | `unknown` |
 
 #### Returns
 
 `Error`
 
-An Error object derived from the input value.
-
-**`Example`**
-
-```ts
-// Returns the original Error
-const originalError = new Error('Something went wrong');
-getError(originalError) === originalError; // true
-```
-
-**`Example`**
-
-```ts
-// Converts a string to an Error
-const error = getError('Network failure');
-error.message; // 'Network failure'
-error instanceof Error; // true
-```
-
-**`Example`**
-
-```ts
-// Converts numbers or other types
-getError(42).message; // '42'
-getError(null).message; // 'null'
-getError(undefined).message; // 'undefined'
-```
-
 #### Defined in
 
-[src/helpers/tools.js:240](https://github.com/supercat1337/store2/blob/c65c4382ec22e2f61bbc31b786846fc524db2820/src/helpers/tools.js#L240)
+[src/helpers/tools.js:212](https://github.com/supercat1337/store2/blob/16b98b1eeb525c194544e8c7935c505c824c9de2/src/helpers/tools.js#L212)
 
 ___
 
@@ -612,50 +556,27 @@ ___
 ▸ **getItemNamesFromSet**(`items`, `options?`): `string`[]
 
 Extracts names (and optionally ids) from a Set of reactive items.
-Returns an array of strings, one per item.
+
+Uses duck typing (`item.engine && item.name`) to avoid importing from
+`reactives/` — that keeps `tools.js` free of circular dependencies.
 
 #### Parameters
 
-| Name | Type | Description |
-| :------ | :------ | :------ |
-| `items` | `Set`\<[`ReactiveItem`](classes/ReactiveItem.md)\> \| [`Iterable`](interfaces/internal_.Iterable.md)\<[`ReactiveItem`](classes/ReactiveItem.md)\> | Collection of reactive items. |
-| `options?` | `Object` | Formatting options. |
-| `options.fallback` | `string` | - |
-| `options.includeId` | `boolean` | - |
-| `options.sorted` | `boolean` | - |
+| Name | Type |
+| :------ | :------ |
+| `items` | `Set`\<[`ReactiveItem`](classes/ReactiveItem.md)\> \| [`Iterable`](interfaces/internal_.Iterable.md)\<[`ReactiveItem`](classes/ReactiveItem.md)\> |
+| `options?` | `Object` |
+| `options.fallback?` | `string` |
+| `options.includeId?` | `boolean` |
+| `options.sorted?` | `boolean` |
 
 #### Returns
 
 `string`[]
 
-Array of item representations.
-
-**`Example`**
-
-```ts
-const a = new Atom(0, { name: 'counter' });
-const b = new Computed(() => a.value * 2, { name: 'double' });
-const set = new Set([a, b]);
-getItemNamesFromSet(set);
-// ['counter', 'double']
-```
-
-**`Example`**
-
-```ts
-getItemNamesFromSet(set, { includeId: true });
-// ['counter:5', 'double:7']
-```
-
-**`Example`**
-
-```ts
-getItemNamesFromSet(set, { fallback: '?', sorted: false });
-```
-
 #### Defined in
 
-[src/helpers/tools.js:266](https://github.com/supercat1337/store2/blob/c65c4382ec22e2f61bbc31b786846fc524db2820/src/helpers/tools.js#L266)
+[src/helpers/tools.js:226](https://github.com/supercat1337/store2/blob/16b98b1eeb525c194544e8c7935c505c824c9de2/src/helpers/tools.js#L226)
 
 ___
 
@@ -663,38 +584,21 @@ ___
 
 ▸ **getNow**(`interval?`): [`Atom`](classes/Atom.md)\<`number`\>
 
-Returns an Atom that automatically updates its value to the current time
-at the given interval. The interval is specified in milliseconds and
-defaults to 1000. When there are subscribers, the Atom updates its value
-at the specified interval. When there are no subscribers, the interval
-is cleared and the Atom's value is reset to 0.
+Returns an Atom that ticks at the given interval while it has subscribers.
 
 #### Parameters
 
-| Name | Type | Default value | Description |
-| :------ | :------ | :------ | :------ |
-| `interval?` | `number` | `1000` | The interval in milliseconds at which the Atom should update its value. |
+| Name | Type | Default value |
+| :------ | :------ | :------ |
+| `interval?` | `number` | `1000` |
 
 #### Returns
 
 [`Atom`](classes/Atom.md)\<`number`\>
 
-An Atom that automatically updates its value to the current time at the given interval.
-
-**`Example`**
-
-```js
-const now = getNow();
-console.log(now.value); // 0
-
-const unsubscribe = now.subscribe(() => {
-    console.log(now.value); // Current time in milliseconds
-});
-```
-
 #### Defined in
 
-[src/api/api.js:476](https://github.com/supercat1337/store2/blob/c65c4382ec22e2f61bbc31b786846fc524db2820/src/api/api.js#L476)
+[src/api/api.js:387](https://github.com/supercat1337/store2/blob/16b98b1eeb525c194544e8c7935c505c824c9de2/src/api/api.js#L387)
 
 ___
 
@@ -708,19 +612,17 @@ to an array and sorted by the internal id of the reactive items.
 
 #### Parameters
 
-| Name | Type | Description |
-| :------ | :------ | :------ |
-| `...items` | ([`ReactiveItem`](classes/ReactiveItem.md) \| `Set`\<[`ReactiveItem`](classes/ReactiveItem.md)\>)[] | Reactive items or sets of reactive items to combine and sort. |
+| Name | Type |
+| :------ | :------ |
+| `...items` | ([`ReactiveItem`](classes/ReactiveItem.md) \| `Set`\<[`ReactiveItem`](classes/ReactiveItem.md)\>)[] |
 
 #### Returns
 
 [`ReactiveItem`](classes/ReactiveItem.md)[]
 
-A sorted array of unique reactive items.
-
 #### Defined in
 
-[src/helpers/tools.js:27](https://github.com/supercat1337/store2/blob/c65c4382ec22e2f61bbc31b786846fc524db2820/src/helpers/tools.js#L27)
+[src/helpers/tools.js:25](https://github.com/supercat1337/store2/blob/16b98b1eeb525c194544e8c7935c505c824c9de2/src/helpers/tools.js#L25)
 
 ___
 
@@ -732,9 +634,9 @@ Checks if a given value is a plain object.
 
 #### Parameters
 
-| Name | Type | Description |
-| :------ | :------ | :------ |
-| `obj` | `any` | The value to check. |
+| Name | Type |
+| :------ | :------ |
+| `obj` | `any` |
 
 #### Returns
 
@@ -744,7 +646,7 @@ true if the value is a plain object, false otherwise.
 
 #### Defined in
 
-[src/helpers/tools.js:45](https://github.com/supercat1337/store2/blob/c65c4382ec22e2f61bbc31b786846fc524db2820/src/helpers/tools.js#L45)
+[src/helpers/tools.js:43](https://github.com/supercat1337/store2/blob/16b98b1eeb525c194544e8c7935c505c824c9de2/src/helpers/tools.js#L43)
 
 ___
 
@@ -752,7 +654,11 @@ ___
 
 ▸ **makeAutoObservable**\<`T`\>(`obj`, `overrides?`, `options?`, `filter?`): `T`
 
-Makes existing object properties observable. Same as [makeObservable](modules.md#makeobservable) but infers all the properties.
+Same as `makeObservable` but infers annotations automatically.
+
+Plain objects become `shallowReactive`, arrays become `collection`,
+getters become `computed`, and everything else becomes `atom`. Pass
+`overrides` to correct the inference or disable a property with `false`.
 
 #### Type parameters
 
@@ -762,51 +668,21 @@ Makes existing object properties observable. Same as [makeObservable](modules.md
 
 #### Parameters
 
-| Name | Type | Description |
-| :------ | :------ | :------ |
-| `obj` | `T` | The object to observe. |
-| `overrides?` | `Object` | The overrides to use to define type of the reactive property. If an override is false, the key will be ignored. |
-| `options?` | `Object` | Options to configure the observable behavior. |
-| `options.name` | `string` | The name of the observable object. Defaults to an empty string. Using as prefix for reactive property names. |
-| `filter?` | `Set`\<`string`\> | A set of property keys to selectively apply annotations. |
+| Name | Type |
+| :------ | :------ |
+| `obj` | `T` |
+| `overrides?` | `Object` |
+| `options?` | `Object` |
+| `options.name` | `string` |
+| `filter?` | `Set`\<`string`\> |
 
 #### Returns
 
 `T`
 
-**`Example`**
-
-```js
-let object = {
-    value: 0,
-    get double() {
-        return this.value * 2;
-    },
-    increment() {
-        this.value++;
-    },
-};
-
-makeAutoObservable(object);
-
-let foo = 0;
-
-autorun(() => {
-    foo++;
-    object.double;
-});
-console.log(foo); // 1
-
-object.increment();
-console.log(foo); // 2
-
-object.increment();
-console.log(foo); // 3
-```
-
 #### Defined in
 
-[src/api/api.js:970](https://github.com/supercat1337/store2/blob/c65c4382ec22e2f61bbc31b786846fc524db2820/src/api/api.js#L970)
+[src/api/api.js:682](https://github.com/supercat1337/store2/blob/16b98b1eeb525c194544e8c7935c505c824c9de2/src/api/api.js#L682)
 
 ___
 
@@ -814,7 +690,10 @@ ___
 
 ▸ **makeObservable**\<`T`\>(`obj`, `annotations`, `options?`): `T`
 
-Enhances an object to make its properties observable using specified annotations.
+Enhances an object with reactive properties using explicit annotations.
+
+Each key maps to one of `"atom"`, `"computed"`, `"collection"`,
+`"shallowReactive"`, or `false` to leave the property untouched.
 
 #### Type parameters
 
@@ -824,97 +703,20 @@ Enhances an object to make its properties observable using specified annotations
 
 #### Parameters
 
-| Name | Type | Description |
-| :------ | :------ | :------ |
-| `obj` | `T` | The object to be observed. |
-| `annotations` | `Object` | Annotations defining the type of reactivity for each property. Properties with a 'false' annotation will be ignored. |
-| `options?` | `Object` | Options to configure the observable behavior. |
-| `options.name` | `string` | The name of the observable object. Defaults to an empty string. Using as prefix for reactive property names. |
+| Name | Type |
+| :------ | :------ |
+| `obj` | `T` |
+| `annotations` | `Object` |
+| `options?` | `Object` |
+| `options.name` | `string` |
 
 #### Returns
 
 `T`
 
-The input object with enhanced reactive properties.
-
-**`Example`**
-
-```js
-class List {
-    data = [];
-
-    constructor(data) {
-        this.data = data;
-        makeObservable(this, { data: "collection" });
-    }
-
-    // not reactive property
-    get length() {
-        return this.data.length;
-    }
-}
-
-const list = new List([1, 2, 3]);
-
-let foo = 0;
-
-autorun((updates) => {
-    console.log(`list.length = ${list.length}`);
-    foo++;
-});
-// Outputs: list.length = 3
-
-console.log(foo);
-// Outputs: 1
-
-list.data.push(4);
-// Outputs: list.length = 4
-console.log(foo);
-// Outputs: 2
-
-list.data.pop();
-// set last element to undefined. foo++
-// Outputs: list.length = 4
-// set new value of length/ foo++
-// Outputs: list.length = 3
-
-console.log(foo);
-// Outputs: 4
-```
-
-**`Example`**
-
-```js
-let object = {
-    value: 0,
-    get double() {
-        return this.value * 2;
-    },
-    increment() {
-        this.value++;
-    },
-};
-
-makeObservable(object, { value: "atom", double: "computed" });
-
-let foo = 0;
-
-autorun(() => {
-    foo++;
-    object.double;
-});
-console.log(foo); // 1
-
-object.increment();
-console.log(foo); // 2
-
-object.increment();
-console.log(foo); // 3
-```
-
 #### Defined in
 
-[src/api/api.js:805](https://github.com/supercat1337/store2/blob/c65c4382ec22e2f61bbc31b786846fc524db2820/src/api/api.js#L805)
+[src/api/api.js:569](https://github.com/supercat1337/store2/blob/16b98b1eeb525c194544e8c7935c505c824c9de2/src/api/api.js#L569)
 
 ___
 
@@ -922,29 +724,26 @@ ___
 
 ▸ **reaction**(`dataFn`, `effectFn`, `options?`): () => `void`
 
-Reaction – tracks dependencies via dataFn and runs effectFn when they change.
-The effect is NOT run immediately; it only runs after the first change.
-Dependencies are re‑collected on every run by default.
+Reaction – tracks dependencies via `dataFn` and runs `effectFn` when they
+change. The effect is NOT run at setup time.
 
 #### Parameters
 
-| Name | Type | Description |
-| :------ | :------ | :------ |
-| `dataFn` | () => `any` | Function whose dependencies are tracked. |
-| `effectFn` | (`updates?`: `Map`\<`string`, [`UpdateDataRecord`](classes/internal_.UpdateDataRecord.md)\>) => `void` | Effect to run. |
-| `options?` | `Object` | Options. |
-| `options.delay` | `number` | Debounce delay (ms). |
-| `options.name` | `string` | Debug name. |
-| `options.onError` | `Function` | Error handler. |
-| `options.passUpdates` | `boolean` | Pass collected updates to effectFn. |
-| `options.recomputeDependencies` | `boolean` | Re‑collect dependencies each run. |
-| `options.signal` | `AbortSignal` | AbortSignal. |
+| Name | Type |
+| :------ | :------ |
+| `dataFn` | () => `any` |
+| `effectFn` | (`updates?`: `Map`\<`string`, [`UpdateDataRecord`](classes/internal_.UpdateDataRecord.md)\>) => `void` |
+| `options?` | `Object` |
+| `options.delay` | `number` |
+| `options.name` | `string` |
+| `options.onError` | `Function` |
+| `options.passUpdates` | `boolean` |
+| `options.recomputeDependencies` | `boolean` |
+| `options.signal` | `AbortSignal` |
 
 #### Returns
 
 `fn`
-
-Unsubscribe function.
 
 ▸ (): `void`
 
@@ -954,7 +753,7 @@ Unsubscribe function.
 
 #### Defined in
 
-[src/api/api.js:218](https://github.com/supercat1337/store2/blob/c65c4382ec22e2f61bbc31b786846fc524db2820/src/api/api.js#L218)
+[src/api/api.js:233](https://github.com/supercat1337/store2/blob/16b98b1eeb525c194544e8c7935c505c824c9de2/src/api/api.js#L233)
 
 ___
 
@@ -962,55 +761,36 @@ ___
 
 ▸ **runInAction**(`fn`): `void`
 
-Runs the given function in an action, i.e. when there are no active
-subscribers. This is useful for making changes to reactive items without
-triggering subscribers.
+Defers mutations until after subscribers finish, so it is safe to call
+from inside a subscriber callback.
 
 #### Parameters
 
-| Name | Type | Description |
-| :------ | :------ | :------ |
-| `fn` | `Function` | The function to be run in an action. |
+| Name | Type |
+| :------ | :------ |
+| `fn` | `Function` |
 
 #### Returns
 
 `void`
 
-**`Example`**
-
-```js
-let a = atom(0, { name: "a" });
-let b = atom(0, { name: "b" });
-
-let count = 0;
-
-a.subscribe(() => {
-    count++;
-    runInAction(() => {
-        b.value = a.value;
-    });
-});
-
-a.value++;
-console.log(a.value, b.value, count); // 1 1 1
-```
-
 #### Defined in
 
-[src/api/api.js:364](https://github.com/supercat1337/store2/blob/c65c4382ec22e2f61bbc31b786846fc524db2820/src/api/api.js#L364)
+[src/api/api.js:326](https://github.com/supercat1337/store2/blob/16b98b1eeb525c194544e8c7935c505c824c9de2/src/api/api.js#L326)
 
 ___
 
-### shallowReactive
+### runWithContext
 
-▸ **shallowReactive**\<`T`\>(`value`, `options?`): [`ShallowReactive`](classes/ShallowReactive.md)\<`T`\>
+▸ **runWithContext**\<`T`\>(`context`, `fn`): `T`
 
-Creates a new reactive ShallowReactive instance that wraps an object.
-The ShallowReactive provides reactivity for property assignments and deletions
-on the top level of the object (shallow reactivity).
+Runs `fn` with `context` installed as the active context.
 
-This function returns the actual `ShallowReactive` instance, not just the proxy.
-To access the reactive object, use the `.value` property.
+On runtimes with `AsyncLocalStorage` (Node 22.3+), the context binding
+survives `await` boundaries — a server-render function that awaits an
+async operation will still see the correct context afterwards. On older
+runtimes and in browsers, the binding only holds for the synchronous
+execution of `fn`.
 
 #### Type parameters
 
@@ -1020,37 +800,79 @@ To access the reactive object, use the `.value` property.
 
 #### Parameters
 
-| Name | Type | Description |
-| :------ | :------ | :------ |
-| `value` | `T` | The object to observe (must be a plain object or an instance). |
-| `options?` | `Object` | Configuration options. |
-| `options.name` | `string` | The name of the ShallowReactive (used for debugging). |
+| Name | Type |
+| :------ | :------ |
+| `context` | [`Store2Context`](classes/Store2Context.md) |
+| `fn` | () => `T` |
+
+#### Returns
+
+`T`
+
+#### Defined in
+
+[src/core/context.js:669](https://github.com/supercat1337/store2/blob/16b98b1eeb525c194544e8c7935c505c824c9de2/src/core/context.js#L669)
+
+___
+
+### runWithContextAsync
+
+▸ **runWithContextAsync**\<`T`\>(`context`, `fn`): `Promise`\<`T`\>
+
+Async-aware variant of `runWithContext`. On runtimes with
+`AsyncLocalStorage`, behaves identically to `runWithContext` for async
+functions. On runtimes without it, this is an explicit marker that the
+caller expects context propagation across `await`, and will lose it
+after the first `await` — the same limitation as `runWithContext`.
+
+#### Type parameters
+
+| Name |
+| :------ |
+| `T` |
+
+#### Parameters
+
+| Name | Type |
+| :------ | :------ |
+| `context` | [`Store2Context`](classes/Store2Context.md) |
+| `fn` | () => `Promise`\<`T`\> |
+
+#### Returns
+
+`Promise`\<`T`\>
+
+#### Defined in
+
+[src/core/context.js:696](https://github.com/supercat1337/store2/blob/16b98b1eeb525c194544e8c7935c505c824c9de2/src/core/context.js#L696)
+
+___
+
+### shallowReactive
+
+▸ **shallowReactive**\<`T`\>(`value`, `options?`): [`ShallowReactive`](classes/ShallowReactive.md)\<`T`\>
+
+#### Type parameters
+
+| Name | Type |
+| :------ | :------ |
+| `T` | extends `Object` |
+
+#### Parameters
+
+| Name | Type |
+| :------ | :------ |
+| `value` | `T` |
+| `options?` | `Object` |
+| `options.name` | `string` |
 
 #### Returns
 
 [`ShallowReactive`](classes/ShallowReactive.md)\<`T`\>
 
-The ShallowReactive instance.
-
-**`Example`**
-
-```js
-const reactive = shallowReactive({ a: 1, b: 2 });
-
-// Subscribe to changes
-reactive.subscribe(() => console.log('changed'));
-
-// Modify the object via .value
-reactive.value.a = 3; // triggers subscriber
-console.log(reactive.value); // { a: 3, b: 2 }
-
-// Direct property access also works (proxied)
-reactive.value.b = 5; // triggers subscriber
-```
-
 #### Defined in
 
-[src/api/api.js:715](https://github.com/supercat1337/store2/blob/c65c4382ec22e2f61bbc31b786846fc524db2820/src/api/api.js#L715)
+[src/api/api.js:552](https://github.com/supercat1337/store2/blob/16b98b1eeb525c194544e8c7935c505c824c9de2/src/api/api.js#L552)
 
 ___
 
@@ -1062,9 +884,9 @@ A Promise-based sleep function.
 
 #### Parameters
 
-| Name | Type | Description |
-| :------ | :------ | :------ |
-| `ms` | `number` | The amount of milliseconds to sleep for. |
+| Name | Type |
+| :------ | :------ |
+| `ms` | `number` |
 
 #### Returns
 
@@ -1072,7 +894,7 @@ A Promise-based sleep function.
 
 #### Defined in
 
-[src/helpers/tools.js:191](https://github.com/supercat1337/store2/blob/c65c4382ec22e2f61bbc31b786846fc524db2820/src/helpers/tools.js#L191)
+[src/helpers/tools.js:184](https://github.com/supercat1337/store2/blob/16b98b1eeb525c194544e8c7935c505c824c9de2/src/helpers/tools.js#L184)
 
 ___
 
@@ -1086,10 +908,10 @@ when they are notified of changes.
 
 #### Parameters
 
-| Name | Type | Description |
-| :------ | :------ | :------ |
-| `a` | [`ReactiveItem`](classes/ReactiveItem.md) | The first item to compare |
-| `b` | [`ReactiveItem`](classes/ReactiveItem.md) | The second item to compare |
+| Name | Type |
+| :------ | :------ |
+| `a` | [`ReactiveItem`](classes/ReactiveItem.md) |
+| `b` | [`ReactiveItem`](classes/ReactiveItem.md) |
 
 #### Returns
 
@@ -1099,7 +921,7 @@ when they are notified of changes.
 
 #### Defined in
 
-[src/helpers/tools.js:14](https://github.com/supercat1337/store2/blob/c65c4382ec22e2f61bbc31b786846fc524db2820/src/helpers/tools.js#L14)
+[src/helpers/tools.js:11](https://github.com/supercat1337/store2/blob/16b98b1eeb525c194544e8c7935c505c824c9de2/src/helpers/tools.js#L11)
 
 ___
 
@@ -1107,9 +929,8 @@ ___
 
 ▸ **untrack**\<`T`\>(`fn`): `T`
 
-Executes the specified function while not tracking reactive items.
-This is useful for operations that access reactive items without
-actually depending on them.
+Runs `fn` without tracking reactive reads. Nesting is safe: the previous
+state is restored on exit even if `fn` throws.
 
 #### Type parameters
 
@@ -1119,42 +940,17 @@ actually depending on them.
 
 #### Parameters
 
-| Name | Type | Description |
-| :------ | :------ | :------ |
-| `fn` | () => `T` | The function to execute while not tracking reactive items. |
+| Name | Type |
+| :------ | :------ |
+| `fn` | () => `T` |
 
 #### Returns
 
 `T`
 
-The result of executing the function.
-
-**`Example`**
-
-```js
-const a = atom(0);
-const b = atom(0);
-
-let foo = 0;
-
-autorun(() => {
-    a.value;
-    untrack(() => {
-        b.value;
-    });
-    foo++;
-});
-console.log(a.value, b.value, foo); // 0 0 1
-
-a.value++;
-console.log(a.value, b.value, foo); // 1 0 2
-b.value++;
-console.log(a.value, b.value, foo); // 1 1 2
-```
-
 #### Defined in
 
-[src/api/api.js:443](https://github.com/supercat1337/store2/blob/c65c4382ec22e2f61bbc31b786846fc524db2820/src/api/api.js#L443)
+[src/api/api.js:371](https://github.com/supercat1337/store2/blob/16b98b1eeb525c194544e8c7935c505c824c9de2/src/api/api.js#L371)
 
 ___
 
@@ -1162,40 +958,23 @@ ___
 
 ▸ **waitUntil**(`predicate`, `options?`): `Promise`\<`void`\>
 
-Waits until the given predicate evaluates to true.
+Returns a promise that resolves when `predicate` becomes true.
 
 #### Parameters
 
-| Name | Type | Description |
-| :------ | :------ | :------ |
-| `predicate` | () => `boolean` | The predicate that should be evaluated. |
-| `options?` | `Object` | Optional options. |
-| `options.timeout` | `number` | The number of milliseconds to wait before timing out. |
+| Name | Type |
+| :------ | :------ |
+| `predicate` | () => `boolean` |
+| `options?` | `Object` |
+| `options.timeout` | `number` |
 
 #### Returns
 
 `Promise`\<`void`\>
 
-A promise that resolves when the predicate evaluates to true.
-
-**`Example`**
-
-```js
-const a = atom(0, { name: "a" });
-let foo = 0;
-
-waitUntil(() => a.value > 3).then(() => {
-    foo++;
-});
-
-a.value = 2; // foo = 0
-a.value = 3; // foo = 0
-a.value = 4; // foo = 1
-```
-
 #### Defined in
 
-[src/api/api.js:308](https://github.com/supercat1337/store2/blob/c65c4382ec22e2f61bbc31b786846fc524db2820/src/api/api.js#L308)
+[src/api/api.js:289](https://github.com/supercat1337/store2/blob/16b98b1eeb525c194544e8c7935c505c824c9de2/src/api/api.js#L289)
 
 ___
 
@@ -1203,24 +982,22 @@ ___
 
 ▸ **when**(`predicate`, `fn`, `options?`): () => `void`
 
-Automatically calls the given function whenever the given predicate evaluates to true.
+Waits for `predicate` to become true, then runs `fn` once.
 
 #### Parameters
 
-| Name | Type | Description |
-| :------ | :------ | :------ |
-| `predicate` | () => `boolean` | The predicate that should be evaluated. |
-| `fn` | () => `void` | The function to be called when the predicate evaluates to true. |
-| `options?` | `Object` | Optional options. |
-| `options.delay` | `number` | The number of milliseconds to wait before calling the function. |
-| `options.signal` | `AbortSignal` | An AbortSignal to cancel the function call. |
-| `options.timeout` | `number` | The number of milliseconds to wait before timing out. |
+| Name | Type |
+| :------ | :------ |
+| `predicate` | () => `boolean` |
+| `fn` | () => `void` |
+| `options?` | `Object` |
+| `options.delay` | `number` |
+| `options.signal` | `AbortSignal` |
+| `options.timeout` | `number` |
 
 #### Returns
 
 `fn`
-
-A function that can be called to unsubscribe the callback function from changes in the tracked dependencies.
 
 ▸ (): `void`
 
@@ -1228,28 +1005,6 @@ A function that can be called to unsubscribe the callback function from changes 
 
 `void`
 
-**`Example`**
-
-```js
-const a = atom(0, { name: "a" });
-let foo = 0;
-
-when(
-    () => a.value > 3,
-    () => {
-        foo++;
-    }
-);
-
-a.value = 2; // foo = 0
-a.value = 3; // foo = 0
-a.value = 4; // foo = 1
-a.value = 5; // foo = 1
-a.value = 3; // foo = 1
-a.value = 4; // foo = 2
-a.value = 5; // foo = 2
-```
-
 #### Defined in
 
-[src/api/api.js:256](https://github.com/supercat1337/store2/blob/c65c4382ec22e2f61bbc31b786846fc524db2820/src/api/api.js#L256)
+[src/api/api.js:252](https://github.com/supercat1337/store2/blob/16b98b1eeb525c194544e8c7935c505c824c9de2/src/api/api.js#L252)

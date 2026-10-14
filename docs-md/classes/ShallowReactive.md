@@ -2,67 +2,19 @@
 
 # Class: ShallowReactive\<T\>
 
-ShallowReactive is a reactive item that holds a shallow object. It is the base unit of reactive state.
-It is a shallow reactive object, meaning that it only tracks changes to the properties of the object itself, not its nested properties.
+ShallowReactive tracks assignments and deletions on the top level of an
+object.
 
-**`Example`**
-
-```js
-const b = new ShallowReactive({ foo: 1 });
-
-let bar = 0;
-
-b.subscribe(() => {
-    bar += 1;
-});
-
-const props = b.value;
-props.foo = 2;
-
-console.log(bar);
-// Outputs: 1
-```
-
-**`Example`**
-
-```js
-class A {
-    foo = 1;
-
-    inc() {
-        this.foo++;
-    }
-}
-
-let bar = 0;
-const b = new ShallowReactive(new A(), { name: "b" });
-
-b.subscribe(() => {
-    bar++;
-});
-
-console.log(b.value.foo);
-// Outputs: 1
-
-b.value.foo = 2;
-console.log(b.value.foo);
-// Outputs: 2
-
-console.log(bar);
-// Outputs: 1
-
-b.value.inc();
-console.log(b.value.foo);
-// Outputs: 3
-console.log(bar);
-// Outputs: 2
-```
+Nested objects are stored by reference and are not made reactive —
+mutating a property of a nested object does not trigger an update. For
+deep reactivity, either use immutable updates on the top level or split
+the state across multiple reactive items.
 
 ## Type parameters
 
-| Name | Description |
-| :------ | :------ |
-| `T` | * |
+| Name |
+| :------ |
+| `T` |
 
 ## Hierarchy
 
@@ -83,10 +35,12 @@ console.log(bar);
 - [#target](ShallowReactive.md##target)
 - [engine](ShallowReactive.md#engine)
 - [name](ShallowReactive.md#name)
+- [path](ShallowReactive.md#path)
 
 ### Accessors
 
 - [isDestroyed](ShallowReactive.md#isdestroyed)
+- [type](ShallowReactive.md#type)
 - [value](ShallowReactive.md#value)
 
 ### Methods
@@ -99,14 +53,19 @@ console.log(bar);
 - [getLastError](ShallowReactive.md#getlasterror)
 - [getRawValue](ShallowReactive.md#getrawvalue)
 - [getValue](ShallowReactive.md#getvalue)
+- [getVersion](ShallowReactive.md#getversion)
 - [hasError](ShallowReactive.md#haserror)
 - [hasSubscribers](ShallowReactive.md#hassubscribers)
+- [hydrate](ShallowReactive.md#hydrate)
 - [onDestroy](ShallowReactive.md#ondestroy)
 - [onHasSubscribers](ShallowReactive.md#onhassubscribers)
 - [onNoSubscribers](ShallowReactive.md#onnosubscribers)
 - [peekValue](ShallowReactive.md#peekvalue)
+- [serialize](ShallowReactive.md#serialize)
 - [setValue](ShallowReactive.md#setvalue)
 - [subscribe](ShallowReactive.md#subscribe)
+- [toJSON](ShallowReactive.md#tojson)
+- [toObservable](ShallowReactive.md#toobservable)
 
 ## Constructors
 
@@ -114,7 +73,7 @@ console.log(bar);
 
 • **new ShallowReactive**\<`T`\>(`value`, `options?`): [`ShallowReactive`](ShallowReactive.md)\<`T`\>
 
-Initializes a ShallowReactive instance with a given value.
+Creates a new ShallowReactive wrapping the given object.
 
 #### Type parameters
 
@@ -126,9 +85,9 @@ Initializes a ShallowReactive instance with a given value.
 
 | Name | Type | Description |
 | :------ | :------ | :------ |
-| `value` | `T` | The initial value of the ShallowReactive. |
-| `options?` | `Object` | Options. |
-| `options.name` | `string` | The name of the ShallowReactive. |
+| `value` | `T` | The object to wrap. Must be a plain object. |
+| `options?` | `Object` |  |
+| `options.name` | `string` | Debug name used in error messages. |
 
 #### Returns
 
@@ -140,7 +99,7 @@ Initializes a ShallowReactive instance with a given value.
 
 #### Defined in
 
-[src/reactives/ShallowReactive.js:80](https://github.com/supercat1337/store2/blob/c65c4382ec22e2f61bbc31b786846fc524db2820/src/reactives/ShallowReactive.js#L80)
+[src/reactives/ShallowReactive.js:37](https://github.com/supercat1337/store2/blob/16b98b1eeb525c194544e8c7935c505c824c9de2/src/reactives/ShallowReactive.js#L37)
 
 ## Properties
 
@@ -150,7 +109,7 @@ Initializes a ShallowReactive instance with a given value.
 
 #### Defined in
 
-[src/reactives/ShallowReactive.js:72](https://github.com/supercat1337/store2/blob/c65c4382ec22e2f61bbc31b786846fc524db2820/src/reactives/ShallowReactive.js#L72)
+[src/reactives/ShallowReactive.js:28](https://github.com/supercat1337/store2/blob/16b98b1eeb525c194544e8c7935c505c824c9de2/src/reactives/ShallowReactive.js#L28)
 
 ___
 
@@ -160,7 +119,7 @@ ___
 
 #### Defined in
 
-[src/reactives/ShallowReactive.js:69](https://github.com/supercat1337/store2/blob/c65c4382ec22e2f61bbc31b786846fc524db2820/src/reactives/ShallowReactive.js#L69)
+[src/reactives/ShallowReactive.js:25](https://github.com/supercat1337/store2/blob/16b98b1eeb525c194544e8c7935c505c824c9de2/src/reactives/ShallowReactive.js#L25)
 
 ___
 
@@ -170,13 +129,22 @@ ___
 
 #### Defined in
 
-[src/reactives/ShallowReactive.js:66](https://github.com/supercat1337/store2/blob/c65c4382ec22e2f61bbc31b786846fc524db2820/src/reactives/ShallowReactive.js#L66)
+[src/reactives/ShallowReactive.js:22](https://github.com/supercat1337/store2/blob/16b98b1eeb525c194544e8c7935c505c824c9de2/src/reactives/ShallowReactive.js#L22)
 
 ___
 
 ### engine
 
-• **engine**: [`Engine`](internal_.Engine.md)
+• **engine**: [`Engine`](Engine.md)
+
+The reactive engine driving this item. Provides access to the
+dependency graph, version counter, and type tag — the machinery
+ecosystem packages (DevTools, diagnostics, structural sharing)
+need to inspect.
+
+Treat the engine as read-only from outside the library. Constructing
+reactive items directly (via `ReactiveItem` factories) is the only
+supported way to create an engine.
 
 #### Inherited from
 
@@ -184,7 +152,7 @@ ___
 
 #### Defined in
 
-[src/reactives/ReactiveItem.js:14](https://github.com/supercat1337/store2/blob/c65c4382ec22e2f61bbc31b786846fc524db2820/src/reactives/ReactiveItem.js#L14)
+[src/reactives/ReactiveItem.js:29](https://github.com/supercat1337/store2/blob/16b98b1eeb525c194544e8c7935c505c824c9de2/src/reactives/ReactiveItem.js#L29)
 
 ___
 
@@ -192,13 +160,33 @@ ___
 
 • **name**: `string`
 
+Debug name assigned at construction. Used in error messages and
+DevTools listings. Empty string when not set.
+
 #### Inherited from
 
 [ReactiveItem](ReactiveItem.md).[name](ReactiveItem.md#name)
 
 #### Defined in
 
-[src/reactives/ShallowReactive.js:88](https://github.com/supercat1337/store2/blob/c65c4382ec22e2f61bbc31b786846fc524db2820/src/reactives/ShallowReactive.js#L88)
+[src/reactives/ShallowReactive.js:40](https://github.com/supercat1337/store2/blob/16b98b1eeb525c194544e8c7935c505c824c9de2/src/reactives/ShallowReactive.js#L40)
+
+___
+
+### path
+
+• **path**: `string` = `''`
+
+Local path assigned by the immediate container. Top-level items get a
+path equal to their key in the root store; standalone items keep `''`.
+
+#### Inherited from
+
+[ReactiveItem](ReactiveItem.md).[path](ReactiveItem.md#path)
+
+#### Defined in
+
+[src/reactives/ReactiveItem.js:43](https://github.com/supercat1337/store2/blob/16b98b1eeb525c194544e8c7935c505c824c9de2/src/reactives/ReactiveItem.js#L43)
 
 ## Accessors
 
@@ -206,11 +194,14 @@ ___
 
 • `get` **isDestroyed**(): `boolean`
 
+Returns `true` if `destroy()` has been called.
+
+After destruction, reads and writes throw. This getter is the only
+operation that remains safe to call.
+
 #### Returns
 
 `boolean`
-
-True if the reactive item has been destroyed, false otherwise.
 
 #### Inherited from
 
@@ -218,7 +209,28 @@ ReactiveItem.isDestroyed
 
 #### Defined in
 
-[src/reactives/ReactiveItem.js:181](https://github.com/supercat1337/store2/blob/c65c4382ec22e2f61bbc31b786846fc524db2820/src/reactives/ReactiveItem.js#L181)
+[src/reactives/ReactiveItem.js:276](https://github.com/supercat1337/store2/blob/16b98b1eeb525c194544e8c7935c505c824c9de2/src/reactives/ReactiveItem.js#L276)
+
+___
+
+### type
+
+• `get` **type**(): [`ReactiveItemType`](../modules/internal_.md#reactiveitemtype)
+
+The numeric type tag of this item: `1` for `Atom`, `2` for `Computed`,
+`3` for `Collection`, `4` for `ShallowReactive`.
+
+#### Returns
+
+[`ReactiveItemType`](../modules/internal_.md#reactiveitemtype)
+
+#### Inherited from
+
+ReactiveItem.type
+
+#### Defined in
+
+[src/reactives/ReactiveItem.js:60](https://github.com/supercat1337/store2/blob/16b98b1eeb525c194544e8c7935c505c824c9de2/src/reactives/ReactiveItem.js#L60)
 
 ___
 
@@ -226,28 +238,27 @@ ___
 
 • `get` **value**(): `T`
 
-Retrieves the proxied value of the ShallowReactive. If the engine is destroyed, an error is thrown.
-Tracks the ShallowReactive for dependency management.
+The proxied object.
+
+Reading a top-level property registers a dependency on this item.
+Writing a top-level property schedules an update. Nested properties
+are not tracked.
 
 #### Returns
 
 `T`
 
-The proxied value of the ShallowReactive.
-
 #### Defined in
 
-[src/reactives/ShallowReactive.js:230](https://github.com/supercat1337/store2/blob/c65c4382ec22e2f61bbc31b786846fc524db2820/src/reactives/ShallowReactive.js#L230)
+[src/reactives/ShallowReactive.js:163](https://github.com/supercat1337/store2/blob/16b98b1eeb525c194544e8c7935c505c824c9de2/src/reactives/ShallowReactive.js#L163)
 
 • `set` **value**(`value`): `void`
 
-Sets the value of the ShallowReactive. If the value is an object, it will be proxied and reactive.
-
 #### Parameters
 
-| Name | Type | Description |
-| :------ | :------ | :------ |
-| `value` | `T` | The new value of the ShallowReactive. |
+| Name | Type |
+| :------ | :------ |
+| `value` | `T` |
 
 #### Returns
 
@@ -255,27 +266,21 @@ Sets the value of the ShallowReactive. If the value is an object, it will be pro
 
 #### Defined in
 
-[src/reactives/ShallowReactive.js:221](https://github.com/supercat1337/store2/blob/c65c4382ec22e2f61bbc31b786846fc524db2820/src/reactives/ShallowReactive.js#L221)
+[src/reactives/ShallowReactive.js:150](https://github.com/supercat1337/store2/blob/16b98b1eeb525c194544e8c7935c505c824c9de2/src/reactives/ShallowReactive.js#L150)
 
 ## Methods
 
 ### #initHandler
 
-▸ **#initHandler**(): `Object`
+▸ **#initHandler**(): [`ProxyHandler`](../interfaces/internal_.ProxyHandler.md)\<`T`\>
 
 #### Returns
 
-`Object`
-
-| Name | Type | Description |
-| :------ | :------ | :------ |
-| `deleteProperty` | (`target`: `T`, `key`: `string`) => `boolean` | - |
-| `get` | (`target`: `T`, `key`: `string`) => `any` | - |
-| `set` | (`target`: `T`, `key`: `string`, `value`: `any`) => `boolean` | - |
+[`ProxyHandler`](../interfaces/internal_.ProxyHandler.md)\<`T`\>
 
 #### Defined in
 
-[src/reactives/ShallowReactive.js:101](https://github.com/supercat1337/store2/blob/c65c4382ec22e2f61bbc31b786846fc524db2820/src/reactives/ShallowReactive.js#L101)
+[src/reactives/ShallowReactive.js:55](https://github.com/supercat1337/store2/blob/16b98b1eeb525c194544e8c7935c505c824c9de2/src/reactives/ShallowReactive.js#L55)
 
 ___
 
@@ -283,7 +288,10 @@ ___
 
 ▸ **clearAllSubscribers**(): `void`
 
-Removes all subscribers, including listeners for "#has-subscribers" and "#no-subscribers" events.
+Removes all subscribers, including lifecycle listeners.
+
+After this call, the item no longer invokes any user callbacks until
+a new subscription is made.
 
 #### Returns
 
@@ -295,7 +303,7 @@ Removes all subscribers, including listeners for "#has-subscribers" and "#no-sub
 
 #### Defined in
 
-[src/reactives/ReactiveItem.js:48](https://github.com/supercat1337/store2/blob/c65c4382ec22e2f61bbc31b786846fc524db2820/src/reactives/ReactiveItem.js#L48)
+[src/reactives/ReactiveItem.js:109](https://github.com/supercat1337/store2/blob/16b98b1eeb525c194544e8c7935c505c824c9de2/src/reactives/ReactiveItem.js#L109)
 
 ___
 
@@ -303,7 +311,9 @@ ___
 
 ▸ **clearSubscribers**(): `void`
 
-Removes all "change" subscribers. Listeners for "#has-subscribers" and "#no-subscribers" are not removed.
+Removes all change subscribers, keeping lifecycle listeners
+registered via `onHasSubscribers`, `onNoSubscribers`, and
+`onDestroy`.
 
 #### Returns
 
@@ -315,7 +325,7 @@ Removes all "change" subscribers. Listeners for "#has-subscribers" and "#no-subs
 
 #### Defined in
 
-[src/reactives/ReactiveItem.js:41](https://github.com/supercat1337/store2/blob/c65c4382ec22e2f61bbc31b786846fc524db2820/src/reactives/ReactiveItem.js#L41)
+[src/reactives/ReactiveItem.js:99](https://github.com/supercat1337/store2/blob/16b98b1eeb525c194544e8c7935c505c824c9de2/src/reactives/ReactiveItem.js#L99)
 
 ___
 
@@ -323,9 +333,11 @@ ___
 
 ▸ **destroy**(): `void`
 
-Destroys the reactive item. This method is useful for cleaning up after a reactive item
-that is no longer needed. It calls destroy on the engine of the reactive item, which
-removes all dependencies, dependents and subscribers, and marks the engine as destroyed.
+Destroys the item and tears down its dependency graph.
+
+All subscribers are detached, all dependencies are released, and any
+further read or write throws. Idempotent — subsequent calls are
+no-ops.
 
 #### Returns
 
@@ -337,7 +349,7 @@ removes all dependencies, dependents and subscribers, and marks the engine as de
 
 #### Defined in
 
-[src/reactives/ReactiveItem.js:154](https://github.com/supercat1337/store2/blob/c65c4382ec22e2f61bbc31b786846fc524db2820/src/reactives/ReactiveItem.js#L154)
+[src/reactives/ReactiveItem.js:240](https://github.com/supercat1337/store2/blob/16b98b1eeb525c194544e8c7935c505c824c9de2/src/reactives/ReactiveItem.js#L240)
 
 ___
 
@@ -345,22 +357,23 @@ ___
 
 ▸ **equals**(`a`, `b?`): `boolean`
 
-Checks if two values are equal. If the compareFn property is a function, it is used to compare the two values.
-If the compareFn property is not a function, the values are compared using the === operator.
-If the optional second argument is not provided, the value of the reactive item is used.
+Returns `true` if the two values are considered equal by this item's
+comparator.
+
+When the second argument is omitted, it is compared against the
+item's current value. Uses the custom `compareFunction` if one was
+provided at construction, otherwise falls back to shallow equality.
 
 #### Parameters
 
-| Name | Type | Description |
-| :------ | :------ | :------ |
-| `a` | `any` | The first value to compare. |
-| `b?` | `any` | The second value to compare. If not provided, the value of the reactive item is used. |
+| Name | Type |
+| :------ | :------ |
+| `a` | `any` |
+| `b?` | `any` |
 
 #### Returns
 
 `boolean`
-
-True if the two values are equal, false otherwise.
 
 #### Inherited from
 
@@ -368,7 +381,7 @@ True if the two values are equal, false otherwise.
 
 #### Defined in
 
-[src/reactives/ReactiveItem.js:166](https://github.com/supercat1337/store2/blob/c65c4382ec22e2f61bbc31b786846fc524db2820/src/reactives/ReactiveItem.js#L166)
+[src/reactives/ReactiveItem.js:256](https://github.com/supercat1337/store2/blob/16b98b1eeb525c194544e8c7935c505c824c9de2/src/reactives/ReactiveItem.js#L256)
 
 ___
 
@@ -376,14 +389,14 @@ ___
 
 ▸ **getLastError**(): `Error`
 
-Returns the last error that occurred while calculating the value of the reactive item,
-or null if there is no error.
+Returns the last error produced by this item, or `null`.
+
+For `Computed`, this is the error thrown during the most recent
+evaluation. The error is preserved until a dependency changes.
 
 #### Returns
 
 `Error`
-
-The last error that occurred, or null if there is no error.
 
 #### Inherited from
 
@@ -391,7 +404,7 @@ The last error that occurred, or null if there is no error.
 
 #### Defined in
 
-[src/reactives/ReactiveItem.js:91](https://github.com/supercat1337/store2/blob/c65c4382ec22e2f61bbc31b786846fc524db2820/src/reactives/ReactiveItem.js#L91)
+[src/reactives/ReactiveItem.js:166](https://github.com/supercat1337/store2/blob/16b98b1eeb525c194544e8c7935c505c824c9de2/src/reactives/ReactiveItem.js#L166)
 
 ___
 
@@ -399,17 +412,19 @@ ___
 
 ▸ **getRawValue**(): `T`
 
-Returns the raw, unproxied value of the ShallowReactive. This is generally not recommended as it breaks reactivity.
+Returns the underlying object without the proxy.
+
+Mutations on the returned object do not trigger reactivity. Use for
+inspection or for passing to APIs that must receive a plain object —
+not for state changes.
 
 #### Returns
 
 `T`
 
-The raw, unproxied value of the ShallowReactive.
-
 #### Defined in
 
-[src/reactives/ShallowReactive.js:238](https://github.com/supercat1337/store2/blob/c65c4382ec22e2f61bbc31b786846fc524db2820/src/reactives/ShallowReactive.js#L238)
+[src/reactives/ShallowReactive.js:176](https://github.com/supercat1337/store2/blob/16b98b1eeb525c194544e8c7935c505c824c9de2/src/reactives/ShallowReactive.js#L176)
 
 ___
 
@@ -417,21 +432,21 @@ ___
 
 ▸ **getValue**(`options?`): `T`
 
-Retrieves the proxied value of the ShallowReactive. If the engine is destroyed, an error is thrown.
-Tracks the ShallowReactive for dependency management.
+Returns the proxied object.
+
+When `options.untracked` is `false` (the default), registers this
+item as a dependency of the enclosing tracked scope.
 
 #### Parameters
 
-| Name | Type | Description |
-| :------ | :------ | :------ |
-| `options?` | `Object` | Optional options. If `untracked` is `false`, the ShallowReactive value will be added to the dependencyTracker. |
-| `options.untracked?` | `boolean` | - |
+| Name | Type |
+| :------ | :------ |
+| `options?` | `Object` |
+| `options.untracked?` | `boolean` |
 
 #### Returns
 
 `T`
-
-The proxied value of the ShallowReactive.
 
 #### Overrides
 
@@ -439,7 +454,31 @@ The proxied value of the ShallowReactive.
 
 #### Defined in
 
-[src/reactives/ShallowReactive.js:188](https://github.com/supercat1337/store2/blob/c65c4382ec22e2f61bbc31b786846fc524db2820/src/reactives/ShallowReactive.js#L188)
+[src/reactives/ShallowReactive.js:117](https://github.com/supercat1337/store2/blob/16b98b1eeb525c194544e8c7935c505c824c9de2/src/reactives/ShallowReactive.js#L117)
+
+___
+
+### getVersion
+
+▸ **getVersion**(): `number`
+
+Monotonic version counter, bumped on every effective change.
+
+Useful as a stable token for `useSyncExternalStore` and for cache
+invalidation: comparing two `getVersion()` results tells you whether
+the value changed, without reading it.
+
+#### Returns
+
+`number`
+
+#### Inherited from
+
+[ReactiveItem](ReactiveItem.md).[getVersion](ReactiveItem.md#getversion)
+
+#### Defined in
+
+[src/reactives/ReactiveItem.js:73](https://github.com/supercat1337/store2/blob/16b98b1eeb525c194544e8c7935c505c824c9de2/src/reactives/ReactiveItem.js#L73)
 
 ___
 
@@ -447,17 +486,14 @@ ___
 
 ▸ **hasError**(): `boolean`
 
-Returns true if there has been an error while calculating the value of the reactive item,
-false otherwise. This method returns true if the reactive item has been destroyed, if the
-reactive item has an error, or if the calculation of the value of the reactive item has
-thrown an error.
+Returns `true` if reading the value currently throws or has thrown.
+
+For `Computed`, this forces a read to determine whether the current
+dependencies are valid.
 
 #### Returns
 
 `boolean`
-
-Whether there has been an error while calculating the value of the
-reactive item.
 
 #### Inherited from
 
@@ -465,7 +501,7 @@ reactive item.
 
 #### Defined in
 
-[src/reactives/ReactiveItem.js:103](https://github.com/supercat1337/store2/blob/c65c4382ec22e2f61bbc31b786846fc524db2820/src/reactives/ReactiveItem.js#L103)
+[src/reactives/ReactiveItem.js:178](https://github.com/supercat1337/store2/blob/16b98b1eeb525c194544e8c7935c505c824c9de2/src/reactives/ReactiveItem.js#L178)
 
 ___
 
@@ -473,13 +509,12 @@ ___
 
 ▸ **hasSubscribers**(): `boolean`
 
-Returns true if there are any subscribers, false otherwise.
+Returns `true` if at least one change subscriber is currently
+registered.
 
 #### Returns
 
 `boolean`
-
-Whether there are any subscribers.
 
 #### Inherited from
 
@@ -487,7 +522,35 @@ Whether there are any subscribers.
 
 #### Defined in
 
-[src/reactives/ReactiveItem.js:56](https://github.com/supercat1337/store2/blob/c65c4382ec22e2f61bbc31b786846fc524db2820/src/reactives/ReactiveItem.js#L56)
+[src/reactives/ReactiveItem.js:119](https://github.com/supercat1337/store2/blob/16b98b1eeb525c194544e8c7935c505c824c9de2/src/reactives/ReactiveItem.js#L119)
+
+___
+
+### hydrate
+
+▸ **hydrate**(`data`): `void`
+
+Applies data previously produced by `serialize()`.
+
+Silently ignores malformed input.
+
+#### Parameters
+
+| Name | Type |
+| :------ | :------ |
+| `data` | `any` |
+
+#### Returns
+
+`void`
+
+#### Overrides
+
+[ReactiveItem](ReactiveItem.md).[hydrate](ReactiveItem.md#hydrate)
+
+#### Defined in
+
+[src/reactives/ShallowReactive.js:210](https://github.com/supercat1337/store2/blob/16b98b1eeb525c194544e8c7935c505c824c9de2/src/reactives/ShallowReactive.js#L210)
 
 ___
 
@@ -495,20 +558,21 @@ ___
 
 ▸ **onDestroy**(`fn`): () => `void`
 
-Subscribes a function to be called when the reactive item is destroyed.
-The function is called with no arguments.
+Registers a callback that fires when the item is destroyed.
+
+The callback receives the destroyed item as its only argument.
 
 #### Parameters
 
-| Name | Type | Description |
-| :------ | :------ | :------ |
-| `fn` | (`reactiveItem`: [`ReactiveItem`](ReactiveItem.md)) => `void` | The function to be called. |
+| Name | Type |
+| :------ | :------ |
+| `fn` | (`reactiveItem`: [`ReactiveItem`](ReactiveItem.md)) => `void` |
 
 #### Returns
 
 `fn`
 
-A function that unsubscribes the given function.
+An unsubscribe function.
 
 ▸ (): `void`
 
@@ -522,7 +586,7 @@ A function that unsubscribes the given function.
 
 #### Defined in
 
-[src/reactives/ReactiveItem.js:139](https://github.com/supercat1337/store2/blob/c65c4382ec22e2f61bbc31b786846fc524db2820/src/reactives/ReactiveItem.js#L139)
+[src/reactives/ReactiveItem.js:224](https://github.com/supercat1337/store2/blob/16b98b1eeb525c194544e8c7935c505c824c9de2/src/reactives/ReactiveItem.js#L224)
 
 ___
 
@@ -530,20 +594,23 @@ ___
 
 ▸ **onHasSubscribers**(`fn`): () => `void`
 
-Subscribes a function to be called whenever a subscriber is added to the reactive item.
-The function is called with no arguments.
+Registers a callback that fires when the first change subscriber is
+added.
+
+Useful for lazy initialisation: start expensive work only when
+somebody actually listens.
 
 #### Parameters
 
-| Name | Type | Description |
-| :------ | :------ | :------ |
-| `fn` | () => `void` | The function to be called. |
+| Name | Type |
+| :------ | :------ |
+| `fn` | () => `void` |
 
 #### Returns
 
 `fn`
 
-A function that unsubscribes the given function.
+An unsubscribe function.
 
 ▸ (): `void`
 
@@ -557,7 +624,7 @@ A function that unsubscribes the given function.
 
 #### Defined in
 
-[src/reactives/ReactiveItem.js:119](https://github.com/supercat1337/store2/blob/c65c4382ec22e2f61bbc31b786846fc524db2820/src/reactives/ReactiveItem.js#L119)
+[src/reactives/ReactiveItem.js:198](https://github.com/supercat1337/store2/blob/16b98b1eeb525c194544e8c7935c505c824c9de2/src/reactives/ReactiveItem.js#L198)
 
 ___
 
@@ -565,20 +632,23 @@ ___
 
 ▸ **onNoSubscribers**(`fn`): () => `void`
 
-Subscribes a function to be called whenever there are no longer any subscribers.
-The function is called with no arguments.
+Registers a callback that fires when the last change subscriber is
+removed.
+
+Useful for cleanup: stop timers or subscriptions that only make sense
+while somebody is listening.
 
 #### Parameters
 
-| Name | Type | Description |
-| :------ | :------ | :------ |
-| `fn` | () => `void` | The function to be called. |
+| Name | Type |
+| :------ | :------ |
+| `fn` | () => `void` |
 
 #### Returns
 
 `fn`
 
-A function that unsubscribes the given function.
+An unsubscribe function.
 
 ▸ (): `void`
 
@@ -592,7 +662,7 @@ A function that unsubscribes the given function.
 
 #### Defined in
 
-[src/reactives/ReactiveItem.js:129](https://github.com/supercat1337/store2/blob/c65c4382ec22e2f61bbc31b786846fc524db2820/src/reactives/ReactiveItem.js#L129)
+[src/reactives/ReactiveItem.js:212](https://github.com/supercat1337/store2/blob/16b98b1eeb525c194544e8c7935c505c824c9de2/src/reactives/ReactiveItem.js#L212)
 
 ___
 
@@ -600,13 +670,15 @@ ___
 
 ▸ **peekValue**(): `any`
 
-Retrieves the current value of the reactive item.
+Returns the current value without registering a dependency and
+without triggering recalculation for `Computed`.
+
+For `Computed`, this returns the last cached value even if it is
+stale. To force a fresh value, use `.value` or `.getValue()`.
 
 #### Returns
 
 `any`
-
-The current value of the reactive item.
 
 #### Inherited from
 
@@ -614,7 +686,28 @@ The current value of the reactive item.
 
 #### Defined in
 
-[src/reactives/ReactiveItem.js:82](https://github.com/supercat1337/store2/blob/c65c4382ec22e2f61bbc31b786846fc524db2820/src/reactives/ReactiveItem.js#L82)
+[src/reactives/ReactiveItem.js:154](https://github.com/supercat1337/store2/blob/16b98b1eeb525c194544e8c7935c505c824c9de2/src/reactives/ReactiveItem.js#L154)
+
+___
+
+### serialize
+
+▸ **serialize**(): `any`
+
+Returns a serializable representation of the object's own enumerable
+properties.
+
+#### Returns
+
+`any`
+
+#### Overrides
+
+[ReactiveItem](ReactiveItem.md).[serialize](ReactiveItem.md#serialize)
+
+#### Defined in
+
+[src/reactives/ShallowReactive.js:186](https://github.com/supercat1337/store2/blob/16b98b1eeb525c194544e8c7935c505c824c9de2/src/reactives/ShallowReactive.js#L186)
 
 ___
 
@@ -622,13 +715,17 @@ ___
 
 ▸ **setValue**(`value`): `void`
 
-Sets the value of the ShallowReactive. If the value is an object, it will be proxied and reactive.
+Replaces the object's properties wholesale.
+
+Keys absent from `value` are deleted from the target; new keys are
+added. The entire operation is batched and produces a single
+notification.
 
 #### Parameters
 
-| Name | Type | Description |
-| :------ | :------ | :------ |
-| `value` | `T` | The new value of the ShallowReactive. |
+| Name | Type |
+| :------ | :------ |
+| `value` | `T` |
 
 #### Returns
 
@@ -636,7 +733,7 @@ Sets the value of the ShallowReactive. If the value is an object, it will be pro
 
 #### Defined in
 
-[src/reactives/ShallowReactive.js:197](https://github.com/supercat1337/store2/blob/c65c4382ec22e2f61bbc31b786846fc524db2820/src/reactives/ShallowReactive.js#L197)
+[src/reactives/ShallowReactive.js:131](https://github.com/supercat1337/store2/blob/16b98b1eeb525c194544e8c7935c505c824c9de2/src/reactives/ShallowReactive.js#L131)
 
 ___
 
@@ -644,20 +741,26 @@ ___
 
 ▸ **subscribe**(`fn`, `options?`): () => `void`
 
-Subscribes a function to be called whenever the value of this reactive item changes.
+Subscribes a function to changes of this item.
+
+The callback receives a `Map` of property paths to
+`UpdateDataRecord` instances. It is invoked once per batch of
+effective changes.
 
 #### Parameters
 
 | Name | Type | Description |
 | :------ | :------ | :------ |
-| `fn` | (`updates`: `Map`\<`string`, [`UpdateDataRecord`](internal_.UpdateDataRecord.md)\>) => `void` | The function to be called whenever the value of this reactive item changes. |
-| `options?` | `Object` | Optional options. |
-| `options.delay` | `number` | The delay in milliseconds before the function is called. |
-| `options.signal` | `AbortSignal` | The signal to abort the subscription. |
+| `fn` | (`updates`: `Map`\<`string`, [`UpdateDataRecord`](internal_.UpdateDataRecord.md)\>) => `void` |  |
+| `options?` | `Object` |  |
+| `options.delay` | `number` | Debounce delay in milliseconds. |
+| `options.signal` | `AbortSignal` | Cancels the subscription when aborted. |
 
 #### Returns
 
 `fn`
+
+An unsubscribe function.
 
 ▸ (): `void`
 
@@ -671,4 +774,51 @@ Subscribes a function to be called whenever the value of this reactive item chan
 
 #### Defined in
 
-[src/reactives/ReactiveItem.js:34](https://github.com/supercat1337/store2/blob/c65c4382ec22e2f61bbc31b786846fc524db2820/src/reactives/ReactiveItem.js#L34)
+[src/reactives/ReactiveItem.js:90](https://github.com/supercat1337/store2/blob/16b98b1eeb525c194544e8c7935c505c824c9de2/src/reactives/ReactiveItem.js#L90)
+
+___
+
+### toJSON
+
+▸ **toJSON**(): `T`
+
+Returns a shallow copy of the raw object without the reactive proxy,
+so that `JSON.stringify(shallowReactive)` produces a plain object.
+
+#### Returns
+
+`T`
+
+#### Overrides
+
+[ReactiveItem](ReactiveItem.md).[toJSON](ReactiveItem.md#tojson)
+
+#### Defined in
+
+[src/reactives/ShallowReactive.js:199](https://github.com/supercat1337/store2/blob/16b98b1eeb525c194544e8c7935c505c824c9de2/src/reactives/ShallowReactive.js#L199)
+
+___
+
+### toObservable
+
+▸ **toObservable**(): [`ObservableValue`](../interfaces/internal_.ObservableValue.md)\<`any`\>
+
+Returns a minimal observable facade for framework adapters.
+
+- `get()` returns the current value without tracking a dependency.
+- `subscribe(fn)` invokes `fn` with the current value on every
+  effective change.
+- `version()` returns the monotonic version, suitable as a token
+  for `useSyncExternalStore`.
+
+#### Returns
+
+[`ObservableValue`](../interfaces/internal_.ObservableValue.md)\<`any`\>
+
+#### Inherited from
+
+[ReactiveItem](ReactiveItem.md).[toObservable](ReactiveItem.md#toobservable)
+
+#### Defined in
+
+[src/reactives/ReactiveItem.js:332](https://github.com/supercat1337/store2/blob/16b98b1eeb525c194544e8c7935c505c824c9de2/src/reactives/ReactiveItem.js#L332)

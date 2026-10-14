@@ -4,6 +4,11 @@
 
 [\<internal\>](../modules/internal_.md).UpdateDataRecord
 
+A single mutation state passed to subscribers.
+
+Every entry in the `updates` map received by a subscriber is an instance
+of this class.
+
 ## Table of contents
 
 ### Constructors
@@ -23,15 +28,15 @@
 
 • **new UpdateDataRecord**(`type`, `oldValue`, `value`, `reactiveItem?`): [`UpdateDataRecord`](internal_.UpdateDataRecord.md)
 
-Initializes an instance of UpdateDataRecord with the provided type, old value, and new value.
+Creates a new update record.
 
 #### Parameters
 
 | Name | Type | Description |
 | :------ | :------ | :------ |
-| `type` | ``"set"`` \| ``"delete"`` | The action performed, either "set" or "delete". |
-| `oldValue` | `any` | The previous value before the update. |
-| `value` | `any` | The new value after the update. |
+| `type` | ``"set"`` \| ``"delete"`` | The operation that produced the change. |
+| `oldValue` | `any` | Value before the change. |
+| `value` | `any` | Value after the change. |
 | `reactiveItem?` | [`ReactiveItem`](ReactiveItem.md) | The reactive item that triggered the update. |
 
 #### Returns
@@ -40,7 +45,7 @@ Initializes an instance of UpdateDataRecord with the provided type, old value, a
 
 #### Defined in
 
-[src/core/UpdateDataRecord.js:23](https://github.com/supercat1337/store2/blob/c65c4382ec22e2f61bbc31b786846fc524db2820/src/core/UpdateDataRecord.js#L23)
+[src/core/UpdateDataRecord.js:32](https://github.com/supercat1337/store2/blob/16b98b1eeb525c194544e8c7935c505c824c9de2/src/core/UpdateDataRecord.js#L32)
 
 ## Properties
 
@@ -50,7 +55,7 @@ Initializes an instance of UpdateDataRecord with the provided type, old value, a
 
 #### Defined in
 
-[src/core/UpdateDataRecord.js:11](https://github.com/supercat1337/store2/blob/c65c4382ec22e2f61bbc31b786846fc524db2820/src/core/UpdateDataRecord.js#L11)
+[src/core/UpdateDataRecord.js:19](https://github.com/supercat1337/store2/blob/16b98b1eeb525c194544e8c7935c505c824c9de2/src/core/UpdateDataRecord.js#L19)
 
 ___
 
@@ -60,7 +65,7 @@ ___
 
 #### Defined in
 
-[src/core/UpdateDataRecord.js:14](https://github.com/supercat1337/store2/blob/c65c4382ec22e2f61bbc31b786846fc524db2820/src/core/UpdateDataRecord.js#L14)
+[src/core/UpdateDataRecord.js:22](https://github.com/supercat1337/store2/blob/16b98b1eeb525c194544e8c7935c505c824c9de2/src/core/UpdateDataRecord.js#L22)
 
 ___
 
@@ -70,7 +75,7 @@ ___
 
 #### Defined in
 
-[src/core/UpdateDataRecord.js:5](https://github.com/supercat1337/store2/blob/c65c4382ec22e2f61bbc31b786846fc524db2820/src/core/UpdateDataRecord.js#L5)
+[src/core/UpdateDataRecord.js:13](https://github.com/supercat1337/store2/blob/16b98b1eeb525c194544e8c7935c505c824c9de2/src/core/UpdateDataRecord.js#L13)
 
 ___
 
@@ -80,4 +85,4 @@ ___
 
 #### Defined in
 
-[src/core/UpdateDataRecord.js:8](https://github.com/supercat1337/store2/blob/c65c4382ec22e2f61bbc31b786846fc524db2820/src/core/UpdateDataRecord.js#L8)
+[src/core/UpdateDataRecord.js:16](https://github.com/supercat1337/store2/blob/16b98b1eeb525c194544e8c7935c505c824c9de2/src/core/UpdateDataRecord.js#L16)

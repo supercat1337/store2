@@ -38,7 +38,7 @@ Initializes an instance of UpdateDataRecordManager with the given data.
 
 #### Defined in
 
-[src/core/UpdateDataRecord.js:36](https://github.com/supercat1337/store2/blob/c65c4382ec22e2f61bbc31b786846fc524db2820/src/core/UpdateDataRecord.js#L36)
+[src/core/UpdateDataRecord.js:45](https://github.com/supercat1337/store2/blob/16b98b1eeb525c194544e8c7935c505c824c9de2/src/core/UpdateDataRecord.js#L45)
 
 ## Properties
 
@@ -48,7 +48,7 @@ Initializes an instance of UpdateDataRecordManager with the given data.
 
 #### Defined in
 
-[src/core/UpdateDataRecord.js:37](https://github.com/supercat1337/store2/blob/c65c4382ec22e2f61bbc31b786846fc524db2820/src/core/UpdateDataRecord.js#L37)
+[src/core/UpdateDataRecord.js:46](https://github.com/supercat1337/store2/blob/16b98b1eeb525c194544e8c7935c505c824c9de2/src/core/UpdateDataRecord.js#L46)
 
 ## Methods
 
@@ -71,4 +71,4 @@ Replaces the deleted items with new UpdateDataRecord instances indicating the "d
 
 #### Defined in
 
-[src/core/UpdateDataRecord.js:45](https://github.com/supercat1337/store2/blob/c65c4382ec22e2f61bbc31b786846fc524db2820/src/core/UpdateDataRecord.js#L45)
+[src/core/UpdateDataRecord.js:54](https://github.com/supercat1337/store2/blob/16b98b1eeb525c194544e8c7935c505c824c9de2/src/core/UpdateDataRecord.js#L54)

@@ -2,51 +2,19 @@
 
 # Class: Computed\<T\>
 
-Computed is a reactive item that holds a value that is computed from other reactive values.
-It is the base unit of reactive state.
+Computed is a reactive item whose value is derived from other reactive
+sources.
 
-**`Example`**
+The function passed to the constructor runs once at construction time to
+establish dependencies and compute the initial value. It runs again
+whenever a dependency changes and the recomputed value differs from the
+cached one. Because equality is checked before notifying subscribers, a
+computed whose dependencies change but whose output stays the same does
+not cause any downstream work.
 
-```js
-const a = new Atom(0); // same as const a = atom(0);
-const b = new Atom(0);
-
-const c = new Computed(() => a.value + b.value);
-
-c.subscribe(() => {
-    console.log("c", c.value);
-});
-
-a.subscribe(() => {
-    console.log("a", a.value);
-});
-
-b.subscribe(() => {
-    console.log("b", b.value);
-});
-
-a.value = 1;
-// Output:
-//a 1
-//c 1
-
-a.value = 2;
-// Output:
-//a 2
-//c 2
-b.value = 2;
-// Output:
-//b 2
-//c 4
-
-a.value = 3;
-// Output:
-//a 3
-//c 5
-
-a.value = 3;
-// Output: nothing
-```
+`Computed` is derived state and is never persisted — `serialize()`
+returns `null`, and the value is recalculated from its dependencies on
+hydration.
 
 ## Type parameters
 
@@ -68,16 +36,19 @@ a.value = 3;
 
 ### Properties
 
+- [#cachedDependentsVersionString](Computed.md##cacheddependentsversionstring)
 - [#currentValue](Computed.md##currentvalue)
 - [#fn](Computed.md##fn)
-- [\_\_cachedDependentsVersionString](Computed.md##cachedDependentsVersionString)
+- [#warnedAboutReference](Computed.md##warnedaboutreference)
 - [engine](Computed.md#engine)
 - [name](Computed.md#name)
 - [options](Computed.md#options)
+- [path](Computed.md#path)
 
 ### Accessors
 
 - [isDestroyed](Computed.md#isdestroyed)
+- [type](Computed.md#type)
 - [value](Computed.md#value)
 - [valueUntracked](Computed.md#valueuntracked)
 
@@ -87,20 +58,27 @@ a.value = 3;
 - [#calc](Computed.md##calc)
 - [#collectDependenciesAndInitValue](Computed.md##collectdependenciesandinitvalue)
 - [#getDependenciesVersionString](Computed.md##getdependenciesversionstring)
+- [#hasAnyDependencyVersionChanged](Computed.md##hasanydependencyversionchanged)
+- [#hasReactiveContainerDependency](Computed.md##hasreactivecontainerdependency)
 - [clearAllSubscribers](Computed.md#clearallsubscribers)
 - [clearSubscribers](Computed.md#clearsubscribers)
 - [destroy](Computed.md#destroy)
 - [equals](Computed.md#equals)
 - [getLastError](Computed.md#getlasterror)
 - [getValue](Computed.md#getvalue)
+- [getVersion](Computed.md#getversion)
 - [hasError](Computed.md#haserror)
 - [hasSubscribers](Computed.md#hassubscribers)
+- [hydrate](Computed.md#hydrate)
 - [isStale](Computed.md#isstale)
 - [onDestroy](Computed.md#ondestroy)
 - [onHasSubscribers](Computed.md#onhassubscribers)
 - [onNoSubscribers](Computed.md#onnosubscribers)
 - [peekValue](Computed.md#peekvalue)
+- [serialize](Computed.md#serialize)
 - [subscribe](Computed.md#subscribe)
+- [toJSON](Computed.md#tojson)
+- [toObservable](Computed.md#toobservable)
 
 ## Constructors
 
@@ -108,7 +86,7 @@ a.value = 3;
 
 • **new Computed**\<`T`\>(`fn`, `options?`): [`Computed`](Computed.md)\<`T`\>
 
-Initializes an Atom instance with a given value.
+Creates a new Computed.
 
 #### Type parameters
 
@@ -120,11 +98,11 @@ Initializes an Atom instance with a given value.
 
 | Name | Type | Description |
 | :------ | :------ | :------ |
-| `fn` | () => `T` | function that returns the value of the Computed |
-| `options?` | `Object` | Options |
-| `options.compareFunction` | (`a`: `T`, `b`: `T`) => `boolean` | A function that compares two values for equality. |
-| `options.name` | `string` | The name of the Computed instance. |
-| `options.smartRecompute` | `boolean` | When true, the computed value will be recalculated only when the version string of its dependencies changes, rather than on every dependency notification. This avoids unnecessary recalculations when dependencies change but their final values remain the same (e.g., toggling back and forth). Defaults to false. |
+| `fn` | () => `T` | The derivation function. Must read at least one reactive value. |
+| `options?` | `Object` |  |
+| `options.compareFunction` | (`a`: `T`, `b`: `T`) => `boolean` | Custom equality function. Defaults to shallow comparison. |
+| `options.name` | `string` | Debug name used in error messages. |
+| `options.smartRecompute` | `boolean` | When `true`, the value is recalculated only if the version of a dependency actually changed, avoiding recomputation when dependencies toggled back to their previous values within a batch. |
 
 #### Returns
 
@@ -136,9 +114,19 @@ Initializes an Atom instance with a given value.
 
 #### Defined in
 
-src/reactives/Computed.js:82
+src/reactives/Computed.js:56
 
 ## Properties
+
+### #cachedDependentsVersionString
+
+• `Private` **#cachedDependentsVersionString**: `string` = `''`
+
+#### Defined in
+
+src/reactives/Computed.js:34
+
+___
 
 ### #currentValue
 
@@ -146,7 +134,7 @@ src/reactives/Computed.js:82
 
 #### Defined in
 
-src/reactives/Computed.js:58
+src/reactives/Computed.js:28
 
 ___
 
@@ -164,23 +152,32 @@ ___
 
 #### Defined in
 
-src/reactives/Computed.js:61
+src/reactives/Computed.js:31
 
 ___
 
-### \_\_cachedDependentsVersionString
+### #warnedAboutReference
 
-• **\_\_cachedDependentsVersionString**: `string` = `''`
+• `Private` **#warnedAboutReference**: `boolean` = `false`
 
 #### Defined in
 
-src/reactives/Computed.js:64
+src/reactives/Computed.js:37
 
 ___
 
 ### engine
 
-• **engine**: [`Engine`](internal_.Engine.md)
+• **engine**: [`Engine`](Engine.md)
+
+The reactive engine driving this item. Provides access to the
+dependency graph, version counter, and type tag — the machinery
+ecosystem packages (DevTools, diagnostics, structural sharing)
+need to inspect.
+
+Treat the engine as read-only from outside the library. Constructing
+reactive items directly (via `ReactiveItem` factories) is the only
+supported way to create an engine.
 
 #### Inherited from
 
@@ -188,7 +185,7 @@ ___
 
 #### Defined in
 
-[src/reactives/ReactiveItem.js:14](https://github.com/supercat1337/store2/blob/c65c4382ec22e2f61bbc31b786846fc524db2820/src/reactives/ReactiveItem.js#L14)
+[src/reactives/ReactiveItem.js:29](https://github.com/supercat1337/store2/blob/16b98b1eeb525c194544e8c7935c505c824c9de2/src/reactives/ReactiveItem.js#L29)
 
 ___
 
@@ -196,19 +193,25 @@ ___
 
 • **name**: `string`
 
+Debug name assigned at construction. Used in error messages and
+DevTools listings. Empty string when not set.
+
 #### Inherited from
 
 [ReactiveItem](ReactiveItem.md).[name](ReactiveItem.md#name)
 
 #### Defined in
 
-src/reactives/Computed.js:96
+src/reactives/Computed.js:70
 
 ___
 
 ### options
 
 • **options**: `Object`
+
+Read-only view of the options passed to the constructor. Currently
+exposes `smartRecompute`.
 
 #### Type declaration
 
@@ -218,7 +221,24 @@ ___
 
 #### Defined in
 
-src/reactives/Computed.js:66
+src/reactives/Computed.js:43
+
+___
+
+### path
+
+• **path**: `string` = `''`
+
+Local path assigned by the immediate container. Top-level items get a
+path equal to their key in the root store; standalone items keep `''`.
+
+#### Inherited from
+
+[ReactiveItem](ReactiveItem.md).[path](ReactiveItem.md#path)
+
+#### Defined in
+
+[src/reactives/ReactiveItem.js:43](https://github.com/supercat1337/store2/blob/16b98b1eeb525c194544e8c7935c505c824c9de2/src/reactives/ReactiveItem.js#L43)
 
 ## Accessors
 
@@ -226,11 +246,14 @@ src/reactives/Computed.js:66
 
 • `get` **isDestroyed**(): `boolean`
 
+Returns `true` if `destroy()` has been called.
+
+After destruction, reads and writes throw. This getter is the only
+operation that remains safe to call.
+
 #### Returns
 
 `boolean`
-
-True if the reactive item has been destroyed, false otherwise.
 
 #### Inherited from
 
@@ -238,7 +261,28 @@ ReactiveItem.isDestroyed
 
 #### Defined in
 
-[src/reactives/ReactiveItem.js:181](https://github.com/supercat1337/store2/blob/c65c4382ec22e2f61bbc31b786846fc524db2820/src/reactives/ReactiveItem.js#L181)
+[src/reactives/ReactiveItem.js:276](https://github.com/supercat1337/store2/blob/16b98b1eeb525c194544e8c7935c505c824c9de2/src/reactives/ReactiveItem.js#L276)
+
+___
+
+### type
+
+• `get` **type**(): [`ReactiveItemType`](../modules/internal_.md#reactiveitemtype)
+
+The numeric type tag of this item: `1` for `Atom`, `2` for `Computed`,
+`3` for `Collection`, `4` for `ShallowReactive`.
+
+#### Returns
+
+[`ReactiveItemType`](../modules/internal_.md#reactiveitemtype)
+
+#### Inherited from
+
+ReactiveItem.type
+
+#### Defined in
+
+[src/reactives/ReactiveItem.js:60](https://github.com/supercat1337/store2/blob/16b98b1eeb525c194544e8c7935c505c824c9de2/src/reactives/ReactiveItem.js#L60)
 
 ___
 
@@ -246,17 +290,18 @@ ___
 
 • `get` **value**(): `T`
 
-Returns the current value of the Computed value.
+The computed value.
+
+Reading this property recalculates if a dependency changed and
+registers a dependency in the enclosing tracked scope.
 
 #### Returns
 
 `T`
 
-The current value of the Computed value.
-
 #### Defined in
 
-src/reactives/Computed.js:239
+src/reactives/Computed.js:240
 
 ___
 
@@ -264,42 +309,18 @@ ___
 
 • `get` **valueUntracked**(): `T`
 
-Returns the current value of the Computed value without tracking it for dependency management.
-This is useful when you want to access the value without affecting its reactive state.
+Returns the computed value without registering a dependency.
+
+Shorthand for `getValue({ untracked: true })`. The value is still
+recalculated if stale — only dependency registration is skipped.
 
 #### Returns
 
 `T`
 
-The current value of the Computed value.
-
-**`Example`**
-
-```js
-const a = atom(0);
-const b = atom(0);
-const c = computed(() => a.value + 1);
-const d = computed(() => c.valueUntracked + b.value);
-
-d.subscribe(() => {
-    console.log(`d = ${d.value}`);
-});
-
-console.log(`c = ${c.value}`);
-// Outputs: c = 1
-a.value++;
-// a = 1
-// Outputs: nothing
-console.log(`c = ${c.value}`);
-// Outputs: c = 2
-
-b.value++;
-// Outputs: d = 3
-```
-
 #### Defined in
 
-src/reactives/Computed.js:300
+src/reactives/Computed.js:265
 
 ## Methods
 
@@ -313,7 +334,7 @@ src/reactives/Computed.js:300
 
 #### Defined in
 
-src/reactives/Computed.js:183
+src/reactives/Computed.js:172
 
 ___
 
@@ -327,7 +348,7 @@ ___
 
 #### Defined in
 
-src/reactives/Computed.js:304
+src/reactives/Computed.js:272
 
 ___
 
@@ -341,7 +362,7 @@ ___
 
 #### Defined in
 
-src/reactives/Computed.js:130
+src/reactives/Computed.js:102
 
 ___
 
@@ -349,15 +370,52 @@ ___
 
 ▸ **#getDependenciesVersionString**(): `string`
 
-Returns a string representation of the dependencies of the Computed value.
-
 #### Returns
 
 `string`
 
 #### Defined in
 
-src/reactives/Computed.js:111
+src/reactives/Computed.js:84
+
+___
+
+### #hasAnyDependencyVersionChanged
+
+▸ **#hasAnyDependencyVersionChanged**(): `boolean`
+
+Returns true if at least one dependency has been notified of a change
+since the previous computation. We cannot know the "previous" version
+exactly, but the version counter on each dependency is monotonic, so
+any dependency with `shouldRecalc === true` or a version bump that
+the computed has not seen yet qualifies. A simpler proxy: check
+whether any dependency's engine has pending updates.
+
+#### Returns
+
+`boolean`
+
+#### Defined in
+
+src/reactives/Computed.js:390
+
+___
+
+### #hasReactiveContainerDependency
+
+▸ **#hasReactiveContainerDependency**(): `boolean`
+
+Returns true if any direct dependency is a Collection or
+ShallowReactive (both expose a proxy whose identity does not change
+when contents change).
+
+#### Returns
+
+`boolean`
+
+#### Defined in
+
+src/reactives/Computed.js:370
 
 ___
 
@@ -365,7 +423,10 @@ ___
 
 ▸ **clearAllSubscribers**(): `void`
 
-Removes all subscribers, including listeners for "#has-subscribers" and "#no-subscribers" events.
+Removes all subscribers, including lifecycle listeners.
+
+After this call, the item no longer invokes any user callbacks until
+a new subscription is made.
 
 #### Returns
 
@@ -377,7 +438,7 @@ Removes all subscribers, including listeners for "#has-subscribers" and "#no-sub
 
 #### Defined in
 
-[src/reactives/ReactiveItem.js:48](https://github.com/supercat1337/store2/blob/c65c4382ec22e2f61bbc31b786846fc524db2820/src/reactives/ReactiveItem.js#L48)
+[src/reactives/ReactiveItem.js:109](https://github.com/supercat1337/store2/blob/16b98b1eeb525c194544e8c7935c505c824c9de2/src/reactives/ReactiveItem.js#L109)
 
 ___
 
@@ -385,7 +446,9 @@ ___
 
 ▸ **clearSubscribers**(): `void`
 
-Removes all "change" subscribers. Listeners for "#has-subscribers" and "#no-subscribers" are not removed.
+Removes all change subscribers, keeping lifecycle listeners
+registered via `onHasSubscribers`, `onNoSubscribers`, and
+`onDestroy`.
 
 #### Returns
 
@@ -397,7 +460,7 @@ Removes all "change" subscribers. Listeners for "#has-subscribers" and "#no-subs
 
 #### Defined in
 
-[src/reactives/ReactiveItem.js:41](https://github.com/supercat1337/store2/blob/c65c4382ec22e2f61bbc31b786846fc524db2820/src/reactives/ReactiveItem.js#L41)
+[src/reactives/ReactiveItem.js:99](https://github.com/supercat1337/store2/blob/16b98b1eeb525c194544e8c7935c505c824c9de2/src/reactives/ReactiveItem.js#L99)
 
 ___
 
@@ -405,9 +468,11 @@ ___
 
 ▸ **destroy**(): `void`
 
-Destroys the reactive item. This method is useful for cleaning up after a reactive item
-that is no longer needed. It calls destroy on the engine of the reactive item, which
-removes all dependencies, dependents and subscribers, and marks the engine as destroyed.
+Destroys the item and tears down its dependency graph.
+
+All subscribers are detached, all dependencies are released, and any
+further read or write throws. Idempotent — subsequent calls are
+no-ops.
 
 #### Returns
 
@@ -419,7 +484,7 @@ removes all dependencies, dependents and subscribers, and marks the engine as de
 
 #### Defined in
 
-[src/reactives/ReactiveItem.js:154](https://github.com/supercat1337/store2/blob/c65c4382ec22e2f61bbc31b786846fc524db2820/src/reactives/ReactiveItem.js#L154)
+[src/reactives/ReactiveItem.js:240](https://github.com/supercat1337/store2/blob/16b98b1eeb525c194544e8c7935c505c824c9de2/src/reactives/ReactiveItem.js#L240)
 
 ___
 
@@ -427,22 +492,23 @@ ___
 
 ▸ **equals**(`a`, `b?`): `boolean`
 
-Checks if two values are equal. If the compareFn property is a function, it is used to compare the two values.
-If the compareFn property is not a function, the values are compared using the === operator.
-If the optional second argument is not provided, the value of the reactive item is used.
+Returns `true` if the two values are considered equal by this item's
+comparator.
+
+When the second argument is omitted, it is compared against the
+item's current value. Uses the custom `compareFunction` if one was
+provided at construction, otherwise falls back to shallow equality.
 
 #### Parameters
 
-| Name | Type | Description |
-| :------ | :------ | :------ |
-| `a` | `any` | The first value to compare. |
-| `b?` | `any` | The second value to compare. If not provided, the value of the reactive item is used. |
+| Name | Type |
+| :------ | :------ |
+| `a` | `any` |
+| `b?` | `any` |
 
 #### Returns
 
 `boolean`
-
-True if the two values are equal, false otherwise.
 
 #### Inherited from
 
@@ -450,7 +516,7 @@ True if the two values are equal, false otherwise.
 
 #### Defined in
 
-[src/reactives/ReactiveItem.js:166](https://github.com/supercat1337/store2/blob/c65c4382ec22e2f61bbc31b786846fc524db2820/src/reactives/ReactiveItem.js#L166)
+[src/reactives/ReactiveItem.js:256](https://github.com/supercat1337/store2/blob/16b98b1eeb525c194544e8c7935c505c824c9de2/src/reactives/ReactiveItem.js#L256)
 
 ___
 
@@ -458,14 +524,14 @@ ___
 
 ▸ **getLastError**(): `Error`
 
-Returns the last error that occurred while calculating the value of the reactive item,
-or null if there is no error.
+Returns the last error produced by this item, or `null`.
+
+For `Computed`, this is the error thrown during the most recent
+evaluation. The error is preserved until a dependency changes.
 
 #### Returns
 
 `Error`
-
-The last error that occurred, or null if there is no error.
 
 #### Inherited from
 
@@ -473,7 +539,7 @@ The last error that occurred, or null if there is no error.
 
 #### Defined in
 
-[src/reactives/ReactiveItem.js:91](https://github.com/supercat1337/store2/blob/c65c4382ec22e2f61bbc31b786846fc524db2820/src/reactives/ReactiveItem.js#L91)
+[src/reactives/ReactiveItem.js:166](https://github.com/supercat1337/store2/blob/16b98b1eeb525c194544e8c7935c505c824c9de2/src/reactives/ReactiveItem.js#L166)
 
 ___
 
@@ -481,18 +547,26 @@ ___
 
 ▸ **getValue**(`options?`): `T`
 
+Returns the computed value, recalculating first if any dependency
+changed.
+
+When `options.untracked` is `false` (the default), registers this
+computed as a dependency of the enclosing tracked scope. Pass
+`{ untracked: true }` to read without creating a dependency.
+
+Throws if the derivation function throws, or if the item has been
+destroyed.
+
 #### Parameters
 
-| Name | Type | Description |
-| :------ | :------ | :------ |
-| `options?` | `Object` | Optional options. If `untracked` is `false`, the Computed value will be added to the dependencyTracker. |
-| `options.untracked?` | `boolean` | - |
+| Name | Type |
+| :------ | :------ |
+| `options?` | `Object` |
+| `options.untracked?` | `boolean` |
 
 #### Returns
 
 `T`
-
-The current value of the Computed value.
 
 #### Overrides
 
@@ -500,7 +574,31 @@ The current value of the Computed value.
 
 #### Defined in
 
-src/reactives/Computed.js:201
+src/reactives/Computed.js:199
+
+___
+
+### getVersion
+
+▸ **getVersion**(): `number`
+
+Monotonic version counter, bumped on every effective change.
+
+Useful as a stable token for `useSyncExternalStore` and for cache
+invalidation: comparing two `getVersion()` results tells you whether
+the value changed, without reading it.
+
+#### Returns
+
+`number`
+
+#### Inherited from
+
+[ReactiveItem](ReactiveItem.md).[getVersion](ReactiveItem.md#getversion)
+
+#### Defined in
+
+[src/reactives/ReactiveItem.js:73](https://github.com/supercat1337/store2/blob/16b98b1eeb525c194544e8c7935c505c824c9de2/src/reactives/ReactiveItem.js#L73)
 
 ___
 
@@ -508,17 +606,14 @@ ___
 
 ▸ **hasError**(): `boolean`
 
-Returns true if there has been an error while calculating the value of the reactive item,
-false otherwise. This method returns true if the reactive item has been destroyed, if the
-reactive item has an error, or if the calculation of the value of the reactive item has
-thrown an error.
+Returns `true` if reading the value currently throws or has thrown.
+
+For `Computed`, this forces a read to determine whether the current
+dependencies are valid.
 
 #### Returns
 
 `boolean`
-
-Whether there has been an error while calculating the value of the
-reactive item.
 
 #### Inherited from
 
@@ -526,7 +621,7 @@ reactive item.
 
 #### Defined in
 
-[src/reactives/ReactiveItem.js:103](https://github.com/supercat1337/store2/blob/c65c4382ec22e2f61bbc31b786846fc524db2820/src/reactives/ReactiveItem.js#L103)
+[src/reactives/ReactiveItem.js:178](https://github.com/supercat1337/store2/blob/16b98b1eeb525c194544e8c7935c505c824c9de2/src/reactives/ReactiveItem.js#L178)
 
 ___
 
@@ -534,13 +629,12 @@ ___
 
 ▸ **hasSubscribers**(): `boolean`
 
-Returns true if there are any subscribers, false otherwise.
+Returns `true` if at least one change subscriber is currently
+registered.
 
 #### Returns
 
 `boolean`
-
-Whether there are any subscribers.
 
 #### Inherited from
 
@@ -548,7 +642,37 @@ Whether there are any subscribers.
 
 #### Defined in
 
-[src/reactives/ReactiveItem.js:56](https://github.com/supercat1337/store2/blob/c65c4382ec22e2f61bbc31b786846fc524db2820/src/reactives/ReactiveItem.js#L56)
+[src/reactives/ReactiveItem.js:119](https://github.com/supercat1337/store2/blob/16b98b1eeb525c194544e8c7935c505c824c9de2/src/reactives/ReactiveItem.js#L119)
+
+___
+
+### hydrate
+
+▸ **hydrate**(`_data`): `void`
+
+Restores state previously produced by `serialize()`.
+
+The base implementation is a no-op. Subclasses override this to apply
+the given data. Implementations must be idempotent and must not throw
+on malformed input — silently ignore what they cannot apply.
+
+#### Parameters
+
+| Name | Type |
+| :------ | :------ |
+| `_data` | `any` |
+
+#### Returns
+
+`void`
+
+#### Inherited from
+
+[ReactiveItem](ReactiveItem.md).[hydrate](ReactiveItem.md#hydrate)
+
+#### Defined in
+
+[src/reactives/ReactiveItem.js:317](https://github.com/supercat1337/store2/blob/16b98b1eeb525c194544e8c7935c505c824c9de2/src/reactives/ReactiveItem.js#L317)
 
 ___
 
@@ -556,18 +680,19 @@ ___
 
 ▸ **isStale**(): `boolean`
 
-Checks whether the Computed value needs to be recalculated. A recalculation is needed if the engine's shouldRecalc
-property is true, if the engine has an error, or if the version string of the dependencies has changed.
+Returns `true` if the cached value is out of date and a read would
+trigger recalculation.
+
+A computed is stale if one of its dependencies notified a change, or
+if its last evaluation threw an error.
 
 #### Returns
 
 `boolean`
 
-true if the Computed value needs to be recalculated, false if it does not.
-
 #### Defined in
 
-src/reactives/Computed.js:169
+src/reactives/Computed.js:157
 
 ___
 
@@ -575,20 +700,21 @@ ___
 
 ▸ **onDestroy**(`fn`): () => `void`
 
-Subscribes a function to be called when the reactive item is destroyed.
-The function is called with no arguments.
+Registers a callback that fires when the item is destroyed.
+
+The callback receives the destroyed item as its only argument.
 
 #### Parameters
 
-| Name | Type | Description |
-| :------ | :------ | :------ |
-| `fn` | (`reactiveItem`: [`ReactiveItem`](ReactiveItem.md)) => `void` | The function to be called. |
+| Name | Type |
+| :------ | :------ |
+| `fn` | (`reactiveItem`: [`ReactiveItem`](ReactiveItem.md)) => `void` |
 
 #### Returns
 
 `fn`
 
-A function that unsubscribes the given function.
+An unsubscribe function.
 
 ▸ (): `void`
 
@@ -602,7 +728,7 @@ A function that unsubscribes the given function.
 
 #### Defined in
 
-[src/reactives/ReactiveItem.js:139](https://github.com/supercat1337/store2/blob/c65c4382ec22e2f61bbc31b786846fc524db2820/src/reactives/ReactiveItem.js#L139)
+[src/reactives/ReactiveItem.js:224](https://github.com/supercat1337/store2/blob/16b98b1eeb525c194544e8c7935c505c824c9de2/src/reactives/ReactiveItem.js#L224)
 
 ___
 
@@ -610,20 +736,23 @@ ___
 
 ▸ **onHasSubscribers**(`fn`): () => `void`
 
-Subscribes a function to be called whenever a subscriber is added to the reactive item.
-The function is called with no arguments.
+Registers a callback that fires when the first change subscriber is
+added.
+
+Useful for lazy initialisation: start expensive work only when
+somebody actually listens.
 
 #### Parameters
 
-| Name | Type | Description |
-| :------ | :------ | :------ |
-| `fn` | () => `void` | The function to be called. |
+| Name | Type |
+| :------ | :------ |
+| `fn` | () => `void` |
 
 #### Returns
 
 `fn`
 
-A function that unsubscribes the given function.
+An unsubscribe function.
 
 ▸ (): `void`
 
@@ -637,7 +766,7 @@ A function that unsubscribes the given function.
 
 #### Defined in
 
-[src/reactives/ReactiveItem.js:119](https://github.com/supercat1337/store2/blob/c65c4382ec22e2f61bbc31b786846fc524db2820/src/reactives/ReactiveItem.js#L119)
+[src/reactives/ReactiveItem.js:198](https://github.com/supercat1337/store2/blob/16b98b1eeb525c194544e8c7935c505c824c9de2/src/reactives/ReactiveItem.js#L198)
 
 ___
 
@@ -645,20 +774,23 @@ ___
 
 ▸ **onNoSubscribers**(`fn`): () => `void`
 
-Subscribes a function to be called whenever there are no longer any subscribers.
-The function is called with no arguments.
+Registers a callback that fires when the last change subscriber is
+removed.
+
+Useful for cleanup: stop timers or subscriptions that only make sense
+while somebody is listening.
 
 #### Parameters
 
-| Name | Type | Description |
-| :------ | :------ | :------ |
-| `fn` | () => `void` | The function to be called. |
+| Name | Type |
+| :------ | :------ |
+| `fn` | () => `void` |
 
 #### Returns
 
 `fn`
 
-A function that unsubscribes the given function.
+An unsubscribe function.
 
 ▸ (): `void`
 
@@ -672,7 +804,7 @@ A function that unsubscribes the given function.
 
 #### Defined in
 
-[src/reactives/ReactiveItem.js:129](https://github.com/supercat1337/store2/blob/c65c4382ec22e2f61bbc31b786846fc524db2820/src/reactives/ReactiveItem.js#L129)
+[src/reactives/ReactiveItem.js:212](https://github.com/supercat1337/store2/blob/16b98b1eeb525c194544e8c7935c505c824c9de2/src/reactives/ReactiveItem.js#L212)
 
 ___
 
@@ -680,34 +812,15 @@ ___
 
 ▸ **peekValue**(): `T`
 
-Returns the current cached value of the computed without triggering a recalculation
-and without tracking dependencies.
+Returns the last cached value without triggering recalculation.
 
-Unlike the `value` getter, this method does not check if dependencies have changed
-and does not recompute the value if it's stale. It simply returns the last
-computed value. This is useful for debugging or for accessing the value
-without causing side effects (e.g., inside an untracked context).
-
-If the computed has an error, this method will still return the last cached
-value (which may be undefined or a previous value) without rethrowing the error.
+If the computed is stale, this returns the previous value — not a
+fresh one. Useful for debugging and for reading without causing side
+effects, but the value may be out of date.
 
 #### Returns
 
 `T`
-
-The cached value.
-
-**`Example`**
-
-```js
-const a = atom(1);
-const b = computed(() => a.value * 2);
-
-console.log(b.peekValue()); // 2 (without tracking dependencies)
-a.value = 2;
-console.log(b.peekValue()); // still 2 (stale, not recomputed)
-console.log(b.value);       // 4 (recomputed now)
-```
 
 #### Overrides
 
@@ -715,7 +828,29 @@ console.log(b.value);       // 4 (recomputed now)
 
 #### Defined in
 
-src/reactives/Computed.js:269
+src/reactives/Computed.js:253
+
+___
+
+### serialize
+
+▸ **serialize**(): ``null``
+
+Always returns `null`. Computed items are derived state and are never
+persisted — they are recalculated from their dependencies on
+hydration.
+
+#### Returns
+
+``null``
+
+#### Overrides
+
+[ReactiveItem](ReactiveItem.md).[serialize](ReactiveItem.md#serialize)
+
+#### Defined in
+
+src/reactives/Computed.js:359
 
 ___
 
@@ -723,20 +858,26 @@ ___
 
 ▸ **subscribe**(`fn`, `options?`): () => `void`
 
-Subscribes a function to be called whenever the value of this reactive item changes.
+Subscribes a function to changes of this item.
+
+The callback receives a `Map` of property paths to
+`UpdateDataRecord` instances. It is invoked once per batch of
+effective changes.
 
 #### Parameters
 
 | Name | Type | Description |
 | :------ | :------ | :------ |
-| `fn` | (`updates`: `Map`\<`string`, [`UpdateDataRecord`](internal_.UpdateDataRecord.md)\>) => `void` | The function to be called whenever the value of this reactive item changes. |
-| `options?` | `Object` | Optional options. |
-| `options.delay` | `number` | The delay in milliseconds before the function is called. |
-| `options.signal` | `AbortSignal` | The signal to abort the subscription. |
+| `fn` | (`updates`: `Map`\<`string`, [`UpdateDataRecord`](internal_.UpdateDataRecord.md)\>) => `void` |  |
+| `options?` | `Object` |  |
+| `options.delay` | `number` | Debounce delay in milliseconds. |
+| `options.signal` | `AbortSignal` | Cancels the subscription when aborted. |
 
 #### Returns
 
 `fn`
+
+An unsubscribe function.
 
 ▸ (): `void`
 
@@ -750,4 +891,55 @@ Subscribes a function to be called whenever the value of this reactive item chan
 
 #### Defined in
 
-[src/reactives/ReactiveItem.js:34](https://github.com/supercat1337/store2/blob/c65c4382ec22e2f61bbc31b786846fc524db2820/src/reactives/ReactiveItem.js#L34)
+[src/reactives/ReactiveItem.js:90](https://github.com/supercat1337/store2/blob/16b98b1eeb525c194544e8c7935c505c824c9de2/src/reactives/ReactiveItem.js#L90)
+
+___
+
+### toJSON
+
+▸ **toJSON**(): `any`
+
+Returns the current value as a plain JavaScript value, for use with
+`JSON.stringify()`. Subclasses override this to return their raw
+value without proxies.
+
+This is a debug/inspection convenience, not a persistence protocol —
+use `serialize()` for snapshots.
+
+#### Returns
+
+`any`
+
+#### Inherited from
+
+[ReactiveItem](ReactiveItem.md).[toJSON](ReactiveItem.md#tojson)
+
+#### Defined in
+
+[src/reactives/ReactiveItem.js:304](https://github.com/supercat1337/store2/blob/16b98b1eeb525c194544e8c7935c505c824c9de2/src/reactives/ReactiveItem.js#L304)
+
+___
+
+### toObservable
+
+▸ **toObservable**(): [`ObservableValue`](../interfaces/internal_.ObservableValue.md)\<`any`\>
+
+Returns a minimal observable facade for framework adapters.
+
+- `get()` returns the current value without tracking a dependency.
+- `subscribe(fn)` invokes `fn` with the current value on every
+  effective change.
+- `version()` returns the monotonic version, suitable as a token
+  for `useSyncExternalStore`.
+
+#### Returns
+
+[`ObservableValue`](../interfaces/internal_.ObservableValue.md)\<`any`\>
+
+#### Inherited from
+
+[ReactiveItem](ReactiveItem.md).[toObservable](ReactiveItem.md#toobservable)
+
+#### Defined in
+
+[src/reactives/ReactiveItem.js:332](https://github.com/supercat1337/store2/blob/16b98b1eeb525c194544e8c7935c505c824c9de2/src/reactives/ReactiveItem.js#L332)

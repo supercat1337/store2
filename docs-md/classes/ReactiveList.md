@@ -2,28 +2,16 @@
 
 # Class: ReactiveList\<T\>
 
-ReactiveList is a reactive array-like structure that stores values of any type.
-It automatically chooses the appropriate reactive item:
-- Objects and arrays are wrapped with `ShallowReactive` (shallow property tracking).
-- Primitives (numbers, strings, booleans, etc.) are wrapped with `Atom`.
+ReactiveList is a reactive array-like structure that stores values of any
+type.
 
-The list supports adding, removing, updating, and splicing items while maintaining
-full reactivity. Subscribers are notified only once per batch of changes.
+Primitives (numbers, strings, booleans) are wrapped in `Atom`; objects
+and arrays are wrapped in `ShallowReactive`. Every mutation — adding,
+removing, replacing, reordering — is batched into a single notification.
 
-**`Example`**
-
-```js
-const list = new ReactiveList();
-
-list.subscribe(() => {
-    console.log('List changed:', list.toArray());
-});
-
-list.add(1, 2, 3);                // numbers -> stored as Atom
-list.setItem(1, 42);
-list.removeRange(0, 1);
-list.setItems([{ a: 1 }, { b: 2 }]); // objects -> stored as ShallowReactive
-```
+Internally the list is backed by a `Store` indexed by string positions,
+plus a separate `Atom` tracking the list length. This is not part of the
+public contract; treat the list as an opaque reactive array.
 
 ## Type parameters
 
@@ -41,6 +29,7 @@ list.setItems([{ a: 1 }, { b: 2 }]); // objects -> stored as ShallowReactive
 
 - [#lengthAtom](ReactiveList.md##lengthatom)
 - [#store](ReactiveList.md##store)
+- [path](ReactiveList.md#path)
 
 ### Accessors
 
@@ -55,14 +44,20 @@ list.setItems([{ a: 1 }, { b: 2 }]); // objects -> stored as ShallowReactive
 - [clear](ReactiveList.md#clear)
 - [destroy](ReactiveList.md#destroy)
 - [getItem](ReactiveList.md#getitem)
+- [getItemVersionAt](ReactiveList.md#getitemversionat)
+- [getVersion](ReactiveList.md#getversion)
+- [hydrate](ReactiveList.md#hydrate)
 - [removeFirstItem](ReactiveList.md#removefirstitem)
 - [removeItem](ReactiveList.md#removeitem)
 - [removeLastItem](ReactiveList.md#removelastitem)
 - [removeRange](ReactiveList.md#removerange)
+- [serialize](ReactiveList.md#serialize)
 - [setItem](ReactiveList.md#setitem)
 - [setItems](ReactiveList.md#setitems)
 - [subscribe](ReactiveList.md#subscribe)
 - [toArray](ReactiveList.md#toarray)
+- [toJSON](ReactiveList.md#tojson)
+- [toObservable](ReactiveList.md#toobservable)
 
 ## Constructors
 
@@ -84,7 +79,7 @@ Creates a new empty ReactiveList.
 
 #### Defined in
 
-src/complex/ReactiveList.js:57
+src/complex/ReactiveList.js:55
 
 ## Properties
 
@@ -94,7 +89,7 @@ src/complex/ReactiveList.js:57
 
 #### Defined in
 
-src/complex/ReactiveList.js:49
+src/complex/ReactiveList.js:47
 
 ___
 
@@ -104,7 +99,21 @@ ___
 
 #### Defined in
 
-src/complex/ReactiveList.js:52
+src/complex/ReactiveList.js:50
+
+___
+
+### path
+
+• **path**: `string` = `''`
+
+Local path of this list. Empty unless set by the user. Used by
+snapshot tooling to build dotted paths when the list is nested inside
+a `Store`.
+
+#### Defined in
+
+src/complex/ReactiveList.js:44
 
 ## Accessors
 
@@ -112,7 +121,10 @@ src/complex/ReactiveList.js:52
 
 • `get` **isDestroyed**(): `boolean`
 
-Indicates whether the list has been destroyed.
+Returns `true` after `destroy()` has been called.
+
+After destruction, all mutating methods throw and only this getter
+remains safe to call.
 
 #### Returns
 
@@ -120,7 +132,7 @@ Indicates whether the list has been destroyed.
 
 #### Defined in
 
-src/complex/ReactiveList.js:356
+src/complex/ReactiveList.js:382
 
 ___
 
@@ -128,7 +140,10 @@ ___
 
 • `get` **length**(): `number`
 
-Returns the current length of the list.
+The current number of items in the list.
+
+Reading this property inside a tracked scope registers a dependency,
+so the enclosing effect re-runs whenever items are added or removed.
 
 #### Returns
 
@@ -136,7 +151,7 @@ Returns the current length of the list.
 
 #### Defined in
 
-src/complex/ReactiveList.js:195
+src/complex/ReactiveList.js:208
 
 ## Methods
 
@@ -144,25 +159,20 @@ src/complex/ReactiveList.js:195
 
 ▸ **#createReactiveItem**(`value`, `name`): [`ShallowReactive`](ShallowReactive.md)\<`any`\>
 
-Creates a reactive wrapper for the given value.
-Uses ShallowReactive for objects/arrays, Atom for items.
-
 #### Parameters
 
-| Name | Type | Description |
-| :------ | :------ | :------ |
-| `value` | `any` | The value to wrap. |
-| `name` | `string` | The name to assign to the reactive item (used for debugging). |
+| Name | Type |
+| :------ | :------ |
+| `value` | `any` |
+| `name` | `string` |
 
 #### Returns
 
 [`ShallowReactive`](ShallowReactive.md)\<`any`\>
 
-The reactive wrapper.
-
 #### Defined in
 
-src/complex/ReactiveList.js:74
+src/complex/ReactiveList.js:69
 
 ___
 
@@ -170,15 +180,12 @@ ___
 
 ▸ **#updateReactiveItem**(`wrapper`, `newValue`): `void`
 
-Updates the value of a reactive wrapper.
-Works for both Atom and ShallowReactive.
-
 #### Parameters
 
-| Name | Type | Description |
-| :------ | :------ | :------ |
-| `wrapper` | [`ShallowReactive`](ShallowReactive.md)\<`any`\> | The reactive wrapper. |
-| `newValue` | `any` | The new value to set. |
+| Name | Type |
+| :------ | :------ |
+| `wrapper` | [`ShallowReactive`](ShallowReactive.md)\<`any`\> |
+| `newValue` | `any` |
 
 #### Returns
 
@@ -186,7 +193,7 @@ Works for both Atom and ShallowReactive.
 
 #### Defined in
 
-src/complex/ReactiveList.js:89
+src/complex/ReactiveList.js:86
 
 ___
 
@@ -194,13 +201,18 @@ ___
 
 ▸ **add**(`...values`): `void`
 
-Adds one or more items to the end of the list.
+Appends one or more values to the end of the list.
+
+Each value is wrapped according to its type — primitives become
+`Atom`, objects and arrays become `ShallowReactive`. The whole
+operation produces a single notification, regardless of how many
+values are added.
 
 #### Parameters
 
-| Name | Type | Description |
-| :------ | :------ | :------ |
-| `...values` | `T`[] | The values to add. Primitives are wrapped in `Atom`, objects and arrays are wrapped in `ShallowReactive`. |
+| Name | Type |
+| :------ | :------ |
+| `...values` | `T`[] |
 
 #### Returns
 
@@ -218,13 +230,15 @@ ___
 
 Removes all items from the list.
 
+The length becomes `0` and every item is destroyed.
+
 #### Returns
 
 `void`
 
 #### Defined in
 
-src/complex/ReactiveList.js:335
+src/complex/ReactiveList.js:357
 
 ___
 
@@ -232,188 +246,12 @@ ___
 
 ▸ **destroy**(): `void`
 
-Destroys the list, releasing all internal resources.
-After destruction, any method call (except `isDestroyed`) will throw an error.
+Destroys the list and releases its internal store.
+
+After this call, all mutating methods throw. Idempotent — subsequent
+calls are no-ops.
 
 #### Returns
-
-`void`
-
-#### Defined in
-
-src/complex/ReactiveList.js:343
-
-___
-
-### getItem
-
-▸ **getItem**(`index`): `T`
-
-Retrieves the value at the given index.
-
-#### Parameters
-
-| Name | Type | Description |
-| :------ | :------ | :------ |
-| `index` | `number` | The index of the item to retrieve. |
-
-#### Returns
-
-`T`
-
-The value, or undefined if the index is out of bounds.
-
-#### Defined in
-
-src/complex/ReactiveList.js:138
-
-___
-
-### removeFirstItem
-
-▸ **removeFirstItem**(): `void`
-
-Removes the first item of the list.
-
-#### Returns
-
-`void`
-
-#### Defined in
-
-src/complex/ReactiveList.js:328
-
-___
-
-### removeItem
-
-▸ **removeItem**(`index`): `void`
-
-Removes the item at the given index.
-
-#### Parameters
-
-| Name | Type | Description |
-| :------ | :------ | :------ |
-| `index` | `number` | The index of the item to remove. |
-
-#### Returns
-
-`void`
-
-#### Defined in
-
-src/complex/ReactiveList.js:314
-
-___
-
-### removeLastItem
-
-▸ **removeLastItem**(): `void`
-
-Removes the last item of the list.
-
-#### Returns
-
-`void`
-
-#### Defined in
-
-src/complex/ReactiveList.js:321
-
-___
-
-### removeRange
-
-▸ **removeRange**(`startIndex`, `count`): `void`
-
-Removes elements from the list starting at `startIndex` and removing `count` items.
-Remaining elements are shifted left. The operation is batched to emit only one notification.
-
-#### Parameters
-
-| Name | Type | Description |
-| :------ | :------ | :------ |
-| `startIndex` | `number` | The index at which to start removal. |
-| `count` | `number` | The number of elements to remove. |
-
-#### Returns
-
-`void`
-
-#### Defined in
-
-src/complex/ReactiveList.js:263
-
-___
-
-### setItem
-
-▸ **setItem**(`index`, `value`): `void`
-
-Updates the value at the specified index.
-
-#### Parameters
-
-| Name | Type | Description |
-| :------ | :------ | :------ |
-| `index` | `number` | The index to update. |
-| `value` | `T` | The new value. Primitives become `Atom`, objects/arrays become `ShallowReactive`. |
-
-#### Returns
-
-`void`
-
-#### Defined in
-
-src/complex/ReactiveList.js:174
-
-___
-
-### setItems
-
-▸ **setItems**(`values`): `void`
-
-Replaces the entire content of the list with the given array.
-
-#### Parameters
-
-| Name | Type | Description |
-| :------ | :------ | :------ |
-| `values` | `T`[] | The new array of values. Wrapping follows the same rules as `add()`. |
-
-#### Returns
-
-`void`
-
-#### Defined in
-
-src/complex/ReactiveList.js:207
-
-___
-
-### subscribe
-
-▸ **subscribe**(`fn`): () => `void`
-
-Subscribes a callback to be invoked whenever the list changes.
-The callback receives a Map of updates with details about changed items.
-
-#### Parameters
-
-| Name | Type | Description |
-| :------ | :------ | :------ |
-| `fn` | (`updates`: `Map`\<`string`, [`UpdateDataRecord`](internal_.UpdateDataRecord.md)\>) => `void` | The callback function. |
-
-#### Returns
-
-`fn`
-
-A function to unsubscribe the callback.
-
-▸ (): `void`
-
-##### Returns
 
 `void`
 
@@ -423,18 +261,348 @@ src/complex/ReactiveList.js:367
 
 ___
 
+### getItem
+
+▸ **getItem**(`index`): `T`
+
+Returns the value at the given index, or `undefined` if the index is
+out of bounds.
+
+Reads through the reactive wrapper, so a call inside a tracked scope
+registers a dependency on the item at that index.
+
+#### Parameters
+
+| Name | Type |
+| :------ | :------ |
+| `index` | `number` |
+
+#### Returns
+
+`T`
+
+#### Defined in
+
+src/complex/ReactiveList.js:141
+
+___
+
+### getItemVersionAt
+
+▸ **getItemVersionAt**(`index`): `number`
+
+Returns the version of the item at the given index, or `-1` if the
+index is out of bounds.
+
+Framework adapters use this to implement fine-grained list selectors
+without re-rendering the whole list on every change.
+
+#### Parameters
+
+| Name | Type |
+| :------ | :------ |
+| `index` | `number` |
+
+#### Returns
+
+`number`
+
+#### Defined in
+
+src/complex/ReactiveList.js:468
+
+___
+
+### getVersion
+
+▸ **getVersion**(): `number`
+
+Monotonic version counter, bumped on every effective change of the
+list, including changes that come from nested items.
+
+The value is stable between notifications, which makes it suitable
+as a snapshot token for `useSyncExternalStore`.
+
+#### Returns
+
+`number`
+
+#### Defined in
+
+src/complex/ReactiveList.js:451
+
+___
+
+### hydrate
+
+▸ **hydrate**(`data`): `void`
+
+Applies data produced by `serialize()`.
+
+Uses `setItems` internally, so the whole replacement is batched and
+subscribers fire once. Silently ignores malformed input.
+
+#### Parameters
+
+| Name | Type |
+| :------ | :------ |
+| `data` | `any` |
+
+#### Returns
+
+`void`
+
+#### Defined in
+
+src/complex/ReactiveList.js:436
+
+___
+
+### removeFirstItem
+
+▸ **removeFirstItem**(): `void`
+
+Removes the first item. No-op if the list is empty.
+
+#### Returns
+
+`void`
+
+#### Defined in
+
+src/complex/ReactiveList.js:348
+
+___
+
+### removeItem
+
+▸ **removeItem**(`index`): `void`
+
+Removes the item at the given index.
+
+Shorthand for `removeRange(index, 1)`. No-op if `index` is out of
+bounds.
+
+#### Parameters
+
+| Name | Type |
+| :------ | :------ |
+| `index` | `number` |
+
+#### Returns
+
+`void`
+
+#### Defined in
+
+src/complex/ReactiveList.js:334
+
+___
+
+### removeLastItem
+
+▸ **removeLastItem**(): `void`
+
+Removes the last item. No-op if the list is empty.
+
+#### Returns
+
+`void`
+
+#### Defined in
+
+src/complex/ReactiveList.js:341
+
+___
+
+### removeRange
+
+▸ **removeRange**(`startIndex`, `count`): `void`
+
+Removes `count` items starting at `startIndex`.
+
+Remaining items shift left to fill the gap; the tail positions are
+destroyed. The whole operation produces a single notification.
+
+No-op if `count <= 0`, `startIndex < 0`, or `startIndex >= length`.
+If `count` exceeds the number of items from `startIndex` to the end,
+it is clamped.
+
+#### Parameters
+
+| Name | Type |
+| :------ | :------ |
+| `startIndex` | `number` |
+| `count` | `number` |
+
+#### Returns
+
+`void`
+
+#### Defined in
+
+src/complex/ReactiveList.js:282
+
+___
+
+### serialize
+
+▸ **serialize**(): `any`
+
+Returns a serializable representation of the list's contents.
+
+The shape is `{ type: 'list', value: [...] }`, matching the
+serialization protocol used by reactive items.
+
+#### Returns
+
+`any`
+
+#### Defined in
+
+src/complex/ReactiveList.js:411
+
+___
+
+### setItem
+
+▸ **setItem**(`index`, `value`): `void`
+
+Replaces the value at the specified index.
+
+The whole operation produces a single notification. No-op if `index`
+is out of bounds.
+
+#### Parameters
+
+| Name | Type |
+| :------ | :------ |
+| `index` | `number` |
+| `value` | `T` |
+
+#### Returns
+
+`void`
+
+#### Defined in
+
+src/complex/ReactiveList.js:184
+
+___
+
+### setItems
+
+▸ **setItems**(`values`): `void`
+
+Replaces the entire content of the list with the given array.
+
+Existing positions are updated in place; positions beyond the new
+length are destroyed; new positions are created. The whole operation
+produces a single notification.
+
+#### Parameters
+
+| Name | Type |
+| :------ | :------ |
+| `values` | `T`[] |
+
+#### Returns
+
+`void`
+
+#### Defined in
+
+src/complex/ReactiveList.js:224
+
+___
+
+### subscribe
+
+▸ **subscribe**(`fn`): () => `void`
+
+Subscribes a function to changes of the list.
+
+The callback receives a `Map` of update paths to `UpdateDataRecord`
+instances. It is invoked once per batch of effective changes,
+regardless of how many items were affected.
+
+#### Parameters
+
+| Name | Type |
+| :------ | :------ |
+| `fn` | (`updates`: `Map`\<`string`, [`UpdateDataRecord`](internal_.UpdateDataRecord.md)\>) => `void` |
+
+#### Returns
+
+`fn`
+
+An unsubscribe function.
+
+▸ (): `void`
+
+##### Returns
+
+`void`
+
+#### Defined in
+
+src/complex/ReactiveList.js:396
+
+___
+
 ### toArray
 
 ▸ **toArray**(): `T`[]
 
 Returns a shallow copy of all items in the list as a plain array.
 
+The array is newly allocated on each call; mutating it does not
+affect the list. Elements that are reactive objects are returned as
+their underlying values, not as wrappers.
+
 #### Returns
 
 `T`[]
 
-An array containing all values.
+#### Defined in
+
+src/complex/ReactiveList.js:161
+
+___
+
+### toJSON
+
+▸ **toJSON**(): `T`[]
+
+Returns the list's contents as a plain array. Enables
+`JSON.stringify(list)` to produce useful output.
+
+#### Returns
+
+`T`[]
 
 #### Defined in
 
-src/complex/ReactiveList.js:154
+src/complex/ReactiveList.js:424
+
+___
+
+### toObservable
+
+▸ **toObservable**(): [`ObservableValue`](../interfaces/internal_.ObservableValue.md)\<`any`[]\>
+
+Returns a minimal observable facade for framework adapters.
+
+- `get()` returns a fresh array via `toArray()`.
+- `subscribe(fn)` invokes `fn` with the array on every effective
+  change of the list.
+- `version()` returns the monotonic version, suitable as a token
+  for `useSyncExternalStore`.
+
+#### Returns
+
+[`ObservableValue`](../interfaces/internal_.ObservableValue.md)\<`any`[]\>
+
+#### Defined in
+
+src/complex/ReactiveList.js:490

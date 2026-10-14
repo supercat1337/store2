@@ -43,7 +43,7 @@ Processes an incoming message.
 | `ctx` | `Object` | Context. |
 | `ctx.recipients` | `Set`\<[`ReactiveItem`](ReactiveItem.md)\> | - |
 | `ctx.sender` | [`ReactiveItem`](ReactiveItem.md) | - |
-| `engineState` | [`Engine`](internal_.Engine.md) | The engine's state container (provides getters/setters). |
+| `engineState` | [`Engine`](Engine.md) | The engine's state container (provides getters/setters). |
 | `setError` | `Function` | Callback to set the engine's error. |
 | `setShouldRecalc` | `Function` | Callback to set the shouldRecalc flag. |
 | `notifyDependents` | `Function` | Callback to notify dependents of a message. |
@@ -56,4 +56,4 @@ Processes an incoming message.
 
 #### Defined in
 
-src/core/MessageHandler.js:32
+[src/core/MessageHandler.js:32](https://github.com/supercat1337/store2/blob/16b98b1eeb525c194544e8c7935c505c824c9de2/src/core/MessageHandler.js#L32)

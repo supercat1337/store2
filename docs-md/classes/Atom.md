@@ -2,50 +2,15 @@
 
 # Class: Atom\<T\>
 
-Atom is a reactive item that holds a value. It is the base unit of reactive state.
+Atom is a reactive item that holds a single value.
 
-**`Example`**
+It is the base unit of reactive state — a single mutable cell. Reads
+inside a tracked scope (a `Computed` body, an `autorun`, or a `reaction`)
+register a dependency; writes schedule a change notification.
 
-```js
-const a = new Atom(0); // same as const a = atom(0);
-const b = new Atom(0);
-
-const c = new Computed(() => a.value + b.value);
-
-c.subscribe(() => {
-    console.log(c.name, c.value);
-});
-
-a.subscribe(() => {
-    console.log(a.name, a.value);
-});
-
-b.subscribe(() => {
-    console.log(b.name, b.value);
-});
-
-a.value = 1;
-// Output:
-//a 1
-//c 1
-
-a.value = 2;
-// Output:
-//a 2
-//c 2
-b.value = 2;
-// Output:
-//b 2
-//c 4
-
-a.value = 3;
-// Output:
-//a 3
-//c 5
-
-a.value = 3;
-// Output: nothing
-```
+Objects assigned to an Atom are shallow-cloned, so mutating nested
+properties does not trigger reactivity. Use `Collection` or
+`ShallowReactive` for structures that need deep updates.
 
 ## Type parameters
 
@@ -70,10 +35,12 @@ a.value = 3;
 - [#currentValue](Atom.md##currentvalue)
 - [engine](Atom.md#engine)
 - [name](Atom.md#name)
+- [path](Atom.md#path)
 
 ### Accessors
 
 - [isDestroyed](Atom.md#isdestroyed)
+- [type](Atom.md#type)
 - [value](Atom.md#value)
 - [valueUntracked](Atom.md#valueuntracked)
 
@@ -85,13 +52,18 @@ a.value = 3;
 - [equals](Atom.md#equals)
 - [getLastError](Atom.md#getlasterror)
 - [getValue](Atom.md#getvalue)
+- [getVersion](Atom.md#getversion)
 - [hasError](Atom.md#haserror)
 - [hasSubscribers](Atom.md#hassubscribers)
+- [hydrate](Atom.md#hydrate)
 - [onDestroy](Atom.md#ondestroy)
 - [onHasSubscribers](Atom.md#onhassubscribers)
 - [onNoSubscribers](Atom.md#onnosubscribers)
 - [peekValue](Atom.md#peekvalue)
+- [serialize](Atom.md#serialize)
 - [subscribe](Atom.md#subscribe)
+- [toJSON](Atom.md#tojson)
+- [toObservable](Atom.md#toobservable)
 
 ## Constructors
 
@@ -99,7 +71,7 @@ a.value = 3;
 
 • **new Atom**\<`T`\>(`value`, `options?`): [`Atom`](Atom.md)\<`T`\>
 
-Initializes an Atom instance with a given value.
+Creates a new Atom with the given initial value.
 
 #### Type parameters
 
@@ -111,10 +83,10 @@ Initializes an Atom instance with a given value.
 
 | Name | Type | Description |
 | :------ | :------ | :------ |
-| `value` | `T` | The initial value of the Atom. |
-| `options?` | `Object` | Options. |
-| `options.compareFunction` | (`a`: `T`, `b`: `T`) => `boolean` | A function that compares two values for equality. |
-| `options.name` | `string` | The name of the Atom. |
+| `value` | `T` | The initial value. |
+| `options?` | `Object` |  |
+| `options.compareFunction` | (`a`: `T`, `b`: `T`) => `boolean` | Custom equality function. Defaults to shallow comparison. |
+| `options.name` | `string` | Debug name used in error messages. |
 
 #### Returns
 
@@ -126,7 +98,7 @@ Initializes an Atom instance with a given value.
 
 #### Defined in
 
-src/reactives/Atom.js:64
+src/reactives/Atom.js:34
 
 ## Properties
 
@@ -136,13 +108,22 @@ src/reactives/Atom.js:64
 
 #### Defined in
 
-src/reactives/Atom.js:55
+src/reactives/Atom.js:24
 
 ___
 
 ### engine
 
-• **engine**: [`Engine`](internal_.Engine.md)
+• **engine**: [`Engine`](Engine.md)
+
+The reactive engine driving this item. Provides access to the
+dependency graph, version counter, and type tag — the machinery
+ecosystem packages (DevTools, diagnostics, structural sharing)
+need to inspect.
+
+Treat the engine as read-only from outside the library. Constructing
+reactive items directly (via `ReactiveItem` factories) is the only
+supported way to create an engine.
 
 #### Inherited from
 
@@ -150,7 +131,7 @@ ___
 
 #### Defined in
 
-[src/reactives/ReactiveItem.js:14](https://github.com/supercat1337/store2/blob/c65c4382ec22e2f61bbc31b786846fc524db2820/src/reactives/ReactiveItem.js#L14)
+[src/reactives/ReactiveItem.js:29](https://github.com/supercat1337/store2/blob/16b98b1eeb525c194544e8c7935c505c824c9de2/src/reactives/ReactiveItem.js#L29)
 
 ___
 
@@ -158,13 +139,33 @@ ___
 
 • **name**: `string`
 
+Debug name assigned at construction. Used in error messages and
+DevTools listings. Empty string when not set.
+
 #### Inherited from
 
 [ReactiveItem](ReactiveItem.md).[name](ReactiveItem.md#name)
 
 #### Defined in
 
-src/reactives/Atom.js:79
+src/reactives/Atom.js:49
+
+___
+
+### path
+
+• **path**: `string` = `''`
+
+Local path assigned by the immediate container. Top-level items get a
+path equal to their key in the root store; standalone items keep `''`.
+
+#### Inherited from
+
+[ReactiveItem](ReactiveItem.md).[path](ReactiveItem.md#path)
+
+#### Defined in
+
+[src/reactives/ReactiveItem.js:43](https://github.com/supercat1337/store2/blob/16b98b1eeb525c194544e8c7935c505c824c9de2/src/reactives/ReactiveItem.js#L43)
 
 ## Accessors
 
@@ -172,11 +173,14 @@ src/reactives/Atom.js:79
 
 • `get` **isDestroyed**(): `boolean`
 
+Returns `true` if `destroy()` has been called.
+
+After destruction, reads and writes throw. This getter is the only
+operation that remains safe to call.
+
 #### Returns
 
 `boolean`
-
-True if the reactive item has been destroyed, false otherwise.
 
 #### Inherited from
 
@@ -184,7 +188,28 @@ ReactiveItem.isDestroyed
 
 #### Defined in
 
-[src/reactives/ReactiveItem.js:181](https://github.com/supercat1337/store2/blob/c65c4382ec22e2f61bbc31b786846fc524db2820/src/reactives/ReactiveItem.js#L181)
+[src/reactives/ReactiveItem.js:276](https://github.com/supercat1337/store2/blob/16b98b1eeb525c194544e8c7935c505c824c9de2/src/reactives/ReactiveItem.js#L276)
+
+___
+
+### type
+
+• `get` **type**(): [`ReactiveItemType`](../modules/internal_.md#reactiveitemtype)
+
+The numeric type tag of this item: `1` for `Atom`, `2` for `Computed`,
+`3` for `Collection`, `4` for `ShallowReactive`.
+
+#### Returns
+
+[`ReactiveItemType`](../modules/internal_.md#reactiveitemtype)
+
+#### Inherited from
+
+ReactiveItem.type
+
+#### Defined in
+
+[src/reactives/ReactiveItem.js:60](https://github.com/supercat1337/store2/blob/16b98b1eeb525c194544e8c7935c505c824c9de2/src/reactives/ReactiveItem.js#L60)
 
 ___
 
@@ -192,28 +217,27 @@ ___
 
 • `get` **value**(): `T`
 
-Returns the current value of the Atom. If the engine is destroyed, an error is thrown.
+The current value.
+
+Reading this property inside a tracked scope registers a dependency.
+Writing it schedules a change if the new value differs from the
+current one.
 
 #### Returns
 
 `T`
 
-The current value of the Atom.
-
 #### Defined in
 
-src/reactives/Atom.js:128
+src/reactives/Atom.js:101
 
 • `set` **value**(`value`): `void`
 
-Sets the value of the Atom. If the new value is the same as the current value, no action is taken.
-Updates the current value to the new value if they are different.
-
 #### Parameters
 
-| Name | Type | Description |
-| :------ | :------ | :------ |
-| `value` | `T` | The new value to set for the Atom. |
+| Name | Type |
+| :------ | :------ |
+| `value` | `T` |
 
 #### Returns
 
@@ -221,7 +245,7 @@ Updates the current value to the new value if they are different.
 
 #### Defined in
 
-src/reactives/Atom.js:89
+src/reactives/Atom.js:54
 
 ___
 
@@ -229,40 +253,19 @@ ___
 
 • `get` **valueUntracked**(): `T`
 
-Returns the current value of the Atom without tracking it for dependency management.
-This is useful when you want to access the value without affecting its reactive state.
+Returns the current value without registering a dependency.
+
+Shorthand for `getValue({ untracked: true })`. Useful when you need
+to peek at an atom inside a `Computed` or `autorun` without making it
+re-run when the atom changes.
 
 #### Returns
 
 `T`
 
-The current value of the Atom.
-
-**`Example`**
-
-```js
-const a = atom(0);
-const b = atom(0);
-const c = computed(() => a.value + b.valueUntracked, {
-    name: "c",
-});
-
-c.subscribe(() => {
-    console.log(c.name, c.value);
-});
-console.log("change b.value");
-b.value++;
-b.value++;
-console.log("change a.value");
-a.value++;
-// Output: c 3
-a.value++;
-// Output: c 4
-```
-
 #### Defined in
 
-src/reactives/Atom.js:157
+src/reactives/Atom.js:114
 
 ## Methods
 
@@ -270,7 +273,10 @@ src/reactives/Atom.js:157
 
 ▸ **clearAllSubscribers**(): `void`
 
-Removes all subscribers, including listeners for "#has-subscribers" and "#no-subscribers" events.
+Removes all subscribers, including lifecycle listeners.
+
+After this call, the item no longer invokes any user callbacks until
+a new subscription is made.
 
 #### Returns
 
@@ -282,7 +288,7 @@ Removes all subscribers, including listeners for "#has-subscribers" and "#no-sub
 
 #### Defined in
 
-[src/reactives/ReactiveItem.js:48](https://github.com/supercat1337/store2/blob/c65c4382ec22e2f61bbc31b786846fc524db2820/src/reactives/ReactiveItem.js#L48)
+[src/reactives/ReactiveItem.js:109](https://github.com/supercat1337/store2/blob/16b98b1eeb525c194544e8c7935c505c824c9de2/src/reactives/ReactiveItem.js#L109)
 
 ___
 
@@ -290,7 +296,9 @@ ___
 
 ▸ **clearSubscribers**(): `void`
 
-Removes all "change" subscribers. Listeners for "#has-subscribers" and "#no-subscribers" are not removed.
+Removes all change subscribers, keeping lifecycle listeners
+registered via `onHasSubscribers`, `onNoSubscribers`, and
+`onDestroy`.
 
 #### Returns
 
@@ -302,7 +310,7 @@ Removes all "change" subscribers. Listeners for "#has-subscribers" and "#no-subs
 
 #### Defined in
 
-[src/reactives/ReactiveItem.js:41](https://github.com/supercat1337/store2/blob/c65c4382ec22e2f61bbc31b786846fc524db2820/src/reactives/ReactiveItem.js#L41)
+[src/reactives/ReactiveItem.js:99](https://github.com/supercat1337/store2/blob/16b98b1eeb525c194544e8c7935c505c824c9de2/src/reactives/ReactiveItem.js#L99)
 
 ___
 
@@ -310,9 +318,11 @@ ___
 
 ▸ **destroy**(): `void`
 
-Destroys the reactive item. This method is useful for cleaning up after a reactive item
-that is no longer needed. It calls destroy on the engine of the reactive item, which
-removes all dependencies, dependents and subscribers, and marks the engine as destroyed.
+Destroys the item and tears down its dependency graph.
+
+All subscribers are detached, all dependencies are released, and any
+further read or write throws. Idempotent — subsequent calls are
+no-ops.
 
 #### Returns
 
@@ -324,7 +334,7 @@ removes all dependencies, dependents and subscribers, and marks the engine as de
 
 #### Defined in
 
-[src/reactives/ReactiveItem.js:154](https://github.com/supercat1337/store2/blob/c65c4382ec22e2f61bbc31b786846fc524db2820/src/reactives/ReactiveItem.js#L154)
+[src/reactives/ReactiveItem.js:240](https://github.com/supercat1337/store2/blob/16b98b1eeb525c194544e8c7935c505c824c9de2/src/reactives/ReactiveItem.js#L240)
 
 ___
 
@@ -332,22 +342,23 @@ ___
 
 ▸ **equals**(`a`, `b?`): `boolean`
 
-Checks if two values are equal. If the compareFn property is a function, it is used to compare the two values.
-If the compareFn property is not a function, the values are compared using the === operator.
-If the optional second argument is not provided, the value of the reactive item is used.
+Returns `true` if the two values are considered equal by this item's
+comparator.
+
+When the second argument is omitted, it is compared against the
+item's current value. Uses the custom `compareFunction` if one was
+provided at construction, otherwise falls back to shallow equality.
 
 #### Parameters
 
-| Name | Type | Description |
-| :------ | :------ | :------ |
-| `a` | `any` | The first value to compare. |
-| `b?` | `any` | The second value to compare. If not provided, the value of the reactive item is used. |
+| Name | Type |
+| :------ | :------ |
+| `a` | `any` |
+| `b?` | `any` |
 
 #### Returns
 
 `boolean`
-
-True if the two values are equal, false otherwise.
 
 #### Inherited from
 
@@ -355,7 +366,7 @@ True if the two values are equal, false otherwise.
 
 #### Defined in
 
-[src/reactives/ReactiveItem.js:166](https://github.com/supercat1337/store2/blob/c65c4382ec22e2f61bbc31b786846fc524db2820/src/reactives/ReactiveItem.js#L166)
+[src/reactives/ReactiveItem.js:256](https://github.com/supercat1337/store2/blob/16b98b1eeb525c194544e8c7935c505c824c9de2/src/reactives/ReactiveItem.js#L256)
 
 ___
 
@@ -363,14 +374,14 @@ ___
 
 ▸ **getLastError**(): `Error`
 
-Returns the last error that occurred while calculating the value of the reactive item,
-or null if there is no error.
+Returns the last error produced by this item, or `null`.
+
+For `Computed`, this is the error thrown during the most recent
+evaluation. The error is preserved until a dependency changes.
 
 #### Returns
 
 `Error`
-
-The last error that occurred, or null if there is no error.
 
 #### Inherited from
 
@@ -378,7 +389,7 @@ The last error that occurred, or null if there is no error.
 
 #### Defined in
 
-[src/reactives/ReactiveItem.js:91](https://github.com/supercat1337/store2/blob/c65c4382ec22e2f61bbc31b786846fc524db2820/src/reactives/ReactiveItem.js#L91)
+[src/reactives/ReactiveItem.js:166](https://github.com/supercat1337/store2/blob/16b98b1eeb525c194544e8c7935c505c824c9de2/src/reactives/ReactiveItem.js#L166)
 
 ___
 
@@ -386,21 +397,22 @@ ___
 
 ▸ **getValue**(`options?`): `T`
 
-Retrieves the current value of the Atom. If the engine is destroyed, an error is thrown.
-Tracks the Atom for dependency management.
+Returns the current value.
+
+When `options.untracked` is `false` (the default), registers this
+atom as a dependency of the enclosing tracked scope. Pass
+`{ untracked: true }` to read without creating a dependency.
 
 #### Parameters
 
-| Name | Type | Description |
-| :------ | :------ | :------ |
-| `options?` | `Object` | Optional options. If `untracked` is `false`, the Atom value will be added to the dependencyTracker. |
-| `options.untracked?` | `boolean` | - |
+| Name | Type |
+| :------ | :------ |
+| `options?` | `Object` |
+| `options.untracked?` | `boolean` |
 
 #### Returns
 
 `T`
-
-The current value of the Atom.
 
 #### Overrides
 
@@ -408,7 +420,31 @@ The current value of the Atom.
 
 #### Defined in
 
-src/reactives/Atom.js:119
+src/reactives/Atom.js:87
+
+___
+
+### getVersion
+
+▸ **getVersion**(): `number`
+
+Monotonic version counter, bumped on every effective change.
+
+Useful as a stable token for `useSyncExternalStore` and for cache
+invalidation: comparing two `getVersion()` results tells you whether
+the value changed, without reading it.
+
+#### Returns
+
+`number`
+
+#### Inherited from
+
+[ReactiveItem](ReactiveItem.md).[getVersion](ReactiveItem.md#getversion)
+
+#### Defined in
+
+[src/reactives/ReactiveItem.js:73](https://github.com/supercat1337/store2/blob/16b98b1eeb525c194544e8c7935c505c824c9de2/src/reactives/ReactiveItem.js#L73)
 
 ___
 
@@ -416,17 +452,14 @@ ___
 
 ▸ **hasError**(): `boolean`
 
-Returns true if there has been an error while calculating the value of the reactive item,
-false otherwise. This method returns true if the reactive item has been destroyed, if the
-reactive item has an error, or if the calculation of the value of the reactive item has
-thrown an error.
+Returns `true` if reading the value currently throws or has thrown.
+
+For `Computed`, this forces a read to determine whether the current
+dependencies are valid.
 
 #### Returns
 
 `boolean`
-
-Whether there has been an error while calculating the value of the
-reactive item.
 
 #### Inherited from
 
@@ -434,7 +467,7 @@ reactive item.
 
 #### Defined in
 
-[src/reactives/ReactiveItem.js:103](https://github.com/supercat1337/store2/blob/c65c4382ec22e2f61bbc31b786846fc524db2820/src/reactives/ReactiveItem.js#L103)
+[src/reactives/ReactiveItem.js:178](https://github.com/supercat1337/store2/blob/16b98b1eeb525c194544e8c7935c505c824c9de2/src/reactives/ReactiveItem.js#L178)
 
 ___
 
@@ -442,13 +475,12 @@ ___
 
 ▸ **hasSubscribers**(): `boolean`
 
-Returns true if there are any subscribers, false otherwise.
+Returns `true` if at least one change subscriber is currently
+registered.
 
 #### Returns
 
 `boolean`
-
-Whether there are any subscribers.
 
 #### Inherited from
 
@@ -456,7 +488,35 @@ Whether there are any subscribers.
 
 #### Defined in
 
-[src/reactives/ReactiveItem.js:56](https://github.com/supercat1337/store2/blob/c65c4382ec22e2f61bbc31b786846fc524db2820/src/reactives/ReactiveItem.js#L56)
+[src/reactives/ReactiveItem.js:119](https://github.com/supercat1337/store2/blob/16b98b1eeb525c194544e8c7935c505c824c9de2/src/reactives/ReactiveItem.js#L119)
+
+___
+
+### hydrate
+
+▸ **hydrate**(`data`): `void`
+
+Applies data previously produced by `serialize()`.
+
+Silently ignores malformed input.
+
+#### Parameters
+
+| Name | Type |
+| :------ | :------ |
+| `data` | `any` |
+
+#### Returns
+
+`void`
+
+#### Overrides
+
+[ReactiveItem](ReactiveItem.md).[hydrate](ReactiveItem.md#hydrate)
+
+#### Defined in
+
+src/reactives/Atom.js:137
 
 ___
 
@@ -464,20 +524,21 @@ ___
 
 ▸ **onDestroy**(`fn`): () => `void`
 
-Subscribes a function to be called when the reactive item is destroyed.
-The function is called with no arguments.
+Registers a callback that fires when the item is destroyed.
+
+The callback receives the destroyed item as its only argument.
 
 #### Parameters
 
-| Name | Type | Description |
-| :------ | :------ | :------ |
-| `fn` | (`reactiveItem`: [`ReactiveItem`](ReactiveItem.md)) => `void` | The function to be called. |
+| Name | Type |
+| :------ | :------ |
+| `fn` | (`reactiveItem`: [`ReactiveItem`](ReactiveItem.md)) => `void` |
 
 #### Returns
 
 `fn`
 
-A function that unsubscribes the given function.
+An unsubscribe function.
 
 ▸ (): `void`
 
@@ -491,7 +552,7 @@ A function that unsubscribes the given function.
 
 #### Defined in
 
-[src/reactives/ReactiveItem.js:139](https://github.com/supercat1337/store2/blob/c65c4382ec22e2f61bbc31b786846fc524db2820/src/reactives/ReactiveItem.js#L139)
+[src/reactives/ReactiveItem.js:224](https://github.com/supercat1337/store2/blob/16b98b1eeb525c194544e8c7935c505c824c9de2/src/reactives/ReactiveItem.js#L224)
 
 ___
 
@@ -499,20 +560,23 @@ ___
 
 ▸ **onHasSubscribers**(`fn`): () => `void`
 
-Subscribes a function to be called whenever a subscriber is added to the reactive item.
-The function is called with no arguments.
+Registers a callback that fires when the first change subscriber is
+added.
+
+Useful for lazy initialisation: start expensive work only when
+somebody actually listens.
 
 #### Parameters
 
-| Name | Type | Description |
-| :------ | :------ | :------ |
-| `fn` | () => `void` | The function to be called. |
+| Name | Type |
+| :------ | :------ |
+| `fn` | () => `void` |
 
 #### Returns
 
 `fn`
 
-A function that unsubscribes the given function.
+An unsubscribe function.
 
 ▸ (): `void`
 
@@ -526,7 +590,7 @@ A function that unsubscribes the given function.
 
 #### Defined in
 
-[src/reactives/ReactiveItem.js:119](https://github.com/supercat1337/store2/blob/c65c4382ec22e2f61bbc31b786846fc524db2820/src/reactives/ReactiveItem.js#L119)
+[src/reactives/ReactiveItem.js:198](https://github.com/supercat1337/store2/blob/16b98b1eeb525c194544e8c7935c505c824c9de2/src/reactives/ReactiveItem.js#L198)
 
 ___
 
@@ -534,20 +598,23 @@ ___
 
 ▸ **onNoSubscribers**(`fn`): () => `void`
 
-Subscribes a function to be called whenever there are no longer any subscribers.
-The function is called with no arguments.
+Registers a callback that fires when the last change subscriber is
+removed.
+
+Useful for cleanup: stop timers or subscriptions that only make sense
+while somebody is listening.
 
 #### Parameters
 
-| Name | Type | Description |
-| :------ | :------ | :------ |
-| `fn` | () => `void` | The function to be called. |
+| Name | Type |
+| :------ | :------ |
+| `fn` | () => `void` |
 
 #### Returns
 
 `fn`
 
-A function that unsubscribes the given function.
+An unsubscribe function.
 
 ▸ (): `void`
 
@@ -561,7 +628,7 @@ A function that unsubscribes the given function.
 
 #### Defined in
 
-[src/reactives/ReactiveItem.js:129](https://github.com/supercat1337/store2/blob/c65c4382ec22e2f61bbc31b786846fc524db2820/src/reactives/ReactiveItem.js#L129)
+[src/reactives/ReactiveItem.js:212](https://github.com/supercat1337/store2/blob/16b98b1eeb525c194544e8c7935c505c824c9de2/src/reactives/ReactiveItem.js#L212)
 
 ___
 
@@ -569,13 +636,15 @@ ___
 
 ▸ **peekValue**(): `any`
 
-Retrieves the current value of the reactive item.
+Returns the current value without registering a dependency and
+without triggering recalculation for `Computed`.
+
+For `Computed`, this returns the last cached value even if it is
+stale. To force a fresh value, use `.value` or `.getValue()`.
 
 #### Returns
 
 `any`
-
-The current value of the reactive item.
 
 #### Inherited from
 
@@ -583,7 +652,27 @@ The current value of the reactive item.
 
 #### Defined in
 
-[src/reactives/ReactiveItem.js:82](https://github.com/supercat1337/store2/blob/c65c4382ec22e2f61bbc31b786846fc524db2820/src/reactives/ReactiveItem.js#L82)
+[src/reactives/ReactiveItem.js:154](https://github.com/supercat1337/store2/blob/16b98b1eeb525c194544e8c7935c505c824c9de2/src/reactives/ReactiveItem.js#L154)
+
+___
+
+### serialize
+
+▸ **serialize**(): `any`
+
+Returns a serializable representation of the current value.
+
+#### Returns
+
+`any`
+
+#### Overrides
+
+[ReactiveItem](ReactiveItem.md).[serialize](ReactiveItem.md#serialize)
+
+#### Defined in
+
+src/reactives/Atom.js:123
 
 ___
 
@@ -591,20 +680,26 @@ ___
 
 ▸ **subscribe**(`fn`, `options?`): () => `void`
 
-Subscribes a function to be called whenever the value of this reactive item changes.
+Subscribes a function to changes of this item.
+
+The callback receives a `Map` of property paths to
+`UpdateDataRecord` instances. It is invoked once per batch of
+effective changes.
 
 #### Parameters
 
 | Name | Type | Description |
 | :------ | :------ | :------ |
-| `fn` | (`updates`: `Map`\<`string`, [`UpdateDataRecord`](internal_.UpdateDataRecord.md)\>) => `void` | The function to be called whenever the value of this reactive item changes. |
-| `options?` | `Object` | Optional options. |
-| `options.delay` | `number` | The delay in milliseconds before the function is called. |
-| `options.signal` | `AbortSignal` | The signal to abort the subscription. |
+| `fn` | (`updates`: `Map`\<`string`, [`UpdateDataRecord`](internal_.UpdateDataRecord.md)\>) => `void` |  |
+| `options?` | `Object` |  |
+| `options.delay` | `number` | Debounce delay in milliseconds. |
+| `options.signal` | `AbortSignal` | Cancels the subscription when aborted. |
 
 #### Returns
 
 `fn`
+
+An unsubscribe function.
 
 ▸ (): `void`
 
@@ -618,4 +713,55 @@ Subscribes a function to be called whenever the value of this reactive item chan
 
 #### Defined in
 
-[src/reactives/ReactiveItem.js:34](https://github.com/supercat1337/store2/blob/c65c4382ec22e2f61bbc31b786846fc524db2820/src/reactives/ReactiveItem.js#L34)
+[src/reactives/ReactiveItem.js:90](https://github.com/supercat1337/store2/blob/16b98b1eeb525c194544e8c7935c505c824c9de2/src/reactives/ReactiveItem.js#L90)
+
+___
+
+### toJSON
+
+▸ **toJSON**(): `any`
+
+Returns the current value as a plain JavaScript value, for use with
+`JSON.stringify()`. Subclasses override this to return their raw
+value without proxies.
+
+This is a debug/inspection convenience, not a persistence protocol —
+use `serialize()` for snapshots.
+
+#### Returns
+
+`any`
+
+#### Inherited from
+
+[ReactiveItem](ReactiveItem.md).[toJSON](ReactiveItem.md#tojson)
+
+#### Defined in
+
+[src/reactives/ReactiveItem.js:304](https://github.com/supercat1337/store2/blob/16b98b1eeb525c194544e8c7935c505c824c9de2/src/reactives/ReactiveItem.js#L304)
+
+___
+
+### toObservable
+
+▸ **toObservable**(): [`ObservableValue`](../interfaces/internal_.ObservableValue.md)\<`any`\>
+
+Returns a minimal observable facade for framework adapters.
+
+- `get()` returns the current value without tracking a dependency.
+- `subscribe(fn)` invokes `fn` with the current value on every
+  effective change.
+- `version()` returns the monotonic version, suitable as a token
+  for `useSyncExternalStore`.
+
+#### Returns
+
+[`ObservableValue`](../interfaces/internal_.ObservableValue.md)\<`any`\>
+
+#### Inherited from
+
+[ReactiveItem](ReactiveItem.md).[toObservable](ReactiveItem.md#toobservable)
+
+#### Defined in
+
+[src/reactives/ReactiveItem.js:332](https://github.com/supercat1337/store2/blob/16b98b1eeb525c194544e8c7935c505c824c9de2/src/reactives/ReactiveItem.js#L332)

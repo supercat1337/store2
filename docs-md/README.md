@@ -260,6 +260,152 @@ console.log(list.toArray()); // [42, 3]
 
 ---
 
+## Contexts & Ecosystem
+
+The core primitives work with a process-wide default context out of the
+box. For SSR, testing, DevTools, and persistence, `store2` exposes explicit
+contexts.
+
+### `Store2Context`
+
+A context owns the services that drive reactivity — ID generation, batch
+and subscriber coordination, dependency tracking, change propagation — plus
+the plugin and root registries. Multiple contexts can coexist in one
+process without sharing state.
+
+```js
+import {
+    createStore2Context,
+    runWithContext,
+    getCurrentContext,
+    defaultContext,
+} from '@supercat1337/store2';
+
+const ctx = createStore2Context({ name: 'app' });
+
+runWithContext(ctx, () => {
+    const a = atom(0); // binds to ctx
+    a.engine.context === ctx; // true
+});
+
+// Outside the run: reads use the default context again.
+getCurrentContext() === defaultContext; // true
+```
+
+This is what makes server-side rendering safe: each request gets its own
+context, and items created inside it never leak across requests.
+
+### Named actions and middleware
+
+`context.action(name, fn, payload?)` wraps a synchronous or asynchronous
+body in a logical action. Middleware registered via `addMiddleware()`
+forms a Koa-style chain around every action.
+
+```js
+await ctx.action('add todo', async () => {
+    todos.value = [...todos.value, newTodo];
+});
+
+ctx.addMiddleware(async (action, next) => {
+    console.log('→', action.name);
+    try {
+        return await next();
+    } finally {
+        console.log('←', action.name);
+    }
+});
+```
+
+Actions are the unit of work that DevTools, loggers, and time-travel
+plugins reason about. Each has an `ActionInfo` with `id`, `name`,
+`payload`, `parentId`, `startTime`, `endTime`, and `error`.
+
+### Plugins
+
+A plugin is an object with `name`, `install(context)`, and any subset of
+lifecycle hooks — `onActionStart`/`onActionEnd`, `onBatchStart`/`onBatchEnd`,
+`onUpdate`, `onComputedRecalc`, `onSubscriberRun`, `onDestroy`, `onError`.
+
+```js
+ctx.use({
+    name: 'logger',
+    install() {},
+    onActionEnd: action => console.log('✓', action.name),
+});
+```
+
+Plugin errors are caught and logged. A plugin cannot break reactivity.
+
+### Snapshots and hydration
+
+Every reactive item implements `serialize(): any` and `hydrate(data): void`.
+`Store` and `ReactiveList` compose them recursively. `Computed` returns
+`null` — derived state is recalculated on hydration, never persisted.
+
+Register the roots you want to snapshot, then capture and restore:
+
+```js
+ctx.registerRoot('app', store);
+
+const snap = ctx.snapshot();
+// { version: 1, timestamp: ..., roots: { app: { type: 'store', ... } } }
+
+ctx.hydrate(snap); // normal restore
+ctx.hydrate(snap, { timeTravel: true }); // DevTools rewind
+```
+
+Snapshots are JSON-safe by construction. Persistence adapters
+(`localStorage`, `IndexedDB`, SSR transport) sit on top of this protocol;
+migration logic belongs in the adapter, not in the core.
+
+### DevTools
+
+DevTools are available as a separate package:
+
+```bash
+npm install @supercat1337/store2-devtools
+```
+
+```js
+import { createStore2Context } from '@supercat1337/store2';
+import { createDevToolsPlugin } from '@supercat1337/store2-devtools';
+
+const ctx = createStore2Context({ name: 'app' });
+ctx.registerRoot('app', store);
+
+const devtools = createDevToolsPlugin({ name: 'my app', maxAge: 50 });
+ctx.use(devtools);
+
+await ctx.action('increment', () => {
+    count.value++;
+});
+
+devtools.getHistory().length; // 3: baseline + 2 actions
+devtools.jumpTo(1);
+count.value; // 1
+```
+
+The plugin records a snapshot on every completed action, exposes
+`jumpTo`, and optionally bridges to the Redux DevTools Extension when
+`__REDUX_DEVTOOLS_EXTENSION__` is present in the host environment.
+
+### Testing
+
+```js
+import { createStore2Context, runWithContext } from '@supercat1337/store2';
+
+const ctx = createStore2Context({ name: 'test' });
+runWithContext(ctx, () => {
+    // create items, register roots, install plugins here
+});
+
+// ctx.flush() forces pending subscribers to run synchronously.
+```
+
+Use a fresh context per test to avoid leaking state between test cases.
+
+---
+
 ## Advanced APIs
 
 ### `autorun(fn, options)`
@@ -303,7 +449,7 @@ a.value = 10; // triggers reaction with updates
 **Options:**
 
 - `passUpdates` (boolean, default `true`) – if `true`, passes a `Map` of updates to `effectFn`. Set to `false` to disable.
-- `recomputeDependencies` (boolean, default `true`) – re‑collect dependencies on each run.
+- `recomputeDependencies` (default `true`) – if `true`, dependencies are re‑collected on every run. Set to `false` to capture dependencies only once (static collection).
 - `delay` (number) – debounce delay in milliseconds.
 - `signal` (AbortSignal) – cancellation signal.
 - `onError` (function) – error handler.
@@ -403,9 +549,10 @@ counter.increment(); // logs "Double: 2"
 
 ## Important Notes / Known Limitations
 
-- **Static dependency collection in `autorun` and `reaction`**  
-  Dependencies are captured **only once** – during the first execution of the tracked function. If your function conditionally uses different reactive items (e.g., inside an `if` statement), changes to items not used in the first run **will not** trigger the effect.  
-  **Workaround:** Use `computed` to pre‑compute conditional values, or restructure your effect so that all possible dependencies are accessed during the first run (e.g., by reading them unconditionally).
+> **Dynamic dependency collection in `autorun` and `reaction`**  
+> By default, dependencies are **re‑collected on every execution** of the tracked function. This means that conditional reads (e.g., inside an `if` statement) are handled correctly: if a condition changes and a new reactive item is read, it will be added to the dependency set for subsequent runs.  
+> However, note that **only the items actually read during a particular execution are tracked** for that run. If a reactive item is not read because a condition is false, a change to that item will **not** trigger a re‑run until the item is read again (i.e., when the condition becomes true in some later execution).  
+> If you need to **fix the dependency set once** (static collection), set the `recomputeDependencies: false` option. This can improve performance in cases where dependencies never change, but be cautious with conditional logic.
 
 - **`Atom` clones objects shallowly**  
   When you assign an object/array to an `Atom`, it is shallow‑cloned (`Object.assign` or `slice`). Mutating nested properties **will not** trigger reactivity. Use `Collection` or `ShallowReactive` for nested structures.
@@ -429,7 +576,10 @@ counter.increment(); // logs "Double: 2"
 
 ## TypeScript Support
 
-This library is written in plain JavaScript with JSDoc annotations. Type definitions are generated automatically and shipped with the package. You get full IntelliSense and type checking in supporting editors.
+This library is written in plain JavaScript with JSDoc annotations.
+Type definitions are bundled into a single `dist/types.d.ts` via
+`@microsoft/api-extractor`. Full IntelliSense and type checking work in
+supporting editors without an extra `@types` package.
 
 ---
 
@@ -438,6 +588,9 @@ This library is written in plain JavaScript with JSDoc annotations. Type definit
 - **Full API Documentation**: [`docs-md/README.md`](docs-md/README.md)
 - **Examples**: Check out the [`examples/`](./examples) folder for runnable code snippets covering all features.
 - **Architecture Overview**: For a deep dive into the internal architecture, dependency graph, batching, and core engine mechanics, see [`AGENTS.md`](./AGENTS.md) — this file is also intended for AI assistants and advanced developers.
+- **Public API contract**: [`etc/store2.api.md`](./etc/store2.api.md) — a
+  machine-generated snapshot of the public surface. Changed on every
+  release; review the diff before merging API-affecting PRs.
 
 ---
 
