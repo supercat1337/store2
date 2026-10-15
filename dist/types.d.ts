@@ -2210,8 +2210,17 @@ export declare class Store2Context {
         timeTravel?: boolean;
     }): void;
     /**
-     * Releases the context and forgets all installed plugins, roots, and
-     * migrations.
+     * Releases the context and forgets all installed plugins, roots,
+     * migrations, and registered items.
+     *
+     * Also detaches every listener this context registered with its mode
+     * controller. Without this step the controller's listener lists would
+     * keep references to closures that capture `this`, preventing the
+     * context from being garbage-collected — and, in structured-clone
+     * scenarios (AVA workers, worker_threads), causing `DataCloneError`
+     * on the function references.
+     *
+     * Idempotent — subsequent calls are no-ops.
      */
     dispose(): void;
     #private;

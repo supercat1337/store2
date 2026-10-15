@@ -96,6 +96,19 @@ class Store2Context {
     /** @type {Map<number, import('../types.js').SnapshotMigration>} */
     #migrations = new Map();
 
+    /**
+     * Unsubscribe functions for every listener this context registered
+     * with its mode controller. Called during `dispose()` so that a
+     * disposed context does not keep a reference to its own internal
+     * closures through the controller's listener lists — otherwise the
+     * context cannot be garbage-collected, and cloning the controller
+     * (e.g. by AVA when serialising a failed test) throws on the
+     * function references.
+     *
+     * @type {Array<() => void>}
+     */
+    #modeControllerUnsubscribers = [];
+
     /** @type {boolean} */
     #pluginsSuspended = false;
 
@@ -121,32 +134,45 @@ class Store2Context {
             this.changedItemsController = options.changedItemsController;
         } else {
             this.changedItemsController = new ChangedItemsController(this.modeController);
-            this.modeController.on('beforeBatchModeEnd', () => {
-                this.changedItemsController.runSubscribers();
-                this.changedItemsController.clear();
-            });
+            this.#modeControllerUnsubscribers.push(
+                this.modeController.on('beforeBatchModeEnd', () => {
+                    this.changedItemsController.runSubscribers();
+                    this.changedItemsController.clear();
+                })
+            );
         }
 
-        this.modeController.on('batchModeStart', () => {
-            this.emitPlugin('onBatchStart', {
-                depth: this.modeController.batchDepth,
-                name: this.modeController.currentBatchName,
-                action: this.modeController.currentAction,
-            });
-        });
-        this.modeController.on('batchModeEnd', () => {
-            this.emitPlugin('onBatchEnd', {
-                depth: this.modeController.batchDepth,
-                name: this.modeController.currentBatchName,
-                action: this.modeController.currentAction,
-            });
-        });
-        this.modeController.onAction('actionStart', action => {
-            this.emitPlugin('onActionStart', action);
-        });
-        this.modeController.onAction('actionEnd', action => {
-            this.emitPlugin('onActionEnd', action);
-        });
+        this.#modeControllerUnsubscribers.push(
+            this.modeController.on('batchModeStart', () => {
+                this.emitPlugin('onBatchStart', {
+                    depth: this.modeController.batchDepth,
+                    name: this.modeController.currentBatchName,
+                    action: this.modeController.currentAction,
+                });
+            })
+        );
+
+        this.#modeControllerUnsubscribers.push(
+            this.modeController.on('batchModeEnd', () => {
+                this.emitPlugin('onBatchEnd', {
+                    depth: this.modeController.batchDepth,
+                    name: this.modeController.currentBatchName,
+                    action: this.modeController.currentAction,
+                });
+            })
+        );
+
+        this.#modeControllerUnsubscribers.push(
+            this.modeController.onAction('actionStart', action => {
+                this.emitPlugin('onActionStart', action);
+            })
+        );
+
+        this.#modeControllerUnsubscribers.push(
+            this.modeController.onAction('actionEnd', action => {
+                this.emitPlugin('onActionEnd', action);
+            })
+        );
     }
 
     /**
@@ -604,14 +630,33 @@ class Store2Context {
     }
 
     /**
-     * Releases the context and forgets all installed plugins, roots, and
-     * migrations.
+     * Releases the context and forgets all installed plugins, roots,
+     * migrations, and registered items.
+     *
+     * Also detaches every listener this context registered with its mode
+     * controller. Without this step the controller's listener lists would
+     * keep references to closures that capture `this`, preventing the
+     * context from being garbage-collected — and, in structured-clone
+     * scenarios (AVA workers, worker_threads), causing `DataCloneError`
+     * on the function references.
+     *
+     * Idempotent — subsequent calls are no-ops.
      */
     dispose() {
         if (this.#disposed) {
             return;
         }
         this.#disposed = true;
+
+        for (const unsubscribe of this.#modeControllerUnsubscribers) {
+            try {
+                unsubscribe();
+            } catch (e) {
+                console.error(e);
+            }
+        }
+        this.#modeControllerUnsubscribers = [];
+
         this.#middlewares.length = 0;
         this.#plugins.length = 0;
         this.#roots.clear();
